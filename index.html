@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Libabite Ops</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen" aria-label="Login">
+      <div class="login-card">
+        <div class="brand login-brand">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <div>
+            <strong>Libabite</strong>
+            <span>Roermond restaurant system</span>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow">Staff login</p>
+          <h1>Open your role workspace</h1>
+        </div>
+        <form id="loginForm" class="stacked-form">
+          <label>
+            Email
+            <input name="email" type="email" value="owner@libabite.nl" autocomplete="username" required>
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" value="admin123" autocomplete="current-password" required>
+          </label>
+          <button class="primary-btn" type="submit">Log In</button>
+        </form>
+        <div class="demo-logins" id="demoLogins" aria-label="Demo accounts"></div>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <div>
+            <strong>Libabite</strong>
+            <span>Roermond</span>
+          </div>
+        </div>
+        <nav class="nav-list" id="navList"></nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">All-in-one restaurant system</p>
+            <h1 id="viewTitle">Live Command Center</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-btn" id="resetDemoBtn" type="button" title="Reset demo data" aria-label="Reset demo data">R</button>
+            <button class="primary-btn" id="quickOrderBtn" type="button">
+              <span aria-hidden="true">+</span>
+              New Order
+            </button>
+            <div class="user-menu">
+              <div>
+                <strong id="currentUserName">Staff</strong>
+                <span id="currentUserRole">Role</span>
+              </div>
+              <button class="mini-btn" id="logoutBtn" type="button">Sign Out</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="view is-active" id="view-dashboard" data-title="Live Command Center">
+          <div class="metric-grid" id="metricGrid"></div>
+          <div class="dashboard-grid">
+            <section class="panel wide-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Single input flow</p>
+                  <h2>Orders drive kitchen, stock, drivers, and purchasing</h2>
+                </div>
+                <button class="ghost-btn" type="button" data-view-link="orders">Open Orders</button>
+              </div>
+              <div class="flow-map" aria-label="Connected workflow map">
+                <div class="flow-node">Order</div>
+                <div class="flow-line"></div>
+                <div class="flow-node">Kitchen</div>
+                <div class="flow-line"></div>
+                <div class="flow-node">Inventory</div>
+                <div class="flow-line"></div>
+                <div class="flow-node">Supplier</div>
+              </div>
+              <div class="order-stream" id="dashboardOrderStream"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Kitchen load</p>
+                  <h2>Stations</h2>
+                </div>
+              </div>
+              <div class="station-list" id="dashboardStations"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Purchasing</p>
+                  <h2>Reorder alerts</h2>
+                </div>
+              </div>
+              <div class="alert-list" id="dashboardAlerts"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-orders" data-title="Order Hub">
+          <div class="split-layout">
+            <section class="panel form-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Input once</p>
+                  <h2>Create order</h2>
+                </div>
+              </div>
+              <form id="orderForm" class="stacked-form">
+                <label>
+                  Channel
+                  <select name="channel">
+                    <option value="Dine-in">Dine-in POS</option>
+                    <option value="QR">Table QR</option>
+                    <option value="Website">Website</option>
+                    <option value="Phone">Phone</option>
+                    <option value="Uber Eats">Uber Eats</option>
+                    <option value="Takeaway">Takeaway</option>
+                  </select>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Guest or table
+                    <input name="customer" type="text" value="Table 7" autocomplete="off">
+                  </label>
+                  <label>
+                    Payment
+                    <select name="paymentStatus">
+                      <option value="Paid">Paid</option>
+                      <option value="Unpaid">Unpaid</option>
+                      <option value="Pay later">Pay later</option>
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Product
+                  <select name="productId" id="productSelect"></select>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Quantity
+                    <input name="quantity" id="orderQuantity" type="number" min="1" max="20" value="1">
+                  </label>
+                  <label>
+                    Fulfillment
+                    <select name="fulfillment">
+                      <option value="Kitchen">Kitchen</option>
+                      <option value="Delivery">Delivery</option>
+                      <option value="Pickup">Pickup</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="availability-card" id="orderAvailability" aria-live="polite"></div>
+                <div class="line-actions">
+                  <button class="ghost-btn" type="button" id="addOrderLineBtn">Add Item</button>
+                  <button class="ghost-btn quiet-btn" type="button" id="clearOrderDraftBtn">Clear Basket</button>
+                </div>
+                <div class="order-draft" id="orderDraft"></div>
+                <label>
+                  Notes
+                  <textarea name="notes" rows="3" placeholder="No onions, extra sauce, allergy note"></textarea>
+                </label>
+                <div class="form-actions">
+                  <button class="primary-btn" id="sendOrderBtn" type="submit">
+                    <span aria-hidden="true">+</span>
+                    Send Order
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Live queue</p>
+                  <h2>Orders</h2>
+                </div>
+                <div class="segmented" role="group" aria-label="Order filter">
+                  <button type="button" class="is-selected" data-order-filter="All">All</button>
+                  <button type="button" data-order-filter="Kitchen">Kitchen</button>
+                  <button type="button" data-order-filter="Delivery">Delivery</button>
+                </div>
+              </div>
+              <div class="order-list" id="orderList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-kitchen" data-title="Kitchen Screens">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Screen routing</p>
+                <h2>Station tickets</h2>
+              </div>
+              <div class="tabs" id="stationTabs" role="tablist" aria-label="Kitchen stations"></div>
+            </div>
+            <div class="ticket-board" id="ticketBoard"></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-inventory" data-title="Products & Inventory">
+          <div class="inventory-layout">
+            <section class="panel form-panel admin-product-only">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Sellable product</p>
+                  <h2>Create menu item</h2>
+                </div>
+              </div>
+              <form id="sellableProductForm" class="stacked-form">
+                <label>
+                  Product name
+                  <input name="name" type="text" value="Kefta Sandwich" autocomplete="off" required>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Product code/SKU
+                    <input name="code" type="text" value="KS-001" autocomplete="off" required>
+                  </label>
+                  <label>
+                    Category
+                    <select name="category" id="sellableCategory"></select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Kitchen station
+                    <select name="station" id="sellableStation"></select>
+                  </label>
+                  <label>
+                    Selling price
+                    <input name="price" type="number" min="0.01" step="0.01" value="9.50" required>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    VAT/tax setting
+                    <select name="vatSetting" id="sellableVat"></select>
+                  </label>
+                  <label>
+                    Product status
+                    <select name="active">
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </label>
+                </div>
+                <fieldset class="check-fieldset">
+                  <legend>Available for</legend>
+                  <div class="language-checks" id="sellableAvailabilityChecks"></div>
+                </fieldset>
+                <div class="recipe-builder">
+                  <div class="form-row">
+                    <label>
+                      Purchased product
+                      <select name="recipeIngredientId" id="sellableRecipeIngredient"></select>
+                    </label>
+                    <label>
+                      Usage quantity
+                      <input name="recipeQuantity" id="sellableRecipeQuantity" type="number" min="0.01" step="0.01" value="1">
+                    </label>
+                  </div>
+                  <div class="form-row align-end">
+                    <label>
+                      Usage unit
+                      <select name="recipeMeasure" id="sellableRecipeMeasure"></select>
+                    </label>
+                    <button class="ghost-btn" type="button" id="addRecipeLineBtn">Add Ingredient</button>
+                  </div>
+                  <div class="order-draft" id="sellableRecipeDraft"></div>
+                </div>
+                <button class="primary-btn" id="createSellableProductBtn" type="submit">Create Sellable Product</button>
+              </form>
+            </section>
+
+            <section class="panel form-panel admin-product-only">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Purchased product</p>
+                  <h2>Create ingredient</h2>
+                </div>
+              </div>
+              <form id="purchasedProductForm" class="stacked-form">
+                <label>
+                  Ingredient name
+                  <input name="name" type="text" value="Kefta Meat" autocomplete="off" required>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Supplier
+                    <input name="supplier" type="text" value="Halal Butcher Limburg" autocomplete="off" required>
+                  </label>
+                  <label>
+                    Purchase price
+                    <input name="purchasePrice" type="number" min="0.01" step="0.01" value="9.40" required>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Unit type
+                    <select name="unitType" id="purchasedUnitType"></select>
+                  </label>
+                  <label>
+                    Product status
+                    <select name="active">
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Current stock
+                    <input name="stock" type="number" min="0" step="0.01" value="4.2" required>
+                  </label>
+                  <label>
+                    Minimum stock
+                    <input name="min" type="number" min="0" step="0.01" value="3" required>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Maximum stock
+                    <input name="max" type="number" min="0" step="0.01" value="12" required>
+                  </label>
+                  <label>
+                    Storage location
+                    <select name="location" id="purchasedLocation" required></select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Custom location
+                    <input name="customLocation" type="text" autocomplete="off">
+                  </label>
+                  <label>
+                    Expiry date
+                    <input name="expiryDate" type="date">
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Barcode/QR code
+                    <input name="barcode" type="text" autocomplete="off">
+                  </label>
+                </div>
+                <button class="primary-btn" type="submit">Create Purchased Product</button>
+              </form>
+            </section>
+
+            <section class="panel form-panel" id="inventoryActionPanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Inventory actions</p>
+                  <h2>Move stock</h2>
+                </div>
+              </div>
+              <form id="inventoryActionForm" class="stacked-form">
+                <label>
+                  Purchased product
+                  <select name="ingredientId" id="inventoryActionIngredient"></select>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Action
+                    <select name="action" id="inventoryActionType"></select>
+                  </label>
+                  <label>
+                    Quantity
+                    <input name="quantity" id="inventoryActionQuantity" type="number" min="0" step="0.01" value="1">
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label id="inventoryFromLocationLabel">
+                    From location
+                    <select name="fromLocation" id="inventoryFromLocation"></select>
+                  </label>
+                  <label id="inventoryToLocationLabel">
+                    To location
+                    <select name="toLocation" id="inventoryToLocation"></select>
+                  </label>
+                </div>
+                <label id="inventoryCustomLocationLabel">
+                  Custom location
+                  <input name="customLocation" id="inventoryCustomLocation" type="text" autocomplete="off">
+                </label>
+                <button class="primary-btn" type="submit">Apply Stock Action</button>
+              </form>
+            </section>
+
+            <section class="panel" id="inventoryLowStockPanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Low-stock dashboard</p>
+                  <h2>Reorder list</h2>
+                </div>
+              </div>
+              <div class="alert-list" id="inventoryLowStockDashboard"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Stock by location</p>
+                  <h2>Purchased products</h2>
+                </div>
+              </div>
+              <div class="inventory-table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Stock</th>
+                      <th>Min/Max</th>
+                      <th>By location</th>
+                      <th>Supplier</th>
+                      <th>Cost</th>
+                      <th>Expiry/Code</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ingredientRows"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Stock history</p>
+                  <h2>Inventory log</h2>
+                </div>
+              </div>
+              <div class="activity-log" id="inventoryHistory"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Menu costing</p>
+                  <h2>Sellable products</h2>
+                </div>
+              </div>
+              <div class="recipe-list" id="recipeList"></div>
+            </section>
+
+            <section class="panel wide-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Auto purchasing</p>
+                  <h2>Supplier orders</h2>
+                </div>
+              </div>
+              <div class="supplier-list" id="supplierOrders"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-procedures" data-title="Procedures & Production">
+          <div class="procedure-layout">
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Shift checklist</p>
+                  <h2>Closing procedure</h2>
+                </div>
+              </div>
+              <div class="procedure-list" id="procedureList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Actual usage</p>
+                  <h2>Recipe execution</h2>
+                </div>
+              </div>
+              <form id="productionForm" class="stacked-form">
+                <label>
+                  Batch
+                  <select name="productId" id="productionProduct"></select>
+                </label>
+                <div class="production-fields" id="productionRecipeFields"></div>
+                <button class="primary-btn" type="submit">Record Batch</button>
+              </form>
+              <div class="activity-log" id="productionLog"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-team" data-title="Staff & Drivers">
+          <div class="team-layout">
+            <section class="panel form-panel admin-only" id="staffAdminPanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Access control</p>
+                  <h2>Create staff user</h2>
+                </div>
+              </div>
+              <form id="staffUserForm" class="stacked-form">
+                <label>
+                  Full name
+                  <input name="name" type="text" value="New Staff Member" autocomplete="off" required>
+                </label>
+                <label>
+                  Email
+                  <input name="email" type="email" value="new.staff@libabite.nl" autocomplete="off" required>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Role
+                    <select name="role" id="staffRoleSelect"></select>
+                  </label>
+                  <label>
+                    Password
+                    <input name="password" type="password" value="demo123" autocomplete="new-password" required>
+                  </label>
+                </div>
+                <label>
+                  Planned shift
+                  <input name="planned" type="text" value="12:00-20:00" autocomplete="off" required>
+                </label>
+                <button class="primary-btn" type="submit">Create User</button>
+              </form>
+            </section>
+
+            <section class="panel admin-only">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Role directory</p>
+                  <h2>System users</h2>
+                </div>
+              </div>
+              <div class="user-list" id="userList"></div>
+            </section>
+
+            <section class="panel" id="schedulePanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Time management</p>
+                  <h2>Today schedule</h2>
+                </div>
+              </div>
+              <div class="staff-list" id="staffList"></div>
+            </section>
+
+            <section class="panel" id="driversPanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Delivery app</p>
+                  <h2>Drivers</h2>
+                </div>
+              </div>
+              <div class="driver-map" aria-label="Driver location map">
+                <div class="map-grid"></div>
+                <span class="map-pin restaurant">R</span>
+                <span class="map-pin driver-a">D1</span>
+                <span class="map-pin driver-b">D2</span>
+                <svg viewBox="0 0 320 180" aria-hidden="true" focusable="false">
+                  <path d="M64 112 C120 80, 160 80, 228 44" />
+                  <path d="M68 116 C128 140, 188 132, 268 128" />
+                </svg>
+              </div>
+              <div class="driver-list" id="driverList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-settings" data-title="Restaurant Settings">
+          <div class="settings-layout">
+            <section class="panel form-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Restaurant profile</p>
+                  <h2>Libabite Roermond</h2>
+                </div>
+              </div>
+              <form id="settingsForm" class="stacked-form">
+                <label>
+                  Restaurant name
+                  <input name="restaurantName" type="text" required>
+                </label>
+                <label>
+                  Location
+                  <input name="location" type="text" required>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Currency
+                    <select name="currency">
+                      <option value="EUR">Euro</option>
+                    </select>
+                  </label>
+                  <label>
+                    Default language
+                    <select name="defaultLanguage" id="defaultLanguageSelect"></select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Opens
+                    <input name="opensAt" type="time" required>
+                  </label>
+                  <label>
+                    Closes
+                    <input name="closesAt" type="time" required>
+                  </label>
+                </div>
+                <div class="language-checks" id="supportedLanguageChecks"></div>
+                <button class="primary-btn" type="submit">Save Settings</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Data model</p>
+                  <h2>Phase 1 database structure</h2>
+                </div>
+              </div>
+              <div class="schema-grid" id="schemaGrid"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-reservations" data-title="Reservations">
+          <div class="split-layout">
+            <section class="panel form-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Own booking flow</p>
+                  <h2>Add reservation</h2>
+                </div>
+              </div>
+              <form id="reservationForm" class="stacked-form">
+                <label>
+                  Name
+                  <input name="name" type="text" value="Nour Family" autocomplete="off">
+                </label>
+                <div class="form-row">
+                  <label>
+                    Guests
+                    <input name="guests" type="number" min="1" max="30" value="4" required>
+                  </label>
+                  <label>
+                    Time
+                    <input name="time" type="time" value="19:30" required>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Table
+                    <select name="tableId" id="reservationTable" required></select>
+                  </label>
+                  <label>
+                    Source
+                    <select name="source">
+                      <option value="Website">Website</option>
+                      <option value="Google">Google link</option>
+                      <option value="Phone">Phone</option>
+                      <option value="Instagram">Instagram</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="availability-card" id="reservationAvailability" aria-live="polite"></div>
+                <button class="primary-btn" id="bookReservationBtn" type="submit">Book Table</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Floor planning</p>
+                  <h2>Tonight</h2>
+                </div>
+              </div>
+              <div class="table-capacity-grid" id="tableCapacityGrid"></div>
+              <div class="reservation-list" id="reservationList"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="dist/main.js"></script>
+  </body>
+</html>
