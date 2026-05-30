@@ -2,18 +2,81 @@
 // This is the TypeScript port of the original static prototype.
 // It intentionally keeps the domain/rendering code together for the first
 // migration step so behavior stays identical while the app gains a typed build.
-const STORAGE_KEY = "libabite-ops-state-v1";
+const STORAGE_KEY = "libabite-ops-state-v3";
 const RESERVATION_TURNOVER_MINUTES = 90;
 const MINUTE_MS = 60 * 1000;
-const TICKET_STATUS_FLOW = ["Queued", "Preparing", "Ready", "Done"];
+const TICKET_STATUS_FLOW = ["Queued", "Accepted", "Preparing", "Ready", "Done"];
+const TICKET_STATUSES = ["Queued", "Accepted", "Preparing", "Delayed", "Ready", "Done"];
+const ORDER_STATUSES = ["New", "Sent to kitchen", "Preparing", "Delayed", "Ready", "Served", "Paid", "Cancelled"];
+const ORDER_TYPE_OPTIONS = [
+    { value: "Dine-in", label: "Dine-in", availabilityKey: "dineIn", fulfillment: "Kitchen", requiresTable: true },
+    { value: "Takeaway", label: "Takeaway", availabilityKey: "takeaway", fulfillment: "Pickup", requiresTable: false },
+    { value: "Delivery", label: "Delivery", availabilityKey: "delivery", fulfillment: "Delivery", requiresTable: false },
+    { value: "Phone/message order", label: "Phone/message order", availabilityKey: "takeaway", fulfillment: "Pickup", requiresTable: false },
+    { value: "QR table order", label: "QR table order", availabilityKey: "qrOrdering", fulfillment: "Kitchen", requiresTable: true },
+    { value: "Website order", label: "Website order", availabilityKey: "websiteOrdering", fulfillment: "Pickup", requiresTable: false },
+    { value: "External delivery app order", label: "External delivery app order", availabilityKey: "externalDeliveryApps", fulfillment: "Delivery", requiresTable: false }
+];
+const LEGACY_ORDER_TYPE_MAP = {
+    QR: "QR table order",
+    Website: "Website order",
+    Phone: "Phone/message order",
+    "Uber Eats": "External delivery app order"
+};
+const UNPAID_PAYMENT_METHOD = "Unpaid / pay later";
+const DEFAULT_PAID_PAYMENT_METHOD = "Cash";
+const PAYMENT_METHOD_OPTIONS = [
+    { value: UNPAID_PAYMENT_METHOD, label: "Unpaid / pay later", paid: false },
+    { value: "Cash", label: "Cash", paid: true },
+    { value: "Card", label: "Card", paid: true },
+    { value: "Online payment", label: "Online payment", paid: true },
+    { value: "External delivery app payment", label: "External delivery app payment", paid: true }
+];
+const VAT_RATES = {
+    standard: 0.21,
+    reduced: 0.09,
+    zero: 0
+};
+const LINE_MODIFIER_OPTIONS = ["No onion", "Extra sauce", "Spicy", "Cutlery", "Allergy check"];
 const TICKET_SLA_MINUTES = {
+    "Burger station": 12,
+    "Cold mezza station": 8,
+    "Sweets station": 10,
+    "Drinks station": 6,
+    "Grill station": 14,
+    "Packaging station": 5,
     "Burger": 12,
     "Cold Mezza": 8,
     "Sweets": 10,
+    "Grill": 14,
     default: 12
 };
 const SLA_WARNING_WINDOW_MINUTES = 3;
-const KITCHEN_STATIONS = ["Burger", "Cold Mezza", "Sweets", "Drinks", "Grill", "Prep", "Packaging", "Main Kitchen"];
+const KITCHEN_STATIONS = ["Burger station", "Cold mezza station", "Sweets station", "Drinks station", "Grill station", "Packaging station", "Main kitchen"];
+const KITCHEN_STATION_ALIASES = {
+    burger: "Burger station",
+    "burger station": "Burger station",
+    "cold mezza": "Cold mezza station",
+    "cold mezza station": "Cold mezza station",
+    mezza: "Cold mezza station",
+    prep: "Cold mezza station",
+    sweets: "Sweets station",
+    sweet: "Sweets station",
+    dessert: "Sweets station",
+    desserts: "Sweets station",
+    "sweets station": "Sweets station",
+    drinks: "Drinks station",
+    drink: "Drinks station",
+    bar: "Drinks station",
+    "drinks station": "Drinks station",
+    grill: "Grill station",
+    "grill station": "Grill station",
+    packaging: "Packaging station",
+    "packaging station": "Packaging station",
+    kitchen: "Main kitchen",
+    "main kitchen": "Main kitchen",
+    "main kitchen station": "Main kitchen"
+};
 const PRODUCT_CATEGORIES = ["Kefta", "Sandwiches", "Burgers", "Cold Mezza", "Sweets", "Drinks", "Packaging", "Other"];
 const VAT_OPTIONS = [
     { id: "standard", label: "Standard VAT" },
@@ -46,6 +109,7 @@ const UNIT_TYPES = [
     { id: "packages", label: "packages", shortLabel: "packages", recipeMeasure: "units" }
 ];
 const DEFAULT_INVENTORY_LOCATIONS = [
+    "Fridge",
     "Fridge 1",
     "Fridge 2",
     "Freezer",
@@ -61,6 +125,27 @@ const INVENTORY_ACTIONS = [
     { id: "waste", label: "Mark wasted" },
     { id: "correct", label: "Correct manually" }
 ];
+const WASTE_REASONS = [
+    { id: "Spoiled", label: "Spoiled" },
+    { id: "Dropped", label: "Dropped" },
+    { id: "Wrong preparation", label: "Wrong preparation" },
+    { id: "Expired", label: "Expired" },
+    { id: "Returned", label: "Returned" },
+    { id: "Other", label: "Other" }
+];
+const RECIPE_APPLIES_OPTIONS = [
+    { id: "all", label: "Every order" },
+    { id: "takeawayDelivery", label: "Takeaway/delivery only" }
+];
+const DEFAULT_MARGIN_TARGET = 65;
+const DEFAULT_MARGIN_MINIMUM = 55;
+const DEFAULT_RECIPE_ORDER_CONTEXT = { channel: "Dine-in", fulfillment: "Kitchen" };
+const TAKEAWAY_DELIVERY_RECIPE_CONTEXT = { channel: "Takeaway", fulfillment: "Delivery" };
+const PHASE_11_SEED_INGREDIENT_IDS = ["minced-beef", "onion-herb-mix", "kefta-spice-blend"];
+const PHASE_11_SEED_PRODUCT_IDS = ["kefta-mix-batch"];
+const CUSTOMER_QR_CHANNEL = "QR table order";
+const CUSTOMER_QR_ORDER_CONTEXT = { channel: CUSTOMER_QR_CHANNEL, fulfillment: "Kitchen" };
+const QR_CODE_STATUSES = ["Active", "Disabled"];
 const ROLE_ORDER = ["owner_admin", "manager", "waiter_cashier", "kitchen_staff", "driver"];
 const ROLE_DEFINITIONS = {
     owner_admin: {
@@ -74,8 +159,12 @@ const ROLE_DEFINITIONS = {
         canCreateOrders: true,
         canAdvanceTickets: true,
         canManageInventory: true,
+        canRecordWaste: true,
         canManageProducts: true,
         canManageProcedures: true,
+        canCreateProcedures: true,
+        canReviewProcedures: true,
+        canCompleteProcedures: true,
         canManageReservations: true,
         operationalRole: "Owner/Admin"
     },
@@ -88,7 +177,10 @@ const ROLE_DEFINITIONS = {
         canCreateOrders: true,
         canAdvanceTickets: true,
         canManageInventory: true,
+        canRecordWaste: true,
         canManageProcedures: true,
+        canReviewProcedures: true,
+        canCompleteProcedures: true,
         canManageReservations: true,
         operationalRole: "Manager"
     },
@@ -96,8 +188,10 @@ const ROLE_DEFINITIONS = {
         label: "Waiter/Cashier",
         icon: "WC",
         homeView: "orders",
-        views: ["dashboard", "orders", "reservations"],
+        views: ["dashboard", "orders", "procedures", "reservations"],
         canCreateOrders: true,
+        canRecordWaste: true,
+        canCompleteProcedures: true,
         canManageReservations: true,
         operationalRole: "Front"
     },
@@ -107,14 +201,17 @@ const ROLE_DEFINITIONS = {
         homeView: "kitchen",
         views: ["dashboard", "kitchen", "procedures"],
         canAdvanceTickets: true,
+        canRecordWaste: true,
         canManageProcedures: true,
+        canCompleteProcedures: true,
         operationalRole: "Kitchen"
     },
     driver: {
         label: "Driver",
         icon: "DR",
         homeView: "team",
-        views: ["dashboard", "team"],
+        views: ["dashboard", "procedures", "team"],
+        canCompleteProcedures: true,
         operationalRole: "Driver"
     }
 };
@@ -124,6 +221,10 @@ const LANGUAGE_OPTIONS = [
     { id: "tr", label: "Turkish" },
     { id: "en", label: "English" }
 ];
+const PROCEDURE_DEPARTMENTS = ["Kitchen", "Front of house", "Cashier", "Delivery", "Cleaning", "Food safety", "Management"];
+const PROCEDURE_FREQUENCIES = ["Daily", "Weekly", "Monthly", "Per shift"];
+const PROCEDURE_ASSIGNED_ROLES = ["All staff", "Owner/Admin", "Manager", "Kitchen", "Front", "Cashier", "Driver"];
+const PROCEDURE_COMPLETION_STATUSES = ["Done", "Problem", "Skipped"];
 const DEFAULT_RESTAURANT_SETTINGS = {
     restaurantName: "Libabite",
     location: "Roermond, Netherlands",
@@ -138,23 +239,26 @@ const DATA_MODEL = [
     { name: "users", fields: "id, name, email, role, password, status" },
     { name: "roles", fields: "role id, label, visible views, permissions" },
     { name: "restaurant_settings", fields: "name, location, currency, hours, languages" },
-    { name: "sellable_products", fields: "name, code/SKU, category, kitchen station, price, VAT, status, availability, recipe links" },
+    { name: "sellable_products", fields: "name, code/SKU, category, kitchen station, price, VAT, status, availability, margin settings, recipe links" },
     { name: "purchased_products", fields: "ingredient, supplier, purchase price, unit type, min/max, total stock, stock by location, expiry, barcode, status" },
     { name: "inventory_locations", fields: "default restaurant locations, custom locations, per-location quantities" },
     { name: "inventory_actions", fields: "add, remove, transfer, waste, manual correction, stock history" },
-    { name: "orders", fields: "channel, customer, payment, fulfillment, line items" },
-    { name: "kitchen_tickets", fields: "order, product, station, status, SLA times" },
-    { name: "reservations", fields: "guest, time, table, source, status" }
+    { name: "waste_records", fields: "product, quantity, unit, reason, staff member, date/time, notes, cost" },
+    { name: "recipes", fields: "sellable product, ingredient, quantity, unit, waste %, preparation station, notes, fulfillment rule" },
+    { name: "orders", fields: "channel, customer, payment status/method, staff member, fulfillment, line items" },
+    { name: "kitchen_tickets", fields: "order, product, station, status, priority, issue note, SLA times" },
+    { name: "table_qr_codes", fields: "token, table, area, active/disabled status, customer order URL" },
+    { name: "reservations", fields: "guest, time, table, source, status" },
+    { name: "procedures", fields: "title, department, language, steps, required tools/products, media, frequency, assigned role" },
+    { name: "procedure_completions", fields: "procedure, staff member, status, completed at, checked steps, notes/issues" }
 ];
-function minutesAgoTimestamp(minutes) {
-    return Date.now() - (minutes * MINUTE_MS);
-}
 const seedState = {
     currentUserId: "",
     activeView: "dashboard",
     activeStation: "All",
     orderFilter: "All",
     orderDraft: [],
+    receiptOrderId: "",
     restaurantSettings: structuredClone(DEFAULT_RESTAURANT_SETTINGS),
     users: [
         {
@@ -206,43 +310,42 @@ const seedState = {
         { id: "table-5", name: "Table 5", capacity: 6, zone: "Banquette" },
         { id: "table-6", name: "Table 6", capacity: 8, zone: "Family corner" }
     ],
+    tableQrCodes: [
+        { id: "qr-table-1", tableId: "table-1", area: "Window", token: "libabite-table-1", status: "Active", createdAt: "09:00", regeneratedAt: "" },
+        { id: "qr-table-2", tableId: "table-2", area: "Window", token: "libabite-table-2", status: "Active", createdAt: "09:00", regeneratedAt: "" },
+        { id: "qr-table-3", tableId: "table-3", area: "Dining room", token: "libabite-table-3", status: "Active", createdAt: "09:00", regeneratedAt: "" },
+        { id: "qr-table-4", tableId: "table-4", area: "Dining room", token: "libabite-table-4", status: "Active", createdAt: "09:00", regeneratedAt: "" },
+        { id: "qr-table-5", tableId: "table-5", area: "Banquette", token: "libabite-table-5", status: "Active", createdAt: "09:00", regeneratedAt: "" },
+        { id: "qr-table-6", tableId: "table-6", area: "Family corner", token: "libabite-table-6", status: "Active", createdAt: "09:00", regeneratedAt: "" }
+    ],
+    customerCart: [],
+    customerLastOrderId: "",
     supplierOrders: [],
-    customInventoryLocations: ["Pastry fridge", "Fridge 3"],
+    customInventoryLocations: [],
     inventoryHistory: [
         {
             id: "INV-SEED-1",
             ingredientId: "kefta",
-            ingredientName: "Kefta Meat",
+            ingredientName: "Kefta",
             type: "add",
-            quantity: 4.2,
+            quantity: 30,
             fromLocation: "",
-            toLocation: "Freezer",
-            resultingStock: 4.2,
+            toLocation: "Fridge",
+            resultingStock: 30,
             time: "09:30",
-            detail: "Opening stock entered for Kefta Meat."
-        },
-        {
-            id: "INV-SEED-2",
-            ingredientId: "pistachio-cream",
-            ingredientName: "Pistachio Cream",
-            type: "correct",
-            quantity: 0.7,
-            fromLocation: "",
-            toLocation: "Pastry fridge",
-            resultingStock: 0.7,
-            time: "10:05",
-            detail: "Manual count confirmed below minimum."
+            detail: "Opening stock entered for Kefta."
         }
     ],
+    wasteRecords: [],
     productRecipeDraft: [],
-    nextOrderNumber: 104,
+    nextOrderNumber: 101,
     products: [
         {
             id: "kefta-plate",
             name: "Kefta Plate",
-            code: "99301",
+            code: "KP-001",
             category: "Kefta",
-            station: "Burger",
+            station: "Grill station",
             price: 14.5,
             vatSetting: "standard",
             active: true,
@@ -255,20 +358,49 @@ const seedState = {
                 externalDeliveryApps: true
             },
             targetMargin: 68,
+            minMargin: 58,
             recipe: [
-                { ingredientId: "kefta", grams: 200 },
-                { ingredientId: "flatbread", units: 1 },
-                { ingredientId: "garlic-sauce", grams: 30 },
-                { ingredientId: "salad-mix", grams: 60 }
+                { ingredientId: "kefta", grams: 200, wastePercent: 0, station: "Grill station", notes: "200g kefta per plate." }
             ]
         },
         {
-            id: "cold-mezza",
-            name: "Cold Mezza Box",
-            code: "88420",
-            category: "Cold Mezza",
-            station: "Cold Mezza",
-            price: 11.75,
+            id: "kefta-mix-batch",
+            name: "Kefta Mix Batch",
+            code: "PREP-KEFTA-10KG",
+            category: "Kefta",
+            station: "Main kitchen",
+            price: 0,
+            vatSetting: "zero",
+            active: false,
+            availability: {
+                dineIn: false,
+                qrOrdering: false,
+                takeaway: false,
+                delivery: false,
+                websiteOrdering: false,
+                externalDeliveryApps: false
+            },
+            targetMargin: 0,
+            minMargin: 0,
+            batchOutput: {
+                ingredientId: "kefta",
+                quantity: 10,
+                unitType: "kilograms",
+                location: "Fridge"
+            },
+            recipe: [
+                { ingredientId: "minced-beef", grams: 8500, wastePercent: 0, station: "Main kitchen", notes: "Combine chilled beef in the mixer." },
+                { ingredientId: "onion-herb-mix", grams: 1200, wastePercent: 0, station: "Main kitchen", notes: "Fold in onion and parsley mix." },
+                { ingredientId: "kefta-spice-blend", grams: 300, wastePercent: 0, station: "Main kitchen", notes: "Add spice blend and mix until even." }
+            ]
+        },
+        {
+            id: "libabite-burger",
+            name: "Libabite Burger",
+            code: "BG-001",
+            category: "Burgers",
+            station: "Burger station",
+            price: 12.5,
             vatSetting: "standard",
             active: true,
             availability: {
@@ -279,20 +411,20 @@ const seedState = {
                 websiteOrdering: true,
                 externalDeliveryApps: true
             },
-            targetMargin: 64,
+            targetMargin: 66,
+            minMargin: 55,
             recipe: [
-                { ingredientId: "hummus", grams: 120 },
-                { ingredientId: "flatbread", units: 1 },
-                { ingredientId: "salad-mix", grams: 80 }
+                { ingredientId: "burger-patty", units: 1, wastePercent: 0, station: "Burger station", notes: "One patty per burger." },
+                { ingredientId: "burger-bun", units: 1, wastePercent: 0, station: "Burger station", notes: "Toast before assembly." }
             ]
         },
         {
-            id: "pistachio-dessert",
-            name: "Pistachio Dessert",
-            code: "55214",
-            category: "Sweets",
-            station: "Sweets",
-            price: 7.25,
+            id: "cold-mezza",
+            name: "Cold Mezza",
+            code: "CM-001",
+            category: "Cold Mezza",
+            station: "Cold mezza station",
+            price: 8.75,
             vatSetting: "standard",
             active: true,
             availability: {
@@ -301,223 +433,417 @@ const seedState = {
                 takeaway: true,
                 delivery: true,
                 websiteOrdering: true,
-                externalDeliveryApps: false
+                externalDeliveryApps: true
             },
             targetMargin: 70,
+            minMargin: 58,
             recipe: [
-                { ingredientId: "pistachio-cream", grams: 45 },
-                { ingredientId: "milk", milliliters: 90 }
+                { ingredientId: "cold-mezza-portion", units: 1, wastePercent: 0, station: "Cold mezza station", notes: "Plate chilled mezza portion." }
+            ]
+        },
+        {
+            id: "dessert",
+            name: "Dessert",
+            code: "SW-001",
+            category: "Sweets",
+            station: "Sweets station",
+            price: 6,
+            vatSetting: "standard",
+            active: true,
+            availability: {
+                dineIn: true,
+                qrOrdering: true,
+                takeaway: true,
+                delivery: true,
+                websiteOrdering: true,
+                externalDeliveryApps: true
+            },
+            targetMargin: 72,
+            minMargin: 60,
+            recipe: [
+                { ingredientId: "dessert-portion", units: 1, wastePercent: 0, station: "Sweets station", notes: "Finish with syrup garnish." }
+            ]
+        },
+        {
+            id: "mint-lemonade",
+            name: "Mint Lemonade",
+            code: "DR-001",
+            category: "Drinks",
+            station: "Drinks station",
+            price: 4.5,
+            vatSetting: "standard",
+            active: true,
+            availability: {
+                dineIn: true,
+                qrOrdering: true,
+                takeaway: true,
+                delivery: true,
+                websiteOrdering: true,
+                externalDeliveryApps: true
+            },
+            targetMargin: 74,
+            minMargin: 62,
+            recipe: [
+                { ingredientId: "lemonade-base", milliliters: 250, wastePercent: 0, station: "Drinks station", notes: "Serve cold with mint." }
+            ]
+        },
+        {
+            id: "takeaway-packaging",
+            name: "Takeaway Packaging",
+            code: "PK-001",
+            category: "Packaging",
+            station: "Packaging station",
+            price: 0.5,
+            vatSetting: "standard",
+            active: true,
+            availability: {
+                dineIn: false,
+                qrOrdering: false,
+                takeaway: true,
+                delivery: true,
+                websiteOrdering: true,
+                externalDeliveryApps: true
+            },
+            targetMargin: 50,
+            minMargin: 35,
+            recipe: [
+                { ingredientId: "packaging-box", units: 1, wastePercent: 0, station: "Packaging station", notes: "Bag, napkin, and sauce cup." }
             ]
         }
     ],
     ingredients: [
         {
             id: "kefta",
-            name: "Kefta Meat",
+            name: "Kefta",
             unitType: "kilograms",
             unit: "kg",
-            stock: 4.2,
-            min: 3,
-            max: 12,
+            stock: 30,
+            min: 5,
+            max: 50,
             purchasePrice: 9.4,
-            location: "Freezer",
-            locationStock: { "Freezer": 4.2 },
+            location: "Fridge",
+            locationStock: { "Fridge": 30 },
             supplier: "Halal Butcher Limburg",
             active: true,
             expiryDate: "",
             barcode: ""
         },
         {
-            id: "flatbread",
-            name: "Flatbread",
+            id: "minced-beef",
+            name: "Minced Beef",
+            unitType: "kilograms",
+            unit: "kg",
+            stock: 25,
+            min: 5,
+            max: 60,
+            purchasePrice: 8.2,
+            location: "Fridge",
+            locationStock: { "Fridge": 25 },
+            supplier: "Halal Butcher Limburg",
+            active: true,
+            expiryDate: "",
+            barcode: ""
+        },
+        {
+            id: "onion-herb-mix",
+            name: "Onion Herb Mix",
+            unitType: "kilograms",
+            unit: "kg",
+            stock: 6,
+            min: 1,
+            max: 12,
+            purchasePrice: 2.4,
+            location: "Fridge 1",
+            locationStock: { "Fridge 1": 6 },
+            supplier: "Libabite Prep Kitchen",
+            active: true,
+            expiryDate: "",
+            barcode: ""
+        },
+        {
+            id: "kefta-spice-blend",
+            name: "Kefta Spice Blend",
+            unitType: "kilograms",
+            unit: "kg",
+            stock: 2,
+            min: 0.5,
+            max: 5,
+            purchasePrice: 12,
+            location: "Dry storage",
+            locationStock: { "Dry storage": 2 },
+            supplier: "Spice Market NL",
+            active: true,
+            expiryDate: "",
+            barcode: ""
+        },
+        {
+            id: "burger-patty",
+            name: "Burger Patty",
+            unitType: "pieces",
+            unit: "pcs",
+            stock: 40,
+            min: 8,
+            max: 80,
+            purchasePrice: 2.9,
+            location: "Fridge",
+            locationStock: { "Fridge": 40 },
+            supplier: "Halal Butcher Limburg",
+            active: true,
+            expiryDate: "",
+            barcode: ""
+        },
+        {
+            id: "burger-bun",
+            name: "Burger Bun",
             unitType: "pieces",
             unit: "pcs",
             stock: 48,
-            min: 30,
-            max: 120,
-            purchasePrice: 0.32,
+            min: 12,
+            max: 96,
+            purchasePrice: 0.55,
             location: "Dry storage",
             locationStock: { "Dry storage": 48 },
-            supplier: "Bakery Roermond",
+            supplier: "Roermond Bakery",
             active: true,
             expiryDate: "",
             barcode: ""
         },
         {
-            id: "garlic-sauce",
-            name: "Garlic Sauce",
-            unitType: "kilograms",
-            unit: "kg",
-            stock: 1.8,
-            min: 1.5,
-            max: 6,
-            purchasePrice: 4.1,
-            location: "Fridge 2",
-            locationStock: { "Fridge 2": 1.8 },
-            supplier: "Fresh Foods BV",
-            active: true,
-            expiryDate: "",
-            barcode: ""
-        },
-        {
-            id: "salad-mix",
-            name: "Salad Mix",
-            unitType: "kilograms",
-            unit: "kg",
-            stock: 2.4,
-            min: 2,
-            max: 7,
-            purchasePrice: 3.6,
+            id: "cold-mezza-portion",
+            name: "Cold Mezza Portion",
+            unitType: "pieces",
+            unit: "pcs",
+            stock: 24,
+            min: 6,
+            max: 48,
+            purchasePrice: 1.85,
             location: "Fridge 1",
-            locationStock: { "Fridge 1": 2.4 },
-            supplier: "Fresh Foods BV",
+            locationStock: { "Fridge 1": 24 },
+            supplier: "Libabite Prep Kitchen",
             active: true,
             expiryDate: "",
             barcode: ""
         },
         {
-            id: "hummus",
-            name: "Hummus",
-            unitType: "kilograms",
-            unit: "kg",
-            stock: 3.1,
-            min: 1.8,
-            max: 8,
-            purchasePrice: 4.8,
+            id: "dessert-portion",
+            name: "Dessert Portion",
+            unitType: "pieces",
+            unit: "pcs",
+            stock: 18,
+            min: 5,
+            max: 36,
+            purchasePrice: 1.25,
             location: "Fridge 2",
-            locationStock: { "Fridge 2": 3.1 },
-            supplier: "Fresh Foods BV",
+            locationStock: { "Fridge 2": 18 },
+            supplier: "Libabite Sweets",
             active: true,
             expiryDate: "",
             barcode: ""
         },
         {
-            id: "pistachio-cream",
-            name: "Pistachio Cream",
-            unitType: "kilograms",
-            unit: "kg",
-            stock: 0.7,
-            min: 0.8,
-            max: 3,
-            purchasePrice: 18.5,
-            location: "Pastry fridge",
-            locationStock: { "Pastry fridge": 0.7 },
-            supplier: "Sweet Trade NL",
-            active: true,
-            expiryDate: "",
-            barcode: ""
-        },
-        {
-            id: "milk",
-            name: "Milk",
+            id: "lemonade-base",
+            name: "Lemonade Base",
             unitType: "liters",
             unit: "l",
-            stock: 8,
-            min: 6,
-            max: 24,
-            purchasePrice: 1.25,
-            location: "Fridge 3",
-            locationStock: { "Fridge 3": 8 },
-            supplier: "Dairy Limburg",
+            stock: 12,
+            min: 2,
+            max: 20,
+            purchasePrice: 1.4,
+            location: "Bar storage",
+            locationStock: { "Bar storage": 12 },
+            supplier: "Beverage Partner Limburg",
+            active: true,
+            expiryDate: "",
+            barcode: ""
+        },
+        {
+            id: "packaging-box",
+            name: "Packaging Box",
+            unitType: "pieces",
+            unit: "pcs",
+            stock: 80,
+            min: 20,
+            max: 150,
+            purchasePrice: 0.18,
+            location: "Dry storage",
+            locationStock: { "Dry storage": 80 },
+            supplier: "Eco Packaging NL",
             active: true,
             expiryDate: "",
             barcode: ""
         }
     ],
-    orders: [
-        {
-            id: "ORD-101",
-            number: 101,
-            channel: "QR",
-            customer: "Table 4",
-            paymentStatus: "Paid",
-            fulfillment: "Kitchen",
-            status: "Preparing",
-            createdAt: "12:22",
-            createdAtMs: minutesAgoTimestamp(14),
-            notes: "Extra garlic",
-            items: [{ productId: "kefta-plate", quantity: 2 }]
-        },
-        {
-            id: "ORD-102",
-            number: 102,
-            channel: "Website",
-            customer: "M. Jansen",
-            paymentStatus: "Paid",
-            fulfillment: "Delivery",
-            status: "Ready",
-            createdAt: "12:31",
-            createdAtMs: minutesAgoTimestamp(5),
-            notes: "Ring doorbell",
-            assignedDriver: "samir",
-            items: [{ productId: "cold-mezza", quantity: 1 }]
-        },
-        {
-            id: "ORD-103",
-            number: 103,
-            channel: "Phone",
-            customer: "Pickup 18:15",
-            paymentStatus: "Unpaid",
-            fulfillment: "Pickup",
-            status: "Queued",
-            createdAt: "12:37",
-            createdAtMs: minutesAgoTimestamp(7),
-            notes: "",
-            items: [{ productId: "pistachio-dessert", quantity: 3 }]
-        }
-    ],
-    tickets: [
-        {
-            id: "TCK-101-1",
-            orderId: "ORD-101",
-            productId: "kefta-plate",
-            quantity: 2,
-            station: "Burger",
-            status: "Preparing",
-            createdAt: "12:22",
-            createdAtMs: minutesAgoTimestamp(14),
-            startedAtMs: minutesAgoTimestamp(12),
-            notes: "Extra garlic"
-        },
-        {
-            id: "TCK-102-1",
-            orderId: "ORD-102",
-            productId: "cold-mezza",
-            quantity: 1,
-            station: "Cold Mezza",
-            status: "Ready",
-            createdAt: "12:31",
-            createdAtMs: minutesAgoTimestamp(5),
-            startedAtMs: minutesAgoTimestamp(4),
-            readyAtMs: minutesAgoTimestamp(1),
-            notes: "Ring doorbell"
-        },
-        {
-            id: "TCK-103-1",
-            orderId: "ORD-103",
-            productId: "pistachio-dessert",
-            quantity: 3,
-            station: "Sweets",
-            status: "Queued",
-            createdAt: "12:37",
-            createdAtMs: minutesAgoTimestamp(7),
-            notes: ""
-        }
-    ],
+    orders: [],
+    tickets: [],
     procedures: [
-        { id: "close-1", text: "Clean grill and burger station with assigned tools.", owner: "Kitchen", done: false },
-        { id: "close-2", text: "Label opened sauces with date and staff initials.", owner: "Cold Mezza", done: true },
-        { id: "close-3", text: "Count freezer, fridge, and dry-storage stock.", owner: "Manager", done: false },
-        { id: "close-4", text: "Run floor sweep, mop, and table reset.", owner: "Front", done: false }
+        {
+            id: "closing-procedure",
+            title: "Closing procedure",
+            department: "Front of house",
+            language: "nl",
+            steps: [
+                "Close open tables and mark every unpaid order for manager review.",
+                "Count the cash drawer and record the payment totals.",
+                "Clean the counter, door handles, payment terminal, and customer area.",
+                "Switch off signs, lights, and non-essential equipment before locking."
+            ],
+            requiredTools: ["Cash drawer key", "Closing sheet"],
+            requiredProducts: ["Surface cleaner", "Disposable cloths"],
+            media: [],
+            frequency: "Daily",
+            assignedRole: "Front",
+            active: true
+        },
+        {
+            id: "opening-procedure",
+            title: "Opening procedure",
+            department: "Front of house",
+            language: "nl",
+            steps: [
+                "Check reservation list and prepare table layout.",
+                "Turn on POS, receipt printer, and payment terminal.",
+                "Restock napkins, cutlery, takeaway bags, and order pads.",
+                "Confirm opening cash and report any difference to the manager."
+            ],
+            requiredTools: ["POS login", "Reservation list"],
+            requiredProducts: ["Napkins", "Cutlery packs", "Takeaway bags"],
+            media: [],
+            frequency: "Daily",
+            assignedRole: "Front",
+            active: true
+        },
+        {
+            id: "kitchen-cleaning",
+            title: "Kitchen cleaning",
+            department: "Kitchen",
+            language: "ar",
+            steps: [
+                "Clear all prep surfaces and remove food containers.",
+                "Wash and sanitize cutting boards, knives, and prep tables.",
+                "Clean grill, fryer edge, and hot holding area after cooling.",
+                "Sweep and mop the kitchen floor before the final manager check."
+            ],
+            requiredTools: ["Brush", "Mop", "Sanitizer bucket"],
+            requiredProducts: ["Degreaser", "Food-safe sanitizer"],
+            media: [],
+            frequency: "Daily",
+            assignedRole: "Kitchen",
+            active: true
+        },
+        {
+            id: "fridge-cleaning",
+            title: "Fridge cleaning",
+            department: "Food safety",
+            language: "tr",
+            steps: [
+                "Move products to the backup fridge shelf by shelf.",
+                "Check labels, dates, and expired items before cleaning.",
+                "Clean seals, handles, and internal shelves with food-safe sanitizer.",
+                "Return products by storage zone and record the fridge temperature."
+            ],
+            requiredTools: ["Thermometer", "Date labels"],
+            requiredProducts: ["Food-safe sanitizer", "Disposable cloths"],
+            media: [],
+            frequency: "Weekly",
+            assignedRole: "Kitchen",
+            active: true
+        },
+        {
+            id: "food-prep-checklist",
+            title: "Food prep checklist",
+            department: "Kitchen",
+            language: "nl",
+            steps: [
+                "Wash hands and sanitize the prep station.",
+                "Prepare cold mezza, burger garnish, sauces, and drink garnish.",
+                "Label every opened product with date and initials.",
+                "Update prep quantities when a batch is finished."
+            ],
+            requiredTools: ["Prep containers", "Date labels", "Scale"],
+            requiredProducts: ["Gloves", "Sanitizer"],
+            media: [],
+            frequency: "Per shift",
+            assignedRole: "Kitchen",
+            active: true
+        },
+        {
+            id: "driver-closing-checklist",
+            title: "Driver closing checklist",
+            department: "Delivery",
+            language: "tr",
+            steps: [
+                "Confirm all delivery orders are delivered or returned.",
+                "Clean delivery bags and return receipts to the manager.",
+                "Charge the work phone and thermal bag battery if used.",
+                "Report delays, complaints, or cash collected during the shift."
+            ],
+            requiredTools: ["Delivery phone", "Thermal bags"],
+            requiredProducts: ["Sanitizer wipes"],
+            media: [],
+            frequency: "Daily",
+            assignedRole: "Driver",
+            active: true
+        },
+        {
+            id: "cashier-closing-checklist",
+            title: "Cashier closing checklist",
+            department: "Cashier",
+            language: "ar",
+            steps: [
+                "Print payment summary and compare cash, card, and online totals.",
+                "Place cash and signed receipts in the closing envelope.",
+                "Mark open pay-later orders for manager follow-up.",
+                "Sign the closing sheet before handing over the drawer."
+            ],
+            requiredTools: ["Receipt printer", "Closing envelope"],
+            requiredProducts: ["Cash bands", "Pen"],
+            media: [],
+            frequency: "Daily",
+            assignedRole: "Cashier",
+            active: true
+        },
+        {
+            id: "hygiene-checklist",
+            title: "Hygiene checklist",
+            department: "Food safety",
+            language: "nl",
+            steps: [
+                "Wash hands before handling food, cash, or delivery packaging.",
+                "Wear gloves for ready-to-eat food and replace them between tasks.",
+                "Keep raw, cooked, and ready-to-eat products separated.",
+                "Report spills, broken equipment, or temperature issues immediately."
+            ],
+            requiredTools: ["Handwash sink", "Thermometer"],
+            requiredProducts: ["Soap", "Gloves", "Food-safe sanitizer"],
+            media: [],
+            frequency: "Per shift",
+            assignedRole: "All staff",
+            active: true
+        }
     ],
+    procedureCompletions: [
+        {
+            id: "PROC-CMP-SEED-1",
+            procedureId: "kitchen-cleaning",
+            status: "Done",
+            completedById: "amina",
+            completedByName: "Amina Kitchen",
+            assignedRole: "Kitchen",
+            completedAtMs: Date.now() - (45 * MINUTE_MS),
+            completedAt: "10:45",
+            checkedSteps: [0, 1, 2, 3],
+            notes: "No issues during the kitchen clean."
+        }
+    ],
+    procedureProgress: {},
     staff: [
         { id: "amina", name: "Amina", role: "Kitchen", planned: "10:00-17:00", clocked: "10:02", status: "On shift" },
         { id: "yusuf", name: "Yusuf", role: "Front", planned: "12:00-21:00", clocked: "11:58", status: "On shift" },
-        { id: "samir", name: "Samir", role: "Driver", planned: "16:00-22:00", clocked: "15:57", status: "On delivery" },
+        { id: "samir", name: "Samir", role: "Driver", planned: "16:00-22:00", clocked: "15:57", status: "On shift" },
         { id: "lina", name: "Lina", role: "Sweets", planned: "15:00-22:00", clocked: "-", status: "Starts soon" }
     ],
     drivers: [
-        { id: "samir", name: "Samir", status: "On route", eta: "8 min", orderId: "ORD-102", location: "Kapellerlaan" },
+        { id: "samir", name: "Samir", status: "Available", eta: "-", orderId: null, location: "Restaurant" },
         { id: "omar", name: "Omar", status: "Available", eta: "-", orderId: null, location: "Restaurant" }
     ],
     reservations: [
@@ -525,36 +851,12 @@ const seedState = {
         { id: "RES-2", name: "Nour Family", guests: 4, time: "19:30", tableId: "table-3", source: "Phone", status: "Confirmed" }
     ],
     productionLog: [
-        { id: "LOG-1", text: "Kefta prep logged: planned 200g, actual 210g. Cost updated for next batch.", time: "11:20" }
-    ]
+        { id: "LOG-1", text: "Kefta Plate recipe ready: 200g Kefta per plate from Fridge stock.", time: "09:35" }
+    ],
+    productionBatches: []
 };
 function getFreshSeedState() {
-    const freshState = structuredClone(seedState);
-    const orderAges = {
-        "ORD-101": 14,
-        "ORD-102": 5,
-        "ORD-103": 7
-    };
-    const ticketTimings = {
-        "TCK-101-1": { created: 14, started: 12 },
-        "TCK-102-1": { created: 5, started: 4, ready: 1 },
-        "TCK-103-1": { created: 7 }
-    };
-    freshState.orders.forEach((order) => {
-        if (orderAges[order.id] !== undefined) {
-            order.createdAtMs = minutesAgoTimestamp(orderAges[order.id]);
-        }
-    });
-    freshState.tickets.forEach((ticket) => {
-        const timing = ticketTimings[ticket.id];
-        if (!timing)
-            return;
-        ticket.createdAtMs = minutesAgoTimestamp(timing.created);
-        ticket.startedAtMs = timing.started === undefined ? "" : minutesAgoTimestamp(timing.started);
-        ticket.readyAtMs = timing.ready === undefined ? "" : minutesAgoTimestamp(timing.ready);
-        ticket.completedAtMs = timing.completed === undefined ? "" : minutesAgoTimestamp(timing.completed);
-    });
-    return freshState;
+    return structuredClone(seedState);
 }
 let state = loadState();
 const views = [
@@ -573,6 +875,11 @@ function slugify(value, fallback = "item") {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
         || fallback;
+}
+function normalizeKitchenStation(value) {
+    const cleaned = String(value || "").replace(/\s+/g, " ").trim();
+    const mapped = KITCHEN_STATION_ALIASES[cleaned.toLowerCase()];
+    return mapped || cleaned || "Main kitchen";
 }
 function unitTypeDefinition(unitType) {
     const legacyMap = {
@@ -608,10 +915,26 @@ function normalizeProductAvailability(availability) {
         return nextAvailability;
     }, {});
 }
+function normalizeMarginPercent(value, fallback = 0) {
+    const percent = Number(value);
+    return Number.isFinite(percent) ? Math.min(100, Math.max(0, Number(percent.toFixed(1)))) : fallback;
+}
+function normalizeRecipeWastePercent(value) {
+    return normalizeMarginPercent(value, 0);
+}
+function normalizeRecipeAppliesTo(value) {
+    return RECIPE_APPLIES_OPTIONS.some((option) => option.id === value) ? value : "all";
+}
 function normalizeRecipeLine(line, ingredientIds) {
     if (!line || !ingredientIds.has(line.ingredientId))
         return null;
-    const base = { ingredientId: line.ingredientId };
+    const base = {
+        ingredientId: line.ingredientId,
+        wastePercent: normalizeRecipeWastePercent(line.wastePercent),
+        station: normalizeKitchenStation(line.station || line.preparationStation),
+        notes: String(line.notes || "").trim(),
+        appliesTo: normalizeRecipeAppliesTo(line.appliesTo || (line.onlyForTakeawayDelivery ? "takeawayDelivery" : "all"))
+    };
     const grams = Number(line.grams);
     const milliliters = Number(line.milliliters);
     const units = Number(line.units);
@@ -627,6 +950,22 @@ function normalizeRecipeLines(recipe, ingredientIds) {
     return Array.isArray(recipe)
         ? recipe.map((line) => normalizeRecipeLine(line, ingredientIds)).filter(Boolean)
         : [];
+}
+function normalizeBatchOutput(output, ingredientIds) {
+    if (!output || typeof output !== "object")
+        return null;
+    const ingredientId = String(output.ingredientId || output.productId || "").trim();
+    if (!ingredientIds.has(ingredientId))
+        return null;
+    const quantity = normalizeStockQuantity(output.quantity ?? output.outputQuantity);
+    if (quantity <= 0)
+        return null;
+    return {
+        ingredientId,
+        quantity,
+        unitType: unitTypeDefinition(output.unitType || output.unit || "kilograms").id,
+        location: normalizeInventoryLocationName(output.location || output.toLocation, "Fridge")
+    };
 }
 function normalizeStockQuantity(value) {
     const quantity = Number(value);
@@ -717,6 +1056,88 @@ function normalizeInventoryHistory(history, ingredientIds) {
         .filter(Boolean)
         .slice(-80);
 }
+function normalizeWasteReason(reason) {
+    const candidate = String(reason || "").trim();
+    return WASTE_REASONS.some((item) => item.id === candidate) ? candidate : "Other";
+}
+function getWasteUnitOptionsForIngredient(ingredient) {
+    const unitType = unitTypeDefinition(ingredient?.unitType || ingredient?.unit);
+    if (unitType.recipeMeasure === "grams") {
+        return UNIT_TYPES.filter((option) => option.id === "grams" || option.id === "kilograms");
+    }
+    if (unitType.recipeMeasure === "milliliters") {
+        return UNIT_TYPES.filter((option) => option.id === "milliliters" || option.id === "liters");
+    }
+    return UNIT_TYPES.filter((option) => option.id === unitType.id);
+}
+function normalizeWasteUnitType(unitType, ingredient) {
+    const candidate = unitTypeDefinition(unitType).id;
+    const allowedUnits = getWasteUnitOptionsForIngredient(ingredient).map((option) => option.id);
+    return allowedUnits.includes(candidate) ? candidate : unitTypeDefinition(ingredient?.unitType || ingredient?.unit).id;
+}
+function convertWasteQuantityToStockUnits(ingredient, quantity, unitTypeId) {
+    const amount = normalizeStockQuantity(quantity);
+    const stockUnitType = unitTypeDefinition(ingredient?.unitType || ingredient?.unit);
+    const wasteUnitType = unitTypeDefinition(unitTypeId);
+    const stockMeasure = stockUnitType.recipeMeasure;
+    const wasteMeasure = wasteUnitType.recipeMeasure;
+    if (stockMeasure === "grams" && wasteMeasure === "grams") {
+        const grams = wasteUnitType.id === "kilograms" ? amount * 1000 : amount;
+        return normalizeStockQuantity(stockUnitType.id === "kilograms" ? grams / 1000 : grams);
+    }
+    if (stockMeasure === "milliliters" && wasteMeasure === "milliliters") {
+        const milliliters = wasteUnitType.id === "liters" ? amount * 1000 : amount;
+        return normalizeStockQuantity(stockUnitType.id === "liters" ? milliliters / 1000 : milliliters);
+    }
+    return amount;
+}
+function getWasteCost(ingredient, stockQuantity) {
+    return Math.max(0, Number(((Number(stockQuantity) || 0) * (Number(ingredient?.purchasePrice) || 0)).toFixed(2)));
+}
+function normalizeWasteTimestamp(record) {
+    const timestamp = normalizeOptionalTimestamp(record?.occurredAtMs)
+        || normalizeOptionalTimestamp(record?.dateTimeMs)
+        || Date.parse(record?.occurredAt || record?.dateTime || "");
+    return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : normalizeTimestamp(record?.timeMs, record?.time);
+}
+function normalizeWasteRecords(records, ingredients, users) {
+    const ingredientByIdLookup = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
+    const userByIdLookup = new Map(users.map((user) => [user.id, user]));
+    return (Array.isArray(records) ? records : [])
+        .map((record, index) => {
+        const ingredientId = String(record.ingredientId || record.productId || "").trim();
+        const ingredient = ingredientByIdLookup.get(ingredientId);
+        if (!ingredient)
+            return null;
+        const quantity = normalizeStockQuantity(record.quantity ?? record.displayQuantity ?? record.stockQuantity);
+        const unitType = normalizeWasteUnitType(record.unitType || record.unit, ingredient);
+        const stockQuantity = normalizeStockQuantity(record.stockQuantity ?? convertWasteQuantityToStockUnits(ingredient, quantity, unitType));
+        if (stockQuantity <= 0)
+            return null;
+        const staffId = String(record.staffId || record.userId || "").trim();
+        const staff = userByIdLookup.get(staffId);
+        const occurredAtMs = normalizeWasteTimestamp(record);
+        const cost = Number(record.cost);
+        return {
+            id: record.id || `WST-${Date.now()}-${index + 1}`,
+            ingredientId,
+            ingredientName: String(record.ingredientName || record.productName || ingredient.name).trim(),
+            quantity,
+            unitType,
+            stockQuantity,
+            stockUnit: ingredient.unit,
+            reason: normalizeWasteReason(record.reason),
+            staffId: staff?.id || "",
+            staffName: String(record.staffName || record.staffMember || staff?.name || "Staff").trim(),
+            occurredAtMs,
+            notes: String(record.notes || "").trim(),
+            fromLocation: normalizeInventoryLocationName(record.fromLocation || record.location, ""),
+            cost: Number.isFinite(cost) ? Math.max(0, Number(cost.toFixed(2))) : getWasteCost(ingredient, stockQuantity)
+        };
+    })
+        .filter(Boolean)
+        .slice(-120);
+}
 function normalizeIngredients(ingredients) {
     const seenIds = new Set();
     return ingredients
@@ -770,22 +1191,107 @@ function normalizeProducts(products, ingredientIds) {
             : PRODUCT_CATEGORIES.includes(product.station)
                 ? product.station
                 : "Other";
+        const station = normalizeKitchenStation(product.station || product.kitchenStation || "Main kitchen");
         const vatSetting = VAT_OPTIONS.some((option) => option.id === product.vatSetting) ? product.vatSetting : "standard";
+        const targetMargin = normalizeMarginPercent(product.targetMargin, DEFAULT_MARGIN_TARGET);
+        const minMargin = Math.min(targetMargin, normalizeMarginPercent(product.minMargin ?? product.minimumMargin, DEFAULT_MARGIN_MINIMUM));
         return {
             id,
             name,
             code: String(product.code || product.sku || product.SKU || "").trim() || id.toUpperCase(),
             category,
-            station: String(product.station || product.kitchenStation || "Main Kitchen").trim(),
+            station,
             price: Math.max(0, Number(product.price ?? product.sellingPrice) || 0),
             vatSetting,
             active: product.active === undefined ? product.status !== "Inactive" : Boolean(product.active),
             availability: normalizeProductAvailability(product.availability),
-            targetMargin: Math.max(0, Number(product.targetMargin) || 65),
+            targetMargin,
+            minMargin,
             recipe: normalizeRecipeLines(product.recipe, ingredientIds)
+                .map((line) => ({ ...line, station: normalizeKitchenStation(line.station || station) })),
+            batchOutput: normalizeBatchOutput(product.batchOutput || product.output, ingredientIds),
+            lastProductionCost: Math.max(0, Number(product.lastProductionCost) || 0),
+            lastProductionPlannedCost: Math.max(0, Number(product.lastProductionPlannedCost) || 0),
+            lastProductionMargin: product.lastProductionMargin === null || product.lastProductionMargin === undefined || product.lastProductionMargin === ""
+                ? null
+                : Number.isFinite(Number(product.lastProductionMargin)) ? Number(product.lastProductionMargin) : null,
+            lastProductionCostDelta: Number.isFinite(Number(product.lastProductionCostDelta)) ? Number(product.lastProductionCostDelta) : 0,
+            lastProductionAt: String(product.lastProductionAt || "").trim(),
+            lastProductionAtMs: normalizeOptionalTimestamp(product.lastProductionAtMs)
         };
     })
         .filter(Boolean);
+}
+function normalizeProductionBatchLines(lines, ingredientIds) {
+    return (Array.isArray(lines) ? lines : [])
+        .map((line) => {
+        const ingredientId = String(line.ingredientId || "").trim();
+        if (!ingredientIds.has(ingredientId))
+            return null;
+        const measure = line.measure && typeof line.measure === "object"
+            ? {
+                key: ["grams", "milliliters", "units"].includes(line.measure.key) ? line.measure.key : "units",
+                label: String(line.measure.label || "pieces"),
+                shortLabel: String(line.measure.shortLabel || "pcs")
+            }
+            : { key: "units", label: "pieces", shortLabel: "pcs" };
+        return {
+            ingredientId,
+            ingredientName: String(line.ingredientName || "").trim(),
+            measure,
+            plannedUsage: normalizeStockQuantity(line.plannedUsage),
+            actualUsage: normalizeStockQuantity(line.actualUsage),
+            plannedStockQuantity: normalizeStockQuantity(line.plannedStockQuantity),
+            actualStockQuantity: normalizeStockQuantity(line.actualStockQuantity),
+            plannedCost: Math.max(0, Number(line.plannedCost) || 0),
+            actualCost: Math.max(0, Number(line.actualCost) || 0)
+        };
+    })
+        .filter(Boolean);
+}
+function normalizeProductionBatches(records, productIds, ingredientIds, users) {
+    const userByIdLookup = new Map(users.map((user) => [user.id, user]));
+    return (Array.isArray(records) ? records : [])
+        .map((record, index) => {
+        const productId = String(record.productId || "").trim();
+        if (!productIds.has(productId))
+            return null;
+        const outputIngredientId = String(record.outputIngredientId || "").trim();
+        const completedById = String(record.completedById || record.userId || "").trim();
+        const completedBy = userByIdLookup.get(completedById);
+        const completedAt = record.completedAt || record.time || timeNow();
+        return {
+            id: record.id || `BAT-${Date.now()}-${index + 1}`,
+            productId,
+            productName: String(record.productName || "").trim(),
+            completedById: completedBy?.id || completedById,
+            completedByName: String(record.completedByName || record.staffName || completedBy?.name || "Staff").trim(),
+            completedAt,
+            completedAtMs: normalizeOptionalTimestamp(record.completedAtMs) || normalizeTimestamp(record.timeMs, completedAt),
+            plannedCost: Math.max(0, Number(record.plannedCost) || 0),
+            actualCost: Math.max(0, Number(record.actualCost) || 0),
+            costDelta: Number.isFinite(Number(record.costDelta)) ? Number(record.costDelta) : 0,
+            plannedMargin: record.plannedMargin === null || record.plannedMargin === undefined || record.plannedMargin === ""
+                ? null
+                : Number.isFinite(Number(record.plannedMargin)) ? Number(record.plannedMargin) : null,
+            actualMargin: record.actualMargin === null || record.actualMargin === undefined || record.actualMargin === ""
+                ? null
+                : Number.isFinite(Number(record.actualMargin)) ? Number(record.actualMargin) : null,
+            marginDelta: record.marginDelta === null || record.marginDelta === undefined || record.marginDelta === ""
+                ? null
+                : Number.isFinite(Number(record.marginDelta)) ? Number(record.marginDelta) : null,
+            outputIngredientId: ingredientIds.has(outputIngredientId) ? outputIngredientId : "",
+            outputIngredientName: String(record.outputIngredientName || "").trim(),
+            outputQuantity: normalizeStockQuantity(record.outputQuantity),
+            outputUnitType: unitTypeDefinition(record.outputUnitType || record.unitType).id,
+            outputStockQuantity: normalizeStockQuantity(record.outputStockQuantity),
+            outputUnitCost: Math.max(0, Number(record.outputUnitCost) || 0),
+            outputLocation: normalizeInventoryLocationName(record.outputLocation, ""),
+            lines: normalizeProductionBatchLines(record.lines, ingredientIds)
+        };
+    })
+        .filter(Boolean)
+        .slice(-80);
 }
 function normalizeRestaurantSettings(settings) {
     const source = settings && typeof settings === "object" ? settings : {};
@@ -829,6 +1335,199 @@ function normalizeUsers(users) {
     })
         .filter(Boolean);
 }
+function normalizeProcedureLanguage(language) {
+    const candidate = String(language || "").trim();
+    return LANGUAGE_OPTIONS.some((option) => option.id === candidate) ? candidate : DEFAULT_RESTAURANT_SETTINGS.defaultLanguage;
+}
+function normalizeProcedureFrequency(frequency) {
+    const candidate = String(frequency || "").trim();
+    return PROCEDURE_FREQUENCIES.includes(candidate) ? candidate : "Daily";
+}
+function normalizeProcedureAssignedRole(role, fallbackDepartment = "") {
+    const candidate = String(role || "").trim();
+    if (PROCEDURE_ASSIGNED_ROLES.includes(candidate))
+        return candidate;
+    const department = String(fallbackDepartment || "").toLowerCase();
+    if (department.includes("cashier"))
+        return "Cashier";
+    if (department.includes("driver") || department.includes("delivery"))
+        return "Driver";
+    if (department.includes("kitchen") || department.includes("food") || department.includes("clean"))
+        return "Kitchen";
+    if (department.includes("manager") || department.includes("management"))
+        return "Manager";
+    if (department.includes("front"))
+        return "Front";
+    return "All staff";
+}
+function normalizeProcedureDepartment(department) {
+    const candidate = String(department || "").trim();
+    return candidate || "Management";
+}
+function normalizeListInput(value) {
+    const values = Array.isArray(value)
+        ? value
+        : String(value || "")
+            .split(/\n|,/)
+            .map((item) => item.trim());
+    return [...new Set(values.map((item) => String(item || "").trim()).filter(Boolean))];
+}
+function normalizeProcedureSteps(steps, fallbackText = "") {
+    const normalizedSteps = normalizeListInput(Array.isArray(steps) ? steps : String(steps || "").split(/\n/));
+    if (normalizedSteps.length)
+        return normalizedSteps;
+    const fallback = String(fallbackText || "").trim();
+    return fallback ? [fallback] : [];
+}
+function normalizeProcedureMedia(media) {
+    return normalizeListInput(media).filter((url) => /^https?:\/\//i.test(url));
+}
+function normalizeProcedureRecord(procedure, index = 0) {
+    const title = String(procedure.title || procedure.name || procedure.text || "").trim() || `Procedure ${index + 1}`;
+    const department = normalizeProcedureDepartment(procedure.department || procedure.owner);
+    return {
+        id: slugify(procedure.id || title, `procedure-${index + 1}`),
+        title,
+        department,
+        language: normalizeProcedureLanguage(procedure.language),
+        steps: normalizeProcedureSteps(procedure.steps, procedure.text),
+        requiredTools: normalizeListInput(procedure.requiredTools || procedure.tools),
+        requiredProducts: normalizeListInput(procedure.requiredProducts || procedure.products),
+        media: normalizeProcedureMedia(procedure.media || procedure.mediaUrls || procedure.attachments),
+        frequency: normalizeProcedureFrequency(procedure.frequency),
+        assignedRole: normalizeProcedureAssignedRole(procedure.assignedRole || procedure.owner, department),
+        active: procedure.active === undefined ? true : Boolean(procedure.active),
+        createdById: String(procedure.createdById || "").trim(),
+        createdByName: String(procedure.createdByName || "").trim(),
+        createdAtMs: normalizeOptionalTimestamp(procedure.createdAtMs) || Date.now()
+    };
+}
+function normalizeProcedures(procedures) {
+    const seenIds = new Set();
+    return (Array.isArray(procedures) ? procedures : [])
+        .map((procedure, index) => normalizeProcedureRecord(procedure, index))
+        .filter((procedure) => {
+        if (!procedure.title || seenIds.has(procedure.id))
+            return false;
+        seenIds.add(procedure.id);
+        return true;
+    });
+}
+function isLegacyProcedureList(procedures) {
+    return Array.isArray(procedures)
+        && procedures.length > 0
+        && procedures.every((procedure) => procedure && procedure.text && !procedure.title);
+}
+function mergeDefaultProcedures(procedures) {
+    const byId = new Map(procedures.map((procedure) => [procedure.id, procedure]));
+    normalizeProcedures(seedState.procedures).forEach((procedure) => {
+        if (!byId.has(procedure.id))
+            byId.set(procedure.id, procedure);
+    });
+    return [...byId.values()];
+}
+function normalizeProcedureCompletions(records, procedureIds, users) {
+    const userById = new Map(users.map((user) => [user.id, user]));
+    return (Array.isArray(records) ? records : [])
+        .map((record, index) => {
+        const procedureId = String(record.procedureId || "").trim();
+        if (!procedureIds.has(procedureId))
+            return null;
+        const status = PROCEDURE_COMPLETION_STATUSES.includes(record.status) ? record.status : "Done";
+        const completedById = String(record.completedById || record.userId || "").trim();
+        const completedBy = userById.get(completedById);
+        const completedAtMs = normalizeOptionalTimestamp(record.completedAtMs)
+            || normalizeOptionalTimestamp(record.timeMs)
+            || Date.parse(record.completedAt || record.time || "")
+            || Date.now();
+        return {
+            id: record.id || `PROC-CMP-${Date.now()}-${index + 1}`,
+            procedureId,
+            status,
+            completedById: completedBy?.id || completedById,
+            completedByName: String(record.completedByName || record.staffName || completedBy?.name || "Staff").trim(),
+            assignedRole: normalizeProcedureAssignedRole(record.assignedRole, completedBy ? roleDefinition(completedBy.role).operationalRole : ""),
+            completedAtMs,
+            completedAt: record.completedAt || timeNow(),
+            checkedSteps: Array.isArray(record.checkedSteps)
+                ? record.checkedSteps.map((step) => Math.max(0, Math.floor(Number(step) || 0)))
+                : [],
+            notes: String(record.notes || record.issue || record.reason || "").trim()
+        };
+    })
+        .filter(Boolean)
+        .slice(-180);
+}
+function normalizeProcedureProgress(progress, procedureIds, users) {
+    if (!progress || typeof progress !== "object" || Array.isArray(progress))
+        return {};
+    const userIds = new Set(users.map((user) => user.id));
+    return Object.entries(progress).reduce((nextProgress, [key, value]) => {
+        const [userId, procedureId] = String(key).split(":");
+        if (!userIds.has(userId) || !procedureIds.has(procedureId))
+            return nextProgress;
+        const steps = Array.isArray(value)
+            ? [...new Set(value.map((step) => Math.max(0, Math.floor(Number(step) || 0))))]
+            : [];
+        if (steps.length)
+            nextProgress[key] = steps;
+        return nextProgress;
+    }, {});
+}
+function normalizeOrderStatus(status, paymentStatus = "") {
+    const legacyMap = {
+        Queued: "Sent to kitchen",
+        Done: "Served"
+    };
+    const candidate = legacyMap[status] || status;
+    if (ORDER_STATUSES.includes(candidate))
+        return candidate;
+    if (paymentStatus === "Paid")
+        return "Paid";
+    return "New";
+}
+function normalizePaymentStatus(status) {
+    return ["Paid", "Unpaid", "Pay later"].includes(status) ? status : "Unpaid";
+}
+function isPaidPaymentMethod(method) {
+    return PAYMENT_METHOD_OPTIONS.some((option) => option.value === method && option.paid);
+}
+function normalizePaymentMethod(method, paymentStatus = "") {
+    const candidate = String(method || "").trim();
+    if (PAYMENT_METHOD_OPTIONS.some((option) => option.value === candidate))
+        return candidate;
+    if (["Unpaid", "Pay later"].includes(candidate))
+        return UNPAID_PAYMENT_METHOD;
+    if (candidate === "Paid" || paymentStatus === "Paid")
+        return DEFAULT_PAID_PAYMENT_METHOD;
+    return UNPAID_PAYMENT_METHOD;
+}
+function getPaymentStatusForMethod(method, fallbackStatus = "") {
+    if (isPaidPaymentMethod(method))
+        return "Paid";
+    const normalizedFallback = normalizePaymentStatus(fallbackStatus);
+    return normalizedFallback === "Paid" ? "Pay later" : normalizedFallback;
+}
+function normalizeLineModifiers(modifiers) {
+    const source = Array.isArray(modifiers)
+        ? modifiers
+        : String(modifiers || "")
+            .split(",")
+            .map((modifier) => modifier.trim());
+    return [...new Set(source.map((modifier) => String(modifier || "").trim()).filter(Boolean))];
+}
+function normalizeOrderLineItem(item, productIds) {
+    const productId = item.productId;
+    const quantity = Math.floor(Number(item.quantity) || 0);
+    if (!productIds.has(productId) || quantity < 1)
+        return null;
+    return {
+        productId,
+        quantity,
+        note: String(item.note || item.notes || "").trim(),
+        modifiers: normalizeLineModifiers(item.modifiers)
+    };
+}
 function normalizeState(candidate) {
     const source = candidate ? structuredClone(candidate) : {};
     const next = { ...getFreshSeedState(), ...source };
@@ -838,15 +1537,20 @@ function normalizeState(candidate) {
         "orders",
         "tickets",
         "tables",
+        "tableQrCodes",
+        "customerCart",
         "supplierOrders",
         "procedures",
+        "procedureCompletions",
         "staff",
         "drivers",
         "reservations",
         "productionLog",
+        "productionBatches",
         "users",
         "customInventoryLocations",
         "inventoryHistory",
+        "wasteRecords",
         "productRecipeDraft"
     ];
     collectionKeys.forEach((key) => {
@@ -857,17 +1561,36 @@ function normalizeState(candidate) {
     next.users = normalizeUsers(next.users);
     if (!next.users.some((user) => user.id === next.currentUserId))
         next.currentUserId = "";
+    const rawProcedures = Array.isArray(source.procedures) ? source.procedures : seedState.procedures;
+    next.procedures = mergeDefaultProcedures(normalizeProcedures(isLegacyProcedureList(rawProcedures) ? seedState.procedures : rawProcedures));
+    const procedureIds = new Set(next.procedures.map((procedure) => procedure.id));
+    next.procedureCompletions = normalizeProcedureCompletions(next.procedureCompletions, procedureIds, next.users);
+    next.procedureProgress = normalizeProcedureProgress(source.procedureProgress, procedureIds, next.users);
     next.ingredients = normalizeIngredients(next.ingredients);
+    const existingIngredientIds = new Set(next.ingredients.map((ingredient) => ingredient.id));
+    normalizeIngredients(seedState.ingredients)
+        .filter((ingredient) => PHASE_11_SEED_INGREDIENT_IDS.includes(ingredient.id) && !existingIngredientIds.has(ingredient.id))
+        .forEach((ingredient) => {
+        next.ingredients.push(ingredient);
+        existingIngredientIds.add(ingredient.id);
+    });
     const ingredientIds = new Set(next.ingredients.map((ingredient) => ingredient.id));
     next.customInventoryLocations = normalizeCustomInventoryLocations(next.customInventoryLocations, next.ingredients);
     next.inventoryHistory = normalizeInventoryHistory(next.inventoryHistory, ingredientIds);
+    next.wasteRecords = normalizeWasteRecords(next.wasteRecords, next.ingredients, next.users);
+    const existingProductIds = new Set((Array.isArray(next.products) ? next.products : []).map((product) => slugify(product.id || product.name || "", "")));
+    seedState.products
+        .filter((product) => PHASE_11_SEED_PRODUCT_IDS.includes(product.id) && !existingProductIds.has(product.id))
+        .forEach((product) => next.products.push(structuredClone(product)));
     next.products = normalizeProducts(next.products, ingredientIds);
     const productIds = new Set(next.products.map((product) => product.id));
+    next.productionBatches = normalizeProductionBatches(next.productionBatches, productIds, ingredientIds, next.users);
     next.orderDraft = Array.isArray(candidate?.orderDraft)
         ? candidate.orderDraft
-            .map((item) => ({ productId: item.productId, quantity: Number(item.quantity) }))
-            .filter((item) => productIds.has(item.productId) && item.quantity > 0)
+            .map((item) => normalizeOrderLineItem(item, productIds))
+            .filter(Boolean)
         : [];
+    next.receiptOrderId = String(candidate?.receiptOrderId || "");
     next.productRecipeDraft = normalizeRecipeLines(candidate?.productRecipeDraft, ingredientIds);
     next.tables = next.tables
         .map((table, index) => ({
@@ -879,6 +1602,12 @@ function normalizeState(candidate) {
         .filter((table) => table.id);
     if (!next.tables.length)
         next.tables = structuredClone(seedState.tables);
+    next.tableQrCodes = normalizeTableQrCodes(next.tableQrCodes, next.tables);
+    next.customerCart = Array.isArray(candidate?.customerCart)
+        ? candidate.customerCart
+            .map((item) => normalizeOrderLineItem(item, productIds))
+            .filter(Boolean)
+        : [];
     const tableIds = new Set(next.tables.map((table) => table.id));
     const normalizedReservations = [];
     next.reservations.forEach((reservation, index) => {
@@ -922,21 +1651,70 @@ function normalizeState(candidate) {
             .filter((order) => order.supplier && order.items.length)
         : [];
     next.orders = next.orders
-        .map((order) => ({
-        ...order,
-        createdAt: order.createdAt || timeNow(),
-        createdAtMs: normalizeTimestamp(order.createdAtMs, order.createdAt)
-    }))
-        .filter((order) => order.id && Array.isArray(order.items));
+        .map((order) => {
+        const channel = normalizeOrderType(order.orderType || order.channel);
+        const typeDefinition = orderTypeDefinition(channel);
+        const rawPaymentStatus = normalizePaymentStatus(order.status === "Paid" ? "Paid" : order.paymentStatus);
+        let paymentMethod = normalizePaymentMethod(order.paymentMethod || order.paymentMethodName || order.payment || rawPaymentStatus, rawPaymentStatus);
+        if (rawPaymentStatus === "Paid" && !isPaidPaymentMethod(paymentMethod))
+            paymentMethod = DEFAULT_PAID_PAYMENT_METHOD;
+        const paymentStatus = getPaymentStatusForMethod(paymentMethod, rawPaymentStatus);
+        const createdAt = order.createdAt || timeNow();
+        const items = Array.isArray(order.items)
+            ? order.items.map((item) => normalizeOrderLineItem(item, productIds)).filter(Boolean)
+            : [];
+        const requestedTableId = String(order.tableId || "").trim();
+        const tableId = tableIds.has(requestedTableId) ? requestedTableId : "";
+        const staffIdCandidate = String(order.staffId || order.createdByUserId || order.userId || "").trim();
+        const staffUser = next.users.find((user) => user.id === staffIdCandidate);
+        const staffId = staffUser?.id || "";
+        const staffName = String(order.staffName || order.staffMember || order.createdByName || staffUser?.name || "").trim();
+        const paidByIdCandidate = String(order.paidByUserId || order.paidById || "").trim();
+        const paidByUser = next.users.find((user) => user.id === paidByIdCandidate) || staffUser;
+        return {
+            ...order,
+            orderType: channel,
+            channel,
+            tableId,
+            customer: String(order.customer || (tableId ? next.tables.find((table) => table.id === tableId)?.name : "") || "Walk-in").trim(),
+            paymentStatus,
+            paymentMethod,
+            fulfillment: order.fulfillment || typeDefinition.fulfillment,
+            status: normalizeOrderStatus(order.status, paymentStatus),
+            createdAt,
+            createdAtMs: normalizeTimestamp(order.createdAtMs, createdAt),
+            sentAt: order.sentAt || (order.status && order.status !== "New" ? createdAt : ""),
+            paidAt: paymentStatus === "Paid" ? order.paidAt || createdAt : "",
+            paidAtMs: paymentStatus === "Paid" ? normalizeTimestamp(order.paidAtMs, order.paidAt || createdAt) : "",
+            staffId,
+            staffName,
+            paidByUserId: paymentStatus === "Paid" ? paidByUser?.id || "" : "",
+            paidByName: paymentStatus === "Paid" ? String(order.paidByName || paidByUser?.name || staffName || "").trim() : "",
+            inventoryDeducted: order.inventoryDeducted === undefined ? order.status && order.status !== "New" : Boolean(order.inventoryDeducted),
+            notes: String(order.notes || "").trim(),
+            items
+        };
+    })
+        .filter((order) => order.id && order.items.length);
+    if (!next.orders.some((order) => order.id === next.receiptOrderId))
+        next.receiptOrderId = "";
+    next.customerLastOrderId = String(candidate?.customerLastOrderId || "");
+    if (next.customerLastOrderId && !next.orders.some((order) => order.id === next.customerLastOrderId))
+        next.customerLastOrderId = "";
     const orderIds = new Set(next.orders.map((order) => order.id));
     next.tickets = next.tickets
         .map((ticket, index) => {
         const product = next.products.find((item) => item.id === ticket.productId);
         const order = next.orders.find((item) => item.id === ticket.orderId);
-        const status = TICKET_STATUS_FLOW.includes(ticket.status) ? ticket.status : "Queued";
+        const status = TICKET_STATUSES.includes(ticket.status) ? ticket.status : "Queued";
         const createdAt = ticket.createdAt || order?.createdAt || timeNow();
         const createdAtMs = normalizeTimestamp(ticket.createdAtMs, createdAt);
-        const startedAtMs = normalizeOptionalTimestamp(ticket.startedAtMs);
+        const acceptedAtMs = normalizeOptionalTimestamp(ticket.acceptedAtMs)
+            || (["Accepted", "Preparing", "Delayed", "Ready", "Done"].includes(status) ? createdAtMs : "");
+        const startedAtMs = normalizeOptionalTimestamp(ticket.startedAtMs)
+            || (["Preparing", "Delayed", "Ready", "Done"].includes(status) ? acceptedAtMs || createdAtMs : "");
+        const delayedAtMs = normalizeOptionalTimestamp(ticket.delayedAtMs)
+            || (status === "Delayed" ? Date.now() : "");
         const readyAtMs = normalizeOptionalTimestamp(ticket.readyAtMs)
             || ((status === "Ready" || status === "Done") ? Date.now() : "");
         const completedAtMs = normalizeOptionalTimestamp(ticket.completedAtMs)
@@ -946,14 +1724,17 @@ function normalizeState(candidate) {
             orderId: ticket.orderId,
             productId: ticket.productId,
             quantity: Math.max(1, Math.floor(Number(ticket.quantity) || 1)),
-            station: ticket.station || product?.station || "Kitchen",
+            station: normalizeKitchenStation(ticket.station || product?.station || "Main kitchen"),
             status,
             createdAt,
             createdAtMs,
-            startedAtMs: startedAtMs || (status !== "Queued" ? createdAtMs : ""),
+            acceptedAtMs,
+            startedAtMs,
+            delayedAtMs,
             readyAtMs,
             completedAtMs,
-            notes: ticket.notes || ""
+            notes: ticket.notes || "",
+            issueNote: String(ticket.issueNote || ticket.delayReason || "").trim()
         };
     })
         .filter((ticket) => orderIds.has(ticket.orderId) && productIds.has(ticket.productId));
@@ -993,8 +1774,249 @@ const htmlEscapes = {
 function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (character) => htmlEscapes[character]);
 }
+function qrCodeSvg(value, title = "QR code") {
+    try {
+        return buildQrCodeSvg(value, title);
+    }
+    catch {
+        return buildFallbackQrSvg(value, title);
+    }
+}
+function buildFallbackQrSvg(value, title) {
+    const size = 29;
+    const modules = [];
+    let hash = 2166136261;
+    String(value).split("").forEach((character) => {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+    });
+    for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+            const inFinder = (x < 7 && y < 7) || (x >= size - 7 && y < 7) || (x < 7 && y >= size - 7);
+            const finderRing = inFinder && (x % (size - 7) === 0 || y % (size - 7) === 0 || x % (size - 7) === 6 || y % (size - 7) === 6);
+            const finderCenter = inFinder && x % (size - 7) >= 2 && x % (size - 7) <= 4 && y % (size - 7) >= 2 && y % (size - 7) <= 4;
+            if (finderRing || finderCenter || (!inFinder && ((Math.imul(hash ^ (x * 31 + y * 17), 1103515245) >>> 27) & 1))) {
+                modules.push(`<rect x="${x + 2}" y="${y + 2}" width="1" height="1"/>`);
+            }
+        }
+    }
+    return `
+    <svg class="qr-code-svg" viewBox="0 0 ${size + 4} ${size + 4}" role="img" aria-label="${escapeHtml(title)}" xmlns="http://www.w3.org/2000/svg">
+      <title>${escapeHtml(title)}</title>
+      <rect width="${size + 4}" height="${size + 4}" fill="#fff"/>
+      <g fill="#173d36">${modules.join("")}</g>
+    </svg>
+  `;
+}
+function buildQrCodeSvg(value, title) {
+    const version = 6;
+    const size = version * 4 + 17;
+    const dataCodewords = 136;
+    const blockDataCodewords = 68;
+    const eccCodewords = 18;
+    const mask = 0;
+    const bytes = [...new TextEncoder().encode(String(value))];
+    if (bytes.length > dataCodewords - 3)
+        return buildFallbackQrSvg(value, title);
+    const data = qrEncodeByteData(bytes, dataCodewords);
+    const divisor = qrReedSolomonDivisor(eccCodewords);
+    const blocks = [
+        data.slice(0, blockDataCodewords),
+        data.slice(blockDataCodewords, blockDataCodewords * 2)
+    ];
+    const eccBlocks = blocks.map((block) => qrReedSolomonRemainder(block, divisor));
+    const codewords = [];
+    for (let i = 0; i < blockDataCodewords; i += 1) {
+        blocks.forEach((block) => codewords.push(block[i]));
+    }
+    for (let i = 0; i < eccCodewords; i += 1) {
+        eccBlocks.forEach((block) => codewords.push(block[i]));
+    }
+    const modules = Array.from({ length: size }, () => Array(size).fill(false));
+    const functions = Array.from({ length: size }, () => Array(size).fill(false));
+    const setFunction = (x, y, dark) => {
+        if (x < 0 || x >= size || y < 0 || y >= size)
+            return;
+        modules[y][x] = dark;
+        functions[y][x] = true;
+    };
+    drawQrFunctionPatterns(version, size, setFunction);
+    drawQrFormatBits(size, mask, setFunction);
+    drawQrCodewords(size, modules, functions, codewords, mask);
+    const rects = [];
+    modules.forEach((row, y) => {
+        row.forEach((dark, x) => {
+            if (dark)
+                rects.push(`<rect x="${x + 4}" y="${y + 4}" width="1" height="1"/>`);
+        });
+    });
+    return `
+    <svg class="qr-code-svg" viewBox="0 0 ${size + 8} ${size + 8}" role="img" aria-label="${escapeHtml(title)}" xmlns="http://www.w3.org/2000/svg">
+      <title>${escapeHtml(title)}</title>
+      <rect width="${size + 8}" height="${size + 8}" fill="#fff"/>
+      <g fill="#173d36">${rects.join("")}</g>
+    </svg>
+  `;
+}
+function qrEncodeByteData(bytes, dataCodewords) {
+    const bits = [];
+    const pushBits = (value, length) => {
+        for (let i = length - 1; i >= 0; i -= 1)
+            bits.push((value >>> i) & 1);
+    };
+    pushBits(0x4, 4);
+    pushBits(bytes.length, 8);
+    bytes.forEach((byte) => pushBits(byte, 8));
+    const terminator = Math.min(4, dataCodewords * 8 - bits.length);
+    pushBits(0, terminator);
+    while (bits.length % 8)
+        bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) {
+        data.push(bits.slice(i, i + 8).reduce((byte, bit) => (byte << 1) | bit, 0));
+    }
+    for (let pad = 0; data.length < dataCodewords; pad += 1) {
+        data.push(pad % 2 ? 0x11 : 0xec);
+    }
+    return data;
+}
+function qrReedSolomonTables() {
+    if (qrReedSolomonTables.cache)
+        return qrReedSolomonTables.cache;
+    const exp = Array(255).fill(0);
+    const log = Array(256).fill(0);
+    let value = 1;
+    for (let i = 0; i < 255; i += 1) {
+        exp[i] = value;
+        log[value] = i;
+        value <<= 1;
+        if (value & 0x100)
+            value ^= 0x11d;
+    }
+    qrReedSolomonTables.cache = { exp, log };
+    return qrReedSolomonTables.cache;
+}
+function qrReedSolomonMultiply(first, second) {
+    if (!first || !second)
+        return 0;
+    const { exp, log } = qrReedSolomonTables();
+    return exp[(log[first] + log[second]) % 255];
+}
+function qrReedSolomonDivisor(degree) {
+    const { exp } = qrReedSolomonTables();
+    let result = [1];
+    for (let i = 0; i < degree; i += 1) {
+        const next = Array(result.length + 1).fill(0);
+        result.forEach((coefficient, index) => {
+            next[index] ^= qrReedSolomonMultiply(coefficient, exp[i]);
+            next[index + 1] ^= coefficient;
+        });
+        result = next;
+    }
+    return result.slice(0, degree);
+}
+function qrReedSolomonRemainder(data, divisor) {
+    const result = Array(divisor.length).fill(0);
+    data.forEach((byte) => {
+        const factor = byte ^ result.shift();
+        result.push(0);
+        divisor.forEach((coefficient, index) => {
+            result[index] ^= qrReedSolomonMultiply(coefficient, factor);
+        });
+    });
+    return result;
+}
+function drawQrFunctionPatterns(version, size, setFunction) {
+    const drawFinder = (left, top) => {
+        for (let y = -1; y <= 7; y += 1) {
+            for (let x = -1; x <= 7; x += 1) {
+                const xx = left + x;
+                const yy = top + y;
+                const dark = x >= 0 && x <= 6 && y >= 0 && y <= 6
+                    && (x === 0 || x === 6 || y === 0 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4));
+                setFunction(xx, yy, dark);
+            }
+        }
+    };
+    const drawAlignment = (centerX, centerY) => {
+        for (let y = -2; y <= 2; y += 1) {
+            for (let x = -2; x <= 2; x += 1) {
+                setFunction(centerX + x, centerY + y, Math.max(Math.abs(x), Math.abs(y)) !== 1);
+            }
+        }
+    };
+    drawFinder(0, 0);
+    drawFinder(size - 7, 0);
+    drawFinder(0, size - 7);
+    for (let i = 8; i < size - 8; i += 1) {
+        setFunction(i, 6, i % 2 === 0);
+        setFunction(6, i, i % 2 === 0);
+    }
+    drawAlignment(34, 34);
+    setFunction(8, version * 4 + 9, true);
+}
+function qrFormatBits(mask) {
+    let data = (1 << 3) | mask;
+    let bits = data << 10;
+    const generator = 0x537;
+    for (let i = 14; i >= 10; i -= 1) {
+        if ((bits >>> i) & 1)
+            bits ^= generator << (i - 10);
+    }
+    return ((data << 10) | bits) ^ 0x5412;
+}
+function drawQrFormatBits(size, mask, setFunction) {
+    const bits = qrFormatBits(mask);
+    const getBit = (index) => Boolean((bits >>> index) & 1);
+    for (let i = 0; i <= 5; i += 1)
+        setFunction(8, i, getBit(i));
+    setFunction(8, 7, getBit(6));
+    setFunction(8, 8, getBit(7));
+    setFunction(7, 8, getBit(8));
+    for (let i = 9; i < 15; i += 1)
+        setFunction(14 - i, 8, getBit(i));
+    for (let i = 0; i < 8; i += 1)
+        setFunction(size - 1 - i, 8, getBit(i));
+    for (let i = 8; i < 15; i += 1)
+        setFunction(8, size - 15 + i, getBit(i));
+    setFunction(8, size - 8, true);
+}
+function qrMask(mask, x, y) {
+    if (mask === 0)
+        return (x + y) % 2 === 0;
+    return false;
+}
+function drawQrCodewords(size, modules, functions, codewords, mask) {
+    let bitIndex = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+        if (right === 6)
+            right -= 1;
+        for (let vertical = 0; vertical < size; vertical += 1) {
+            const upward = ((right + 1) & 2) === 0;
+            const y = upward ? size - 1 - vertical : vertical;
+            for (let j = 0; j < 2; j += 1) {
+                const x = right - j;
+                if (functions[y][x])
+                    continue;
+                let dark = false;
+                if (bitIndex < codewords.length * 8) {
+                    dark = Boolean((codewords[bitIndex >>> 3] >>> (7 - (bitIndex & 7))) & 1);
+                    bitIndex += 1;
+                }
+                modules[y][x] = qrMask(mask, x, y) ? !dark : dark;
+            }
+        }
+    }
+}
 function timeNow() {
     return new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+}
+function formatDateTime(timestamp, fallbackClockTime = "") {
+    const resolvedTimestamp = normalizeOptionalTimestamp(timestamp) || parseClockTimeToTimestamp(fallbackClockTime) || Date.now();
+    return new Intl.DateTimeFormat("nl-NL", {
+        dateStyle: "short",
+        timeStyle: "short"
+    }).format(new Date(resolvedTimestamp));
 }
 function parseClockTimeToTimestamp(time) {
     if (typeof time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))
@@ -1068,17 +2090,15 @@ function productAvailabilityLabel(product) {
         .map((option) => option.label)
         .join(", ") || "No channels";
 }
+function normalizeOrderType(value) {
+    const candidate = LEGACY_ORDER_TYPE_MAP[value] || value || "Dine-in";
+    return ORDER_TYPE_OPTIONS.some((option) => option.value === candidate) ? candidate : "Dine-in";
+}
+function orderTypeDefinition(value) {
+    return ORDER_TYPE_OPTIONS.find((option) => option.value === normalizeOrderType(value)) || ORDER_TYPE_OPTIONS[0];
+}
 function getChannelAvailabilityKey(channel) {
-    const map = {
-        "Dine-in": "dineIn",
-        QR: "qrOrdering",
-        Website: "websiteOrdering",
-        Phone: "takeaway",
-        "Uber Eats": "externalDeliveryApps",
-        Takeaway: "takeaway",
-        Delivery: "delivery"
-    };
-    return map[channel] || "dineIn";
+    return orderTypeDefinition(channel).availabilityKey;
 }
 function productCanBeOrdered(product, channel) {
     if (!product || !product.active)
@@ -1091,6 +2111,117 @@ function getOrderableProducts(channel) {
 }
 function tableById(id) {
     return state.tables.find((table) => table.id === id);
+}
+function normalizeQrCodeStatus(status) {
+    return QR_CODE_STATUSES.includes(status) ? status : "Active";
+}
+function createQrToken(tableId, existingTokens = new Set()) {
+    const base = `${slugify(tableId, "table")}-${Date.now().toString(36).slice(-5)}-${Math.random().toString(36).slice(2, 7)}`;
+    let token = base;
+    let suffix = 2;
+    while (existingTokens.has(token)) {
+        token = `${base}-${suffix}`;
+        suffix += 1;
+    }
+    existingTokens.add(token);
+    return token;
+}
+function createDefaultTableQrCodes(tables) {
+    return tables.map((table) => ({
+        id: `qr-${table.id}`,
+        tableId: table.id,
+        area: table.zone || "Dining room",
+        token: `libabite-${table.id}`,
+        status: "Active",
+        createdAt: "09:00",
+        regeneratedAt: ""
+    }));
+}
+function normalizeTableQrCodes(codes, tables) {
+    const tableIds = new Set(tables.map((table) => table.id));
+    const tokens = new Set();
+    const source = Array.isArray(codes) && codes.length ? codes : createDefaultTableQrCodes(tables);
+    const normalized = source
+        .map((code, index) => {
+        const fallbackTable = tables[index % Math.max(1, tables.length)];
+        const tableId = tableIds.has(code.tableId) ? code.tableId : fallbackTable?.id || "";
+        if (!tableId)
+            return null;
+        const rawToken = String(code.token || "").trim();
+        const token = rawToken && !tokens.has(rawToken) ? rawToken : createQrToken(tableId, tokens);
+        tokens.add(token);
+        const table = tables.find((item) => item.id === tableId);
+        return {
+            id: code.id || `qr-${tableId}-${index + 1}`,
+            tableId,
+            area: String(code.area || table?.zone || "Dining room").trim(),
+            token,
+            status: normalizeQrCodeStatus(code.status),
+            createdAt: code.createdAt || timeNow(),
+            regeneratedAt: code.regeneratedAt || ""
+        };
+    })
+        .filter(Boolean);
+    tables.forEach((table) => {
+        if (normalized.some((code) => code.tableId === table.id))
+            return;
+        const token = createQrToken(table.id, tokens);
+        normalized.push({
+            id: `qr-${table.id}`,
+            tableId: table.id,
+            area: table.zone || "Dining room",
+            token,
+            status: "Active",
+            createdAt: timeNow(),
+            regeneratedAt: ""
+        });
+    });
+    return normalized;
+}
+function qrCodeById(id) {
+    return state.tableQrCodes.find((code) => code.id === id);
+}
+function qrCodeByToken(token) {
+    return state.tableQrCodes.find((code) => code.token === token);
+}
+function getActiveQrCodeForTable(tableId) {
+    return state.tableQrCodes.find((code) => code.tableId === tableId && code.status === "Active") || null;
+}
+function getQrBaseUrl() {
+    const base = `${window.location.origin}${window.location.pathname}`;
+    return window.location.protocol === "file:" ? window.location.pathname : base;
+}
+function getQrOrderUrl(code) {
+    const separator = getQrBaseUrl().includes("?") ? "&" : "?";
+    return `${getQrBaseUrl()}${separator}qr=${encodeURIComponent(code.token)}`;
+}
+function getStaffUrl() {
+    return getQrBaseUrl();
+}
+function getCustomerQrSession() {
+    const params = new URLSearchParams(window.location.search);
+    const token = String(params.get("qr") || "").trim();
+    const tableParam = String(params.get("table") || "").trim();
+    if (!token && !tableParam)
+        return null;
+    if (token) {
+        const code = qrCodeByToken(token);
+        if (!code)
+            return { error: "This QR code is not recognized.", code: null, table: null };
+        const table = tableById(code.tableId);
+        if (!table)
+            return { error: "This QR code is not assigned to a table.", code, table: null };
+        if (code.status !== "Active")
+            return { error: `${table.name} ordering is disabled.`, code, table };
+        return { error: "", code, table };
+    }
+    const table = tableById(tableParam);
+    if (!table)
+        return { error: "This table link is not recognized.", code: null, table: null };
+    const code = getActiveQrCodeForTable(table.id);
+    if (!code)
+        return { error: `${table.name} does not have an active QR code.`, code: null, table };
+    return { error: "", code, table };
 }
 function isReservationTime(time) {
     return typeof time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
@@ -1210,26 +2341,100 @@ function getReservationValidation(candidate) {
 function getOrderTotal(order) {
     return getItemsTotal(order.items);
 }
-function getLineCost(line) {
+function getVatRate(product) {
+    return VAT_RATES[product?.vatSetting] ?? VAT_RATES.standard;
+}
+function getVatLabel(vatSetting) {
+    return VAT_OPTIONS.find((option) => option.id === vatSetting)?.label || "Standard VAT";
+}
+function getOrderSubtotalExcludingVat(order) {
+    return normalizeOrderItems(order.items || []).reduce((sum, item) => {
+        const product = productById(item.productId);
+        if (!product)
+            return sum;
+        const lineTotal = product.price * item.quantity;
+        return sum + (lineTotal / (1 + getVatRate(product)));
+    }, 0);
+}
+function getOrderVatTotal(order) {
+    return Math.max(0, getOrderTotal(order) - getOrderSubtotalExcludingVat(order));
+}
+function getOrderVatBreakdown(order) {
+    const breakdown = new Map();
+    normalizeOrderItems(order.items || []).forEach((item) => {
+        const product = productById(item.productId);
+        if (!product)
+            return;
+        const vatSetting = VAT_OPTIONS.some((option) => option.id === product.vatSetting) ? product.vatSetting : "standard";
+        const rate = getVatRate(product);
+        const lineTotal = product.price * item.quantity;
+        const tax = lineTotal - (lineTotal / (1 + rate));
+        const current = breakdown.get(vatSetting) || { vatSetting, rate, tax: 0 };
+        current.tax += tax;
+        breakdown.set(vatSetting, current);
+    });
+    return [...breakdown.values()];
+}
+function getCurrentOrderContext() {
+    const form = document.querySelector("#orderForm");
+    return {
+        channel: form?.elements.channel.value || DEFAULT_RECIPE_ORDER_CONTEXT.channel,
+        fulfillment: form?.elements.fulfillment.value || DEFAULT_RECIPE_ORDER_CONTEXT.fulfillment
+    };
+}
+function isTakeawayDeliveryContext(orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
+    const channel = String(orderContext.channel || "");
+    const fulfillment = String(orderContext.fulfillment || "");
+    return fulfillment === "Delivery"
+        || fulfillment === "Pickup"
+        || channel === "Takeaway"
+        || channel === "Uber Eats";
+}
+function recipeLineAppliesToOrder(line, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
+    if (line.appliesTo !== "takeawayDelivery")
+        return true;
+    return isTakeawayDeliveryContext(orderContext);
+}
+function getRecipeLineWasteMultiplier(line) {
+    return 1 + (normalizeRecipeWastePercent(line.wastePercent) / 100);
+}
+function getLineCost(line, orderContext = null) {
+    if (orderContext && !recipeLineAppliesToOrder(line, orderContext))
+        return 0;
     const ingredient = ingredientById(line.ingredientId);
     if (!ingredient)
         return 0;
     return convertRecipeLineToStockUnits(line) * ingredient.purchasePrice;
 }
-function getProductCost(product) {
-    return (product.recipe || []).reduce((sum, line) => sum + getLineCost(line), 0);
+function getProductCost(product, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
+    return (product.recipe || []).reduce((sum, line) => sum + getLineCost(line, orderContext), 0);
 }
-function getProductMargin(product) {
+function getProductGrossMargin(product, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
+    return Math.max(0, (Number(product.price) || 0) - getProductCost(product, orderContext));
+}
+function getProductMargin(product, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
     if (!product.price)
         return 0;
-    return ((product.price - getProductCost(product)) / product.price) * 100;
+    return ((product.price - getProductCost(product, orderContext)) / product.price) * 100;
+}
+function productHasConditionalRecipeLines(product) {
+    return (product.recipe || []).some((line) => line.appliesTo === "takeawayDelivery");
+}
+function getProductMarginProfile(product) {
+    const baseMargin = getProductMargin(product, DEFAULT_RECIPE_ORDER_CONTEXT);
+    const takeawayMargin = getProductMargin(product, TAKEAWAY_DELIVERY_RECIPE_CONTEXT);
+    const margin = productHasConditionalRecipeLines(product) ? Math.min(baseMargin, takeawayMargin) : baseMargin;
+    const className = margin < product.minMargin ? "danger" : margin < product.targetMargin ? "warning" : "ok";
+    const label = margin < product.minMargin ? "Below minimum" : margin < product.targetMargin ? "Below target" : "On target";
+    return { baseMargin, takeawayMargin, margin, className, label };
 }
 function getRecipeUsageLabel(line) {
+    const wasteLabel = line.wastePercent ? ` +${normalizeRecipeWastePercent(line.wastePercent)}% waste` : "";
     if (line.grams)
-        return `${line.grams}g`;
+        return `${line.grams}g${wasteLabel}`;
     if (line.milliliters)
-        return `${line.milliliters}ml`;
-    return `${line.units} pcs`;
+        return `${line.milliliters}ml${wasteLabel}`;
+    return `${line.units} pcs${wasteLabel}`;
 }
 function getRecipeMeasure(line) {
     if (line.grams !== undefined)
@@ -1251,11 +2456,12 @@ function formatActualUsageLabel(actualUsage, measure) {
 function convertRecipeLineToStockUnits(line) {
     const ingredient = ingredientById(line.ingredientId);
     const unitType = unitTypeDefinition(ingredient?.unitType || ingredient?.unit);
+    const multiplier = getRecipeLineWasteMultiplier(line);
     if (line.grams)
-        return unitType.id === "kilograms" ? line.grams / 1000 : line.grams;
+        return (unitType.id === "kilograms" ? line.grams / 1000 : line.grams) * multiplier;
     if (line.milliliters)
-        return unitType.id === "liters" ? line.milliliters / 1000 : line.milliliters;
-    return line.units || 0;
+        return (unitType.id === "liters" ? line.milliliters / 1000 : line.milliliters) * multiplier;
+    return (line.units || 0) * multiplier;
 }
 function convertActualUsageToStockUnits(line, actualUsage) {
     const measure = getRecipeMeasure(line);
@@ -1264,11 +2470,184 @@ function convertActualUsageToStockUnits(line, actualUsage) {
         [measure.key]: actualUsage
     });
 }
+function roundMoneyValue(value) {
+    return Number((Number(value) || 0).toFixed(2));
+}
+function formatSignedAmount(value, suffix = "") {
+    const numericValue = Number(value) || 0;
+    const sign = numericValue > 0 ? "+" : "";
+    return `${sign}${numericValue.toFixed(1)}${suffix}`;
+}
+function getProductionProducts() {
+    return state.products.filter((product) => product.recipe?.length);
+}
+function getDefaultProductionProductId(selectedProductId = "") {
+    const products = getProductionProducts();
+    if (products.some((product) => product.id === selectedProductId))
+        return selectedProductId;
+    return products.find((product) => product.batchOutput)?.id || products[0]?.id || "";
+}
+function getProductionOutputDefault(product) {
+    return product?.batchOutput || {
+        ingredientId: "",
+        quantity: 0,
+        unitType: "",
+        location: ""
+    };
+}
+function getProductionFormValue(form, name, fallback = "") {
+    const field = form?.elements?.[name];
+    return field ? field.value : fallback;
+}
+function getProductionOutputUnitType(ingredient, requestedUnitType, fallbackUnitType = "") {
+    if (!ingredient)
+        return "";
+    const allowedUnits = getWasteUnitOptionsForIngredient(ingredient);
+    const requested = unitTypeDefinition(requestedUnitType).id;
+    if (allowedUnits.some((unit) => unit.id === requested))
+        return requested;
+    const fallback = unitTypeDefinition(fallbackUnitType || ingredient.unitType).id;
+    if (allowedUnits.some((unit) => unit.id === fallback))
+        return fallback;
+    return allowedUnits[0]?.id || ingredient.unitType;
+}
+function getProductionStepCheckboxes(form = document.querySelector("#productionForm")) {
+    return [...(form?.querySelectorAll("[data-production-step]") || [])];
+}
+function productionStepsComplete(form = document.querySelector("#productionForm")) {
+    const steps = getProductionStepCheckboxes(form);
+    return steps.length ? steps.every((step) => step.checked) : false;
+}
+function productionMarkedComplete(form = document.querySelector("#productionForm")) {
+    return Boolean(form?.elements?.prepComplete?.checked);
+}
+function getProductionLineDraft(line, index, form) {
+    const ingredient = ingredientById(line.ingredientId);
+    if (!ingredient)
+        return null;
+    const measure = getRecipeMeasure(line);
+    const plannedUsage = normalizeStockQuantity(getRecipeLineQuantity(line) * getRecipeLineWasteMultiplier(line));
+    const actualFieldName = getProductionFieldName(line, index);
+    const rawActualUsage = getProductionFormValue(form, actualFieldName, plannedUsage);
+    const actualUsage = normalizeStockQuantity(rawActualUsage);
+    const plannedStockQuantity = normalizeStockQuantity(convertRecipeLineToStockUnits(line));
+    const actualStockQuantity = normalizeStockQuantity(convertActualUsageToStockUnits(line, actualUsage));
+    const plannedCost = roundMoneyValue(plannedStockQuantity * ingredient.purchasePrice);
+    const actualCost = roundMoneyValue(actualStockQuantity * ingredient.purchasePrice);
+    const shortage = ingredient.active ? Math.max(0, actualStockQuantity - ingredient.stock) : actualStockQuantity;
+    return {
+        index,
+        sourceLine: line,
+        ingredient,
+        measure,
+        plannedUsage,
+        actualUsage,
+        plannedStockQuantity,
+        actualStockQuantity,
+        plannedCost,
+        actualCost,
+        shortage: normalizeStockQuantity(shortage)
+    };
+}
+function getProductionExecutionDraft(form = document.querySelector("#productionForm")) {
+    const product = productById(getProductionFormValue(form, "productId"));
+    const outputDefault = getProductionOutputDefault(product);
+    const lines = (product?.recipe || [])
+        .map((line, index) => getProductionLineDraft(line, index, form))
+        .filter(Boolean);
+    const plannedCost = roundMoneyValue(lines.reduce((sum, line) => sum + line.plannedCost, 0));
+    const actualCost = roundMoneyValue(lines.reduce((sum, line) => sum + line.actualCost, 0));
+    const price = Number(product?.price) || 0;
+    const plannedMargin = price ? ((price - plannedCost) / price) * 100 : null;
+    const actualMargin = price ? ((price - actualCost) / price) * 100 : null;
+    const outputIngredientId = getProductionFormValue(form, "outputIngredientId", outputDefault.ingredientId || "");
+    const outputIngredient = ingredientById(outputIngredientId);
+    const outputQuantity = outputIngredient
+        ? normalizeStockQuantity(getProductionFormValue(form, "outputQuantity", outputDefault.quantity || ""))
+        : 0;
+    const outputUnitType = outputIngredient
+        ? getProductionOutputUnitType(outputIngredient, getProductionFormValue(form, "outputUnitType", outputDefault.unitType), outputDefault.unitType)
+        : "";
+    const outputStockQuantity = outputIngredient && outputQuantity > 0
+        ? convertWasteQuantityToStockUnits(outputIngredient, outputQuantity, outputUnitType)
+        : 0;
+    const outputUnitCost = outputStockQuantity > 0 ? roundMoneyValue(actualCost / outputStockQuantity) : 0;
+    const outputLocation = outputIngredient
+        ? normalizeInventoryLocationName(getProductionFormValue(form, "outputLocation", outputDefault.location || outputIngredient.location), outputIngredient.location)
+        : "";
+    return {
+        product,
+        lines,
+        plannedCost,
+        actualCost,
+        costDelta: roundMoneyValue(actualCost - plannedCost),
+        plannedMargin,
+        actualMargin,
+        marginDelta: plannedMargin === null || actualMargin === null ? null : actualMargin - plannedMargin,
+        outputIngredient,
+        outputQuantity,
+        outputUnitType,
+        outputStockQuantity,
+        outputUnitCost,
+        outputLocation
+    };
+}
+function getProductionReadiness(draft, form = document.querySelector("#productionForm")) {
+    const shortages = draft.lines.filter((line) => line.shortage > 0);
+    const zeroActuals = draft.lines.filter((line) => line.actualUsage <= 0);
+    const needsOutputQuantity = Boolean(draft.outputIngredient && draft.outputStockQuantity <= 0);
+    const stepsDone = productionStepsComplete(form);
+    const markedDone = productionMarkedComplete(form);
+    if (!draft.product || !draft.lines.length)
+        return { ok: false, className: "warning", label: "No recipe", detail: "Select a recipe with ingredients." };
+    if (zeroActuals.length)
+        return { ok: false, className: "warning", label: "Actuals needed", detail: "Enter actual quantity for each ingredient." };
+    if (shortages.length)
+        return { ok: false, className: "danger", label: "Missing stock", detail: shortages.map((line) => `${line.ingredient.name} ${formatStockAmount(line.shortage, line.ingredient.unit)}`).join(", ") };
+    if (needsOutputQuantity)
+        return { ok: false, className: "warning", label: "Yield needed", detail: "Enter the prepared batch quantity." };
+    if (!stepsDone || !markedDone)
+        return { ok: false, className: "warning", label: "Steps pending", detail: "Complete the preparation checklist." };
+    return { ok: true, className: "ok", label: "Ready", detail: "Batch result can be saved." };
+}
 function formatStockAmount(value, unit) {
     const safeValue = Math.max(0, Number(value) || 0);
     const wholeUnit = ["pcs", "boxes", "packages"].includes(unit);
     const amount = wholeUnit ? Math.floor(safeValue) : safeValue.toFixed(safeValue >= 10 ? 1 : 2);
     return `${amount} ${unit}`;
+}
+function formatDateTimeLocalInput(timestamp = Date.now()) {
+    const date = new Date(normalizeOptionalTimestamp(timestamp) || Date.now());
+    const localTime = new Date(date.getTime() - date.getTimezoneOffset() * MINUTE_MS);
+    return localTime.toISOString().slice(0, 16);
+}
+function wasteUnitLabel(unitTypeId) {
+    const unitType = UNIT_TYPES.find((type) => type.id === unitTypeId) || unitTypeDefinition(unitTypeId);
+    return unitType.shortLabel;
+}
+function formatWasteQuantity(record) {
+    return `${formatStockAmount(record.quantity, wasteUnitLabel(record.unitType))}`;
+}
+function getWasteReportSummary() {
+    const totalCost = state.wasteRecords.reduce((sum, record) => sum + (Number(record.cost) || 0), 0);
+    const totalStockQuantity = state.wasteRecords.reduce((sum, record) => sum + (Number(record.stockQuantity) || 0), 0);
+    const todayKey = new Date().toDateString();
+    const todayRecords = state.wasteRecords.filter((record) => new Date(record.occurredAtMs).toDateString() === todayKey);
+    const todayCost = todayRecords.reduce((sum, record) => sum + (Number(record.cost) || 0), 0);
+    const reasonCounts = state.wasteRecords.reduce((counts, record) => {
+        counts[record.reason] = (counts[record.reason] || 0) + 1;
+        return counts;
+    }, {});
+    const topReason = Object.entries(reasonCounts)
+        .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]?.[0] || "No waste";
+    return {
+        totalCost,
+        totalStockQuantity,
+        todayCost,
+        todayCount: todayRecords.length,
+        topReason,
+        count: state.wasteRecords.length
+    };
 }
 function normalizeOrderItems(items) {
     const byProduct = new Map();
@@ -1277,15 +2656,26 @@ function normalizeOrderItems(items) {
         const quantity = Math.floor(Number(item.quantity) || 0);
         if (!product || quantity < 1)
             return;
-        byProduct.set(product.id, (byProduct.get(product.id) || 0) + quantity);
+        const note = String(item.note || item.notes || "").trim();
+        const modifiers = normalizeLineModifiers(item.modifiers);
+        const key = JSON.stringify([product.id, note, modifiers]);
+        const current = byProduct.get(key);
+        if (current) {
+            current.quantity += quantity;
+        }
+        else {
+            byProduct.set(key, { productId: product.id, quantity, note, modifiers });
+        }
     });
-    return [...byProduct.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+    return [...byProduct.values()];
 }
-function getStockRequirementsForItems(items) {
+function getStockRequirementsForItems(items, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
     const requirements = new Map();
     normalizeOrderItems(items).forEach((item) => {
         const product = productById(item.productId);
         (product.recipe || []).forEach((line) => {
+            if (!recipeLineAppliesToOrder(line, orderContext))
+                return;
             const ingredient = ingredientById(line.ingredientId);
             if (!ingredient)
                 return;
@@ -1295,13 +2685,14 @@ function getStockRequirementsForItems(items) {
     });
     return requirements;
 }
-function getProductAvailability(product, reservedItems = state.orderDraft) {
+function getProductAvailability(product, reservedItems = state.orderDraft, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
     if (!product)
         return { maxQuantity: 0, limiting: null, details: [] };
     if (!product.active)
         return { maxQuantity: 0, limiting: null, details: [] };
-    const reservedStock = getStockRequirementsForItems(reservedItems);
+    const reservedStock = getStockRequirementsForItems(reservedItems, orderContext);
     const details = (product.recipe || [])
+        .filter((line) => recipeLineAppliesToOrder(line, orderContext))
         .map((line) => {
         const ingredient = ingredientById(line.ingredientId);
         if (!ingredient)
@@ -1317,8 +2708,8 @@ function getProductAvailability(product, reservedItems = state.orderDraft) {
     const limiting = details.slice().sort((a, b) => a.maxQuantity - b.maxQuantity)[0] || null;
     return { maxQuantity: Math.max(0, maxQuantity), limiting, details };
 }
-function getStockShortages(items) {
-    return [...getStockRequirementsForItems(items).entries()]
+function getStockShortages(items, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
+    return [...getStockRequirementsForItems(items, orderContext).entries()]
         .map(([ingredientId, required]) => {
         const ingredient = ingredientById(ingredientId);
         const shortage = ingredient?.active ? required - (ingredient.stock || 0) : required;
@@ -1405,10 +2796,14 @@ function getSupplierOrderDrafts() {
     return [...bySupplier.values()].sort((a, b) => a.supplier.localeCompare(b.supplier));
 }
 function getStationNames() {
-    const stations = new Set();
-    state.products.filter((product) => product.active).forEach((product) => stations.add(product.station));
-    getOpenTickets().forEach((ticket) => stations.add(ticket.station));
-    return ["All", ...stations];
+    const stations = new Set(KITCHEN_STATIONS);
+    state.products.filter((product) => product.active).forEach((product) => stations.add(normalizeKitchenStation(product.station)));
+    getOpenTickets().forEach((ticket) => stations.add(normalizeKitchenStation(ticket.station)));
+    const knownStations = KITCHEN_STATIONS.filter((station) => stations.has(station));
+    const customStations = [...stations]
+        .filter((station) => !KITCHEN_STATIONS.includes(station))
+        .sort((first, second) => first.localeCompare(second));
+    return ["All", ...knownStations, ...customStations];
 }
 function getOpenTickets() {
     return state.tickets.filter((ticket) => ticket.status !== "Done");
@@ -1420,11 +2815,29 @@ function getTicketAgeMinutes(ticket, now = Date.now()) {
     const endTime = ticket.readyAtMs || ticket.completedAtMs || now;
     return Math.max(0, Math.floor((endTime - ticket.createdAtMs) / MINUTE_MS));
 }
+function getTicketOrderAgeMinutes(ticket, now = Date.now()) {
+    const order = orderById(ticket.orderId);
+    const startedAt = order?.createdAtMs || ticket.createdAtMs;
+    const endTime = ticket.completedAtMs || now;
+    return Math.max(0, Math.floor((endTime - startedAt) / MINUTE_MS));
+}
 function getTicketSla(ticket, now = Date.now()) {
     const targetMinutes = getTicketTargetMinutes(ticket);
     const ageMinutes = getTicketAgeMinutes(ticket, now);
     const remainingMinutes = targetMinutes - ageMinutes;
     const progress = Math.min(100, Math.max(4, Math.round((ageMinutes / targetMinutes) * 100)));
+    if (ticket.status === "Delayed") {
+        return {
+            state: "delayed",
+            label: "Delayed",
+            pillClass: "danger",
+            cardClass: "sla-delayed",
+            detail: ticket.issueNote ? `Issue: ${ticket.issueNote}` : "Issue needs manager attention",
+            ageMinutes,
+            targetMinutes,
+            progress: 100
+        };
+    }
     if (ticket.status === "Ready" || ticket.status === "Done") {
         return {
             state: "ready",
@@ -1472,16 +2885,46 @@ function getTicketSla(ticket, now = Date.now()) {
         progress
     };
 }
+function getTicketPriority(ticket, now = Date.now()) {
+    const order = orderById(ticket.orderId);
+    const sla = getTicketSla(ticket, now);
+    if (ticket.status === "Delayed" || sla.state === "escalated")
+        return { label: "Urgent", className: "danger" };
+    if (sla.state === "warning" || order?.fulfillment === "Delivery")
+        return { label: "High", className: "warning" };
+    if (order?.fulfillment === "Pickup" || normalizeOrderType(order?.channel) === "External delivery app order") {
+        return { label: "High", className: "warning" };
+    }
+    return { label: "Normal", className: "info" };
+}
+function getTicketStatusLabel(status) {
+    if (status === "Queued")
+        return "New";
+    if (status === "Done")
+        return "Complete";
+    return status;
+}
+function ticketStatusClass(status) {
+    if (status === "Ready" || status === "Done")
+        return "ok";
+    if (status === "Preparing" || status === "Accepted")
+        return "info";
+    if (status === "Delayed")
+        return "danger";
+    return "warning";
+}
 function getKitchenSlaSummary(tickets = getOpenTickets(), now = Date.now()) {
     return tickets.reduce((summary, ticket) => {
         const sla = getTicketSla(ticket, now);
         summary.total += 1;
         summary[sla.state] = (summary[sla.state] || 0) + 1;
         return summary;
-    }, { total: 0, aging: 0, warning: 0, escalated: 0, ready: 0 });
+    }, { total: 0, aging: 0, warning: 0, escalated: 0, delayed: 0, ready: 0 });
 }
 function getSlaSummaryLabel(summary) {
     const issues = [];
+    if (summary.delayed)
+        issues.push(`${summary.delayed} delayed`);
     if (summary.escalated)
         issues.push(`${summary.escalated} escalated`);
     if (summary.warning)
@@ -1538,22 +2981,26 @@ function ensureActiveViewAccess() {
 }
 function renderAuthShell() {
     const user = currentUser();
+    const customerSession = getCustomerQrSession();
     const loginScreen = document.querySelector("#loginScreen");
     const appShell = document.querySelector(".app-shell");
+    const customerScreen = document.querySelector("#customerQrScreen");
     const loginForm = document.querySelector("#loginForm");
     const currentUserName = document.querySelector("#currentUserName");
     const currentUserRole = document.querySelector("#currentUserRole");
     const quickOrderButton = document.querySelector("#quickOrderBtn");
     const resetDemoButton = document.querySelector("#resetDemoBtn");
     renderDemoLogins();
-    document.body.classList.toggle("is-authenticated", Boolean(user));
-    loginScreen.classList.toggle("is-hidden", Boolean(user));
-    appShell.classList.toggle("is-hidden", !user);
-    if (loginForm && !user) {
+    document.body.classList.toggle("is-authenticated", Boolean(user) && !customerSession);
+    document.body.classList.toggle("is-customer-ordering", Boolean(customerSession));
+    customerScreen.hidden = !customerSession;
+    loginScreen.classList.toggle("is-hidden", Boolean(user) || Boolean(customerSession));
+    appShell.classList.toggle("is-hidden", !user || Boolean(customerSession));
+    if (loginForm && !user && !customerSession) {
         loginForm.elements.email.value = loginForm.elements.email.value || "owner@libabite.nl";
         loginForm.elements.password.value = loginForm.elements.password.value || "admin123";
     }
-    if (!user)
+    if (!user || customerSession)
         return;
     currentUserName.textContent = user.name;
     currentUserRole.textContent = roleDefinition(user.role).label;
@@ -1580,6 +3027,10 @@ function renderDemoLogins() {
 }
 function render() {
     renderAuthShell();
+    if (getCustomerQrSession()) {
+        renderCustomerQrScreen();
+        return;
+    }
     if (!currentUser())
         return;
     ensureActiveViewAccess();
@@ -1592,6 +3043,7 @@ function render() {
     renderKitchen();
     renderProductManagement();
     renderInventory();
+    renderWasteTracking();
     renderProcedures();
     renderTeam();
     renderSettings();
@@ -1602,10 +3054,10 @@ function render() {
 function renderNav() {
     const navList = document.querySelector("#navList");
     const counts = {
-        orders: state.orders.filter((order) => order.status !== "Done").length,
+        orders: state.orders.filter((order) => order.status !== "Paid" && order.status !== "Cancelled").length,
         kitchen: getOpenTickets().length,
         inventory: getLowStockIngredients().length,
-        procedures: state.procedures.filter((item) => !item.done).length,
+        procedures: getCurrentUserProcedures().filter((procedure) => procedurePeriodStatus(procedure).status !== "Completed").length,
         team: state.drivers.filter((driver) => driver.status === "On route").length,
         reservations: state.reservations.length
     };
@@ -1625,21 +3077,56 @@ function renderProductsInSelects() {
     const productSelect = document.querySelector("#productSelect");
     const productionProduct = document.querySelector("#productionProduct");
     const orderForm = document.querySelector("#orderForm");
-    const channel = orderForm?.elements.channel.value || "Dine-in";
+    const orderTypeSelect = document.querySelector("#orderTypeSelect");
+    const orderTableSelect = document.querySelector("#orderTableSelect");
+    const orderPaymentMethodSelect = document.querySelector("#orderPaymentMethod");
+    const fulfillmentInput = document.querySelector("#orderFulfillment");
+    const selectedOrderType = normalizeOrderType(orderForm?.elements.channel.value || "Dine-in");
+    const orderType = orderTypeDefinition(selectedOrderType);
+    const channel = orderType.value;
+    if (orderTypeSelect) {
+        orderTypeSelect.innerHTML = ORDER_TYPE_OPTIONS
+            .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+            .join("");
+        orderTypeSelect.value = channel;
+    }
+    if (orderTableSelect) {
+        const selectedTable = orderTableSelect.value || state.tables[0]?.id || "";
+        orderTableSelect.innerHTML = state.tables
+            .map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)} - ${table.capacity} seats - ${escapeHtml(table.zone)}</option>`)
+            .join("");
+        orderTableSelect.value = state.tables.some((table) => table.id === selectedTable) ? selectedTable : state.tables[0]?.id || "";
+        orderTableSelect.disabled = !orderType.requiresTable;
+    }
+    if (fulfillmentInput)
+        fulfillmentInput.value = orderType.fulfillment;
+    if (orderPaymentMethodSelect) {
+        const selectedPaymentMethod = normalizePaymentMethod(orderPaymentMethodSelect.value);
+        orderPaymentMethodSelect.innerHTML = PAYMENT_METHOD_OPTIONS
+            .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+            .join("");
+        orderPaymentMethodSelect.value = selectedPaymentMethod;
+    }
     const orderableProducts = getOrderableProducts(channel);
     const orderOptions = orderableProducts
         .map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)} - ${escapeHtml(money(product.price))}</option>`)
         .join("");
-    const productionOptions = state.products
-        .map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)} - ${escapeHtml(money(product.price))}</option>`)
+    const productionProducts = getProductionProducts();
+    const productionOptions = productionProducts
+        .map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}${product.batchOutput ? " - prepared batch" : ` - ${escapeHtml(money(product.price))}`}</option>`)
         .join("");
-    const selectedProduct = productSelect.value || orderableProducts[0]?.id;
-    const selectedProductionProduct = productionProduct.value || state.products[0]?.id;
-    productSelect.innerHTML = orderOptions;
-    productionProduct.innerHTML = productionOptions;
-    productSelect.disabled = !orderableProducts.length || !can("canCreateOrders");
-    productSelect.value = orderableProducts.some((product) => product.id === selectedProduct) ? selectedProduct : orderableProducts[0]?.id || "";
-    productionProduct.value = productById(selectedProductionProduct) ? selectedProductionProduct : state.products[0]?.id;
+    const selectedProduct = productSelect?.value || orderableProducts[0]?.id;
+    const selectedProductionProduct = getDefaultProductionProductId(productionProduct?.value);
+    if (productSelect) {
+        productSelect.innerHTML = orderOptions;
+        productSelect.disabled = !orderableProducts.length || !can("canCreateOrders");
+        productSelect.value = orderableProducts.some((product) => product.id === selectedProduct) ? selectedProduct : orderableProducts[0]?.id || "";
+    }
+    if (productionProduct) {
+        productionProduct.innerHTML = productionOptions;
+        productionProduct.value = getDefaultProductionProductId(selectedProductionProduct);
+        productionProduct.disabled = !productionProducts.length || !can("canManageProcedures");
+    }
     renderProductionRecipeFields();
 }
 function renderOrderBuilder() {
@@ -1651,18 +3138,36 @@ function renderOrderBuilder() {
     const addLineButton = document.querySelector("#addOrderLineBtn");
     const clearDraftButton = document.querySelector("#clearOrderDraftBtn");
     const sendOrderButton = document.querySelector("#sendOrderBtn");
-    const channel = orderForm?.elements.channel.value || "Dine-in";
+    const saveOrderButton = document.querySelector("#saveOrderBtn");
+    const modifierChecks = document.querySelector("#orderModifierChecks");
+    const channel = normalizeOrderType(orderForm?.elements.channel.value || "Dine-in");
+    const orderType = orderTypeDefinition(channel);
+    if (orderForm?.elements.channel)
+        orderForm.elements.channel.value = channel;
+    if (orderForm?.elements.fulfillment)
+        orderForm.elements.fulfillment.value = orderType.fulfillment;
+    if (modifierChecks && !modifierChecks.children.length) {
+        modifierChecks.innerHTML = LINE_MODIFIER_OPTIONS
+            .map((modifier) => `
+        <label class="modifier-chip">
+          <input name="lineModifier" type="checkbox" value="${escapeHtml(modifier)}">
+          <span>${escapeHtml(modifier)}</span>
+        </label>
+      `)
+            .join("");
+    }
+    const orderContext = getCurrentOrderContext();
     state.orderDraft = normalizeOrderItems(state.orderDraft).filter((item) => productCanBeOrdered(productById(item.productId), channel));
-    const product = productById(productSelect.value);
+    const product = productById(productSelect?.value);
     const requestedQuantity = Math.max(1, Math.floor(Number(quantityInput.value) || 1));
-    const availability = getProductAvailability(product);
+    const availability = getProductAvailability(product, state.orderDraft, orderContext);
     const canAddLine = Boolean(productCanBeOrdered(product, channel) && requestedQuantity <= availability.maxQuantity);
     const availabilityClass = availability.maxQuantity === 0 ? "danger" : requestedQuantity > availability.maxQuantity ? "warning" : "";
     const limiting = availability.limiting;
     const limitingText = limiting
         ? `${limiting.ingredient.name} limits this item; ${formatStockAmount(limiting.remaining, limiting.ingredient.unit)} left after basket.`
         : product
-            ? "No stock rule is attached to this product."
+            ? `Route: ${orderType.fulfillment}. No stock rule is attached to this product.`
             : "No active sellable product is available for this channel.";
     availabilityPanel.className = `availability-card ${availabilityClass}`.trim();
     availabilityPanel.innerHTML = `
@@ -1670,18 +3175,20 @@ function renderOrderBuilder() {
       <strong>${escapeHtml(product?.name || "Select product")}</strong>
       <span class="pill ${availability.maxQuantity ? "ok" : "danger"}">${availability.maxQuantity} available</span>
     </header>
-    <p>${escapeHtml(limitingText)}</p>
+    <p>${escapeHtml(limiting ? `${limitingText} Route: ${orderType.fulfillment}.` : limitingText)}</p>
   `;
     const draftItems = state.orderDraft;
     const pendingItems = draftItems.length ? draftItems : product ? [{ productId: product.id, quantity: requestedQuantity }] : [];
-    const shortages = getStockShortages(pendingItems);
+    const shortages = getStockShortages(pendingItems, orderContext);
     const itemCount = getItemCount(pendingItems);
     const orderTotal = getItemsTotal(pendingItems);
     const selectedLineBlocked = !draftItems.length && (!productCanBeOrdered(product, channel) || requestedQuantity > availability.maxQuantity);
     addLineButton.disabled = !can("canCreateOrders") || !canAddLine;
     clearDraftButton.disabled = !draftItems.length;
+    if (saveOrderButton)
+        saveOrderButton.disabled = !can("canCreateOrders") || !itemCount || shortages.length > 0 || selectedLineBlocked;
     sendOrderButton.disabled = !can("canCreateOrders") || !itemCount || shortages.length > 0 || selectedLineBlocked;
-    sendOrderButton.innerHTML = `<span aria-hidden="true">+</span>${itemCount > 1 ? `Send ${itemCount} Items` : "Send Order"} · ${escapeHtml(money(orderTotal))}`;
+    sendOrderButton.innerHTML = `<span aria-hidden="true">+</span>${itemCount > 1 ? `Send ${itemCount} Items` : "Send to Kitchen"} · ${escapeHtml(money(orderTotal))}`;
     if (!draftItems.length) {
         draftPanel.innerHTML = `<p class="draft-empty">Basket is empty.</p>`;
         return;
@@ -1695,17 +3202,22 @@ function renderOrderBuilder() {
       <span class="draft-meta">${getItemCount(draftItems)} items</span>
     </div>
     <div class="draft-lines">
-      ${draftItems.map((item) => {
+      ${draftItems.map((item, index) => {
         const lineProduct = productById(item.productId);
         if (!lineProduct)
             return "";
+        const lineDetails = [
+            item.modifiers?.length ? `Modifiers: ${item.modifiers.join(", ")}` : "",
+            item.note ? `Note: ${item.note}` : ""
+        ].filter(Boolean).join(" · ");
         return `
           <div class="draft-line">
             <div>
               <strong>${item.quantity}x ${escapeHtml(lineProduct.name)}</strong>
               <p>${escapeHtml(lineProduct.station)} · ${escapeHtml(money(lineProduct.price * item.quantity))}</p>
+              ${lineDetails ? `<p class="line-detail">${escapeHtml(lineDetails)}</p>` : ""}
             </div>
-            <button class="mini-btn" type="button" data-remove-draft="${escapeHtml(item.productId)}" aria-label="Remove ${escapeHtml(lineProduct.name)}">Remove</button>
+            <button class="mini-btn" type="button" data-remove-draft-index="${index}" aria-label="Remove ${escapeHtml(lineProduct.name)}">Remove</button>
           </div>
         `;
     }).join("")}
@@ -1715,6 +3227,184 @@ function renderOrderBuilder() {
       <span>Total</span>
       <strong>${escapeHtml(money(getItemsTotal(draftItems)))}</strong>
     </div>
+  `;
+}
+function getCustomerCartItems() {
+    state.customerCart = normalizeOrderItems(state.customerCart || [])
+        .filter((item) => productCanBeOrdered(productById(item.productId), CUSTOMER_QR_CHANNEL));
+    return state.customerCart;
+}
+function getCustomerCartTotal() {
+    return getItemsTotal(getCustomerCartItems());
+}
+function customerProductCard(product, cartItems) {
+    const availability = getProductAvailability(product, cartItems, CUSTOMER_QR_ORDER_CONTEXT);
+    const cartQuantity = cartItems
+        .filter((item) => item.productId === product.id)
+        .reduce((sum, item) => sum + item.quantity, 0);
+    const disabled = availability.maxQuantity < 1;
+    const stockLabel = disabled
+        ? "Unavailable"
+        : cartQuantity
+            ? `${cartQuantity} in cart`
+            : `${availability.maxQuantity} available`;
+    const stockClass = disabled ? "danger" : cartQuantity ? "info" : "ok";
+    return `
+    <article class="customer-product-card">
+      <div>
+        <span class="customer-product-kicker">${escapeHtml(product.category)}</span>
+        <strong>${escapeHtml(product.name)}</strong>
+        <p>${escapeHtml(product.station)} · ${escapeHtml(money(product.price))}</p>
+      </div>
+      <div class="customer-product-actions">
+        <span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>
+        <button class="icon-btn customer-add-btn" type="button" data-customer-add="${escapeHtml(product.id)}" aria-label="Add ${escapeHtml(product.name)}" ${disabled ? "disabled" : ""}>+</button>
+      </div>
+    </article>
+  `;
+}
+function customerCartLine(item, index) {
+    const product = productById(item.productId);
+    if (!product)
+        return "";
+    return `
+    <div class="customer-cart-line">
+      <div>
+        <strong>${item.quantity}x ${escapeHtml(product.name)}</strong>
+        <span>${escapeHtml(money(product.price * item.quantity))}</span>
+      </div>
+      <div class="customer-quantity-controls">
+        <button class="mini-btn" type="button" data-customer-decrease="${index}" aria-label="Decrease ${escapeHtml(product.name)}">-</button>
+        <button class="mini-btn" type="button" data-customer-increase="${index}" aria-label="Increase ${escapeHtml(product.name)}">+</button>
+        <button class="mini-btn danger-action" type="button" data-customer-remove="${index}">Remove</button>
+      </div>
+    </div>
+  `;
+}
+function customerCartHtml(cartItems) {
+    const total = getItemsTotal(cartItems);
+    const itemCount = getItemCount(cartItems);
+    const shortages = getStockShortages(cartItems, CUSTOMER_QR_ORDER_CONTEXT);
+    const blocked = !cartItems.length || shortages.length > 0;
+    const shortageText = shortages.length
+        ? `<p class="customer-cart-note">Missing ${escapeHtml(shortages.map((item) => `${formatStockAmount(item.shortage, item.ingredient.unit)} ${item.ingredient.name}`).join(", "))}.</p>`
+        : "";
+    return `
+    <form id="customerOrderForm" class="customer-cart-panel">
+      <div class="panel-header compact">
+        <div>
+          <p class="eyebrow">Cart</p>
+          <h2>${itemCount ? `${itemCount} item${itemCount === 1 ? "" : "s"}` : "Your order"}</h2>
+        </div>
+      </div>
+      <div class="customer-cart-lines">
+        ${cartItems.length ? cartItems.map(customerCartLine).join("") : emptyState("Choose items from the menu.")}
+      </div>
+      ${shortageText}
+      <label>
+        Notes
+        <textarea name="notes" rows="3" placeholder="Allergy, no onion, extra sauce"></textarea>
+      </label>
+      <fieldset class="customer-payment-options">
+        <legend>Payment</legend>
+        <label class="check-row">
+          <input name="paymentOption" type="radio" value="online" checked>
+          <span>Pay online now</span>
+        </label>
+        <label class="check-row">
+          <input name="paymentOption" type="radio" value="later">
+          <span>Order now, pay later</span>
+        </label>
+      </fieldset>
+      <div class="customer-cart-total">
+        <span>Total</span>
+        <strong>${escapeHtml(money(total))}</strong>
+      </div>
+      <button class="primary-btn" type="submit" ${blocked ? "disabled" : ""}>Place Order · ${escapeHtml(money(total))}</button>
+    </form>
+  `;
+}
+function renderCustomerQrScreen() {
+    const screen = document.querySelector("#customerQrScreen");
+    const session = getCustomerQrSession();
+    if (!screen || !session)
+        return;
+    if (session.error) {
+        screen.innerHTML = `
+      <main class="customer-shell customer-error-shell">
+        <section class="customer-error-card">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true">L</span>
+            <div>
+              <strong>Libabite</strong>
+              <span>QR ordering</span>
+            </div>
+          </div>
+          <h1>QR ordering unavailable</h1>
+          <p>${escapeHtml(session.error)}</p>
+          <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
+        </section>
+      </main>
+    `;
+        return;
+    }
+    const table = session.table;
+    const code = session.code;
+    const cartItems = getCustomerCartItems();
+    const products = getOrderableProducts(CUSTOMER_QR_CHANNEL);
+    const productsByCategory = PRODUCT_CATEGORIES
+        .map((category) => ({
+        category,
+        products: products.filter((product) => product.category === category)
+    }))
+        .filter((group) => group.products.length);
+    const lastOrder = orderById(state.customerLastOrderId);
+    const confirmation = lastOrder ? `
+    <section class="customer-confirmation">
+      <div>
+        <p class="eyebrow">Sent to kitchen</p>
+        <h2>Order #${escapeHtml(lastOrder.number)} received</h2>
+        <p>${escapeHtml(orderLocationLabel(lastOrder))} · ${escapeHtml(getOrderPaymentSummary(lastOrder).statusLabel)} · ${escapeHtml(money(getOrderTotal(lastOrder)))}</p>
+      </div>
+      <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>
+    </section>
+  ` : "";
+    screen.innerHTML = `
+    <header class="customer-topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">L</span>
+        <div>
+          <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
+          <span>${escapeHtml(state.restaurantSettings.location)}</span>
+        </div>
+      </div>
+      <div class="customer-table-badge">
+        <span>${escapeHtml(code.area || table.zone)}</span>
+        <strong>${escapeHtml(table.name)}</strong>
+      </div>
+    </header>
+    <main class="customer-shell">
+      ${confirmation}
+      <section class="customer-menu-panel">
+        <div class="panel-header compact">
+          <div>
+            <p class="eyebrow">Menu</p>
+            <h1>${escapeHtml(table.name)} ordering</h1>
+          </div>
+        </div>
+        <div class="customer-menu-groups">
+          ${productsByCategory.length ? productsByCategory.map((group) => `
+            <section class="customer-menu-group">
+              <h2>${escapeHtml(group.category)}</h2>
+              <div class="customer-product-grid">
+                ${group.products.map((product) => customerProductCard(product, cartItems)).join("")}
+              </div>
+            </section>
+          `).join("") : emptyState("No QR menu items are active.")}
+        </div>
+      </section>
+      ${customerCartHtml(cartItems)}
+    </main>
   `;
 }
 function renderMetrics() {
@@ -1738,6 +3428,7 @@ function renderMetrics() {
         .join("");
 }
 function renderDashboard() {
+    renderKeftaLoopProof();
     const recentOrders = state.orders.slice(-4).reverse();
     document.querySelector("#dashboardOrderStream").innerHTML = recentOrders.length
         ? recentOrders.map(orderCard).join("")
@@ -1748,13 +3439,15 @@ function renderDashboard() {
         const open = openTickets.length;
         const slaSummary = getKitchenSlaSummary(openTickets);
         const load = Math.min(100, open * 34);
-        const stationState = slaSummary.escalated ? "sla-escalated" : slaSummary.warning ? "sla-warning" : "";
-        const pillClass = slaSummary.escalated ? "danger" : slaSummary.warning ? "warning" : open ? "info" : "ok";
-        const pillText = slaSummary.escalated
-            ? `${slaSummary.escalated} late`
-            : slaSummary.warning
-                ? `${slaSummary.warning} warn`
-                : `${open} open`;
+        const stationState = slaSummary.delayed || slaSummary.escalated ? "sla-escalated" : slaSummary.warning ? "sla-warning" : "";
+        const pillClass = slaSummary.delayed || slaSummary.escalated ? "danger" : slaSummary.warning ? "warning" : open ? "info" : "ok";
+        const pillText = slaSummary.delayed
+            ? `${slaSummary.delayed} delayed`
+            : slaSummary.escalated
+                ? `${slaSummary.escalated} late`
+                : slaSummary.warning
+                    ? `${slaSummary.warning} warn`
+                    : `${open} open`;
         return `
       <article class="station-card ${stationState}">
         <div class="card-title">
@@ -1771,31 +3464,201 @@ function renderDashboard() {
         ? alerts.map(alertCard).join("")
         : emptyState("No reorder alerts.");
 }
+function getOrderQuantityForProduct(order, productId) {
+    return normalizeOrderItems(order.items || [])
+        .filter((item) => item.productId === productId)
+        .reduce((sum, item) => sum + item.quantity, 0);
+}
+function getLatestOrderForProduct(productId) {
+    return state.orders
+        .slice()
+        .reverse()
+        .find((order) => getOrderQuantityForProduct(order, productId) > 0);
+}
+function renderKeftaLoopProof() {
+    const container = document.querySelector("#keftaLoopProof");
+    if (!container)
+        return;
+    const ingredient = ingredientById("kefta");
+    const product = productById("kefta-plate");
+    if (!ingredient || !product) {
+        container.innerHTML = emptyState("Kefta loop is waiting for setup.");
+        return;
+    }
+    const demoQuantity = 10;
+    const orderContext = DEFAULT_RECIPE_ORDER_CONTEXT;
+    const demoUsage = normalizeStockQuantity(getStockRequirementsForItems([{ productId: product.id, quantity: demoQuantity }], orderContext).get(ingredient.id) || 0);
+    const latestOrder = getLatestOrderForProduct(product.id);
+    const latestQuantity = latestOrder ? getOrderQuantityForProduct(latestOrder, product.id) : 0;
+    const latestUsage = latestOrder
+        ? normalizeStockQuantity(getStockRequirementsForItems(latestOrder.items, {
+            channel: latestOrder.channel,
+            fulfillment: latestOrder.fulfillment
+        }).get(ingredient.id) || 0)
+        : 0;
+    const previousStock = latestOrder ? normalizeStockQuantity(ingredient.stock + latestUsage) : ingredient.stock;
+    const projectedStock = normalizeStockQuantity(ingredient.stock - demoUsage);
+    const recipeLine = product.recipe.find((line) => line.ingredientId === ingredient.id);
+    const marginProfile = getProductMarginProfile(product);
+    const stockStatus = getIngredientStatus(ingredient);
+    const stockClass = stockStatus === "danger" ? "danger" : stockStatus === "warning" ? "warning" : "ok";
+    const stockLabel = stockStatus === "danger" ? "Low stock" : stockStatus === "warning" ? "Watch" : "Healthy";
+    const proofText = latestOrder
+        ? `Order #${latestOrder.number}: ${latestQuantity} Kefta Plates used ${formatStockAmount(latestUsage, ingredient.unit)}.`
+        : `${demoQuantity} Kefta Plates use ${formatStockAmount(demoUsage, ingredient.unit)}.`;
+    const stockTrail = latestOrder
+        ? `${formatStockAmount(previousStock, ingredient.unit)} -> ${formatStockAmount(ingredient.stock, ingredient.unit)}`
+        : `${formatStockAmount(ingredient.stock, ingredient.unit)} -> ${formatStockAmount(projectedStock, ingredient.unit)}`;
+    container.className = `phase-loop-card ${stockClass === "danger" ? "danger" : ""}`;
+    container.innerHTML = `
+    <header>
+      <div>
+        <p class="eyebrow">Phase 5 test product</p>
+        <h3>Kefta Plate loop</h3>
+      </div>
+      <div class="ticket-pills">
+        <span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>
+        <span class="pill ${marginProfile.className}">${marginProfile.margin.toFixed(1)}% margin</span>
+      </div>
+    </header>
+    <p>${escapeHtml(proofText)}</p>
+    <div class="phase-loop-grid">
+      <div class="phase-loop-metric">
+        <span>Purchased product</span>
+        <strong>${escapeHtml(ingredient.name)}</strong>
+        <small>${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))} in ${escapeHtml(ingredient.location)}</small>
+      </div>
+      <div class="phase-loop-metric">
+        <span>Recipe</span>
+        <strong>${escapeHtml(recipeLine ? getRecipeUsageLabel(recipeLine) : "No recipe")}</strong>
+        <small>per Kefta Plate</small>
+      </div>
+      <div class="phase-loop-metric">
+        <span>10-plate stock move</span>
+        <strong>${escapeHtml(formatStockAmount(demoUsage, ingredient.unit))}</strong>
+        <small>${escapeHtml(stockTrail)}</small>
+      </div>
+      <div class="phase-loop-metric">
+        <span>Cost and margin</span>
+        <strong>${escapeHtml(money(getProductCost(product, orderContext)))}</strong>
+        <small>${marginProfile.baseMargin.toFixed(1)}% at ${escapeHtml(money(product.price))}</small>
+      </div>
+    </div>
+  `;
+}
+function orderStatusClass(status) {
+    if (status === "Paid" || status === "Served")
+        return "ok";
+    if (status === "Cancelled" || status === "Delayed")
+        return "danger";
+    if (status === "New")
+        return "warning";
+    return "info";
+}
+function orderTypeLabel(order) {
+    return orderTypeDefinition(order.orderType || order.channel).label;
+}
+function orderLocationLabel(order) {
+    const table = tableById(order.tableId);
+    if (table)
+        return table.name;
+    return order.customer || "Walk-in";
+}
+function userNameById(userId) {
+    return state.users.find((user) => user.id === userId)?.name || "";
+}
+function getOrderStaffName(order) {
+    return userNameById(order.staffId) || order.staffName || "Staff";
+}
+function getOrderPaidByName(order) {
+    return userNameById(order.paidByUserId) || order.paidByName || getOrderStaffName(order);
+}
+function isOrderPaid(order) {
+    return order.paymentStatus === "Paid" || isPaidPaymentMethod(order.paymentMethod);
+}
+function getOrderPaymentSummary(order) {
+    const paid = isOrderPaid(order);
+    const paymentMethod = normalizePaymentMethod(order.paymentMethod, order.paymentStatus);
+    return {
+        paid,
+        method: paid ? paymentMethod : UNPAID_PAYMENT_METHOD,
+        statusLabel: paid ? "Paid" : "Unpaid",
+        className: paid ? "ok" : "warning"
+    };
+}
+function paymentMethodOptionsHtml(selectedMethod = DEFAULT_PAID_PAYMENT_METHOD, paidOnly = false) {
+    const options = paidOnly ? PAYMENT_METHOD_OPTIONS.filter((option) => option.paid) : PAYMENT_METHOD_OPTIONS;
+    const normalizedMethod = normalizePaymentMethod(selectedMethod);
+    const selected = paidOnly && !isPaidPaymentMethod(normalizedMethod) ? DEFAULT_PAID_PAYMENT_METHOD : normalizedMethod;
+    return options
+        .map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selected ? "selected" : ""}>${escapeHtml(option.label)}</option>`)
+        .join("");
+}
+function paymentCaptureHtml(order) {
+    return `
+    <span class="payment-capture">
+      <select class="mini-select" data-payment-method-select="${escapeHtml(order.id)}" aria-label="Payment method for order #${escapeHtml(order.number)}">
+        ${paymentMethodOptionsHtml(order.paymentMethod, true)}
+      </select>
+      <button class="mini-btn" type="button" data-mark-paid="${escapeHtml(order.id)}">Mark Paid</button>
+    </span>
+  `;
+}
+function getSelectedPaymentMethodFromAction(action) {
+    const select = action.closest(".payment-capture")?.querySelector("[data-payment-method-select]");
+    return normalizePaymentMethod(select?.value || DEFAULT_PAID_PAYMENT_METHOD);
+}
+function orderItemDetailText(item) {
+    const details = [
+        item.modifiers?.length ? item.modifiers.join(", ") : "",
+        item.note || ""
+    ].filter(Boolean);
+    return details.join(" · ");
+}
 function orderCard(order) {
     const productLines = order.items.map((item) => {
         const product = productById(item.productId);
         if (!product)
             return null;
-        return `${item.quantity}x ${product.name}`;
+        const detail = orderItemDetailText(item);
+        return `${item.quantity}x ${product.name}${detail ? ` (${detail})` : ""}`;
     }).filter(Boolean).join(", ");
-    const statusClass = order.status === "Ready" || order.status === "Done" ? "ok" : order.status === "Queued" ? "warning" : "info";
+    const statusClass = orderStatusClass(order.status);
+    const paymentSummary = getOrderPaymentSummary(order);
+    const canFrontUpdate = can("canCreateOrders") && order.status !== "Paid" && order.status !== "Cancelled";
+    const canKitchenUpdate = can("canAdvanceTickets") && ["Sent to kitchen", "Preparing", "Delayed"].includes(order.status);
+    const kitchenSummary = getOrderProgressSummary(order);
     return `
     <article class="order-card">
       <div>
         <div class="card-title">
           <strong>#${order.number} ${escapeHtml(productLines)}</strong>
           <span class="pill ${statusClass}">${escapeHtml(order.status)}</span>
+          <span class="pill ${paymentSummary.className}">${escapeHtml(paymentSummary.statusLabel)}</span>
         </div>
         <div class="meta-line">
-          <span>${escapeHtml(order.channel)}</span>
-          <span>${escapeHtml(order.customer)}</span>
+          <span>${escapeHtml(orderTypeLabel(order))}</span>
+          <span>${escapeHtml(orderLocationLabel(order))}</span>
           <span>${escapeHtml(order.fulfillment)}</span>
           <span>${escapeHtml(money(getOrderTotal(order)))}</span>
-          <span>${escapeHtml(order.paymentStatus)}</span>
+          <span>Payment: ${escapeHtml(paymentSummary.method)}</span>
+          <span>Staff: ${escapeHtml(getOrderStaffName(order))}</span>
         </div>
+        ${kitchenSummary.total ? `
+          <div class="order-progress-mini">
+            <div class="progress-track"><div class="progress-bar" style="--value: ${kitchenSummary.percent}%"></div></div>
+            <span>${kitchenSummary.finished}/${kitchenSummary.total} kitchen tasks ready</span>
+          </div>
+        ` : ""}
       </div>
       <div class="mini-actions">
-        ${order.status !== "Done" && (can("canCreateOrders") || can("canAdvanceTickets")) ? `<button class="mini-btn" type="button" data-next-order="${escapeHtml(order.id)}">Next</button>` : ""}
+        ${order.status === "New" && canFrontUpdate ? `<button class="mini-btn" type="button" data-send-kitchen="${escapeHtml(order.id)}">Send</button>` : ""}
+        ${canKitchenUpdate ? `<button class="mini-btn" type="button" data-next-order="${escapeHtml(order.id)}">Next</button>` : ""}
+        ${order.status === "Ready" && canFrontUpdate ? `<button class="mini-btn" type="button" data-mark-served="${escapeHtml(order.id)}">Served</button>` : ""}
+        ${!paymentSummary.paid && canFrontUpdate ? paymentCaptureHtml(order) : ""}
+        ${order.status === "New" && canFrontUpdate ? `<button class="mini-btn danger-action" type="button" data-cancel-order="${escapeHtml(order.id)}">Cancel</button>` : ""}
+        <button class="mini-btn" type="button" data-show-receipt="${escapeHtml(order.id)}">Receipt</button>
+        <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Print</button>
       </div>
     </article>
   `;
@@ -1822,47 +3685,225 @@ function alertCard(ingredient) {
 function renderOrders() {
     const filtered = state.orderFilter === "All"
         ? state.orders
-        : state.orders.filter((order) => order.fulfillment === state.orderFilter);
+        : state.orderFilter === "Dine-in"
+            ? state.orders.filter((order) => orderTypeDefinition(order.channel).requiresTable)
+            : state.orderFilter === "Kitchen"
+                ? state.orders.filter((order) => ["Sent to kitchen", "Preparing", "Delayed", "Ready"].includes(order.status))
+                : state.orderFilter === "Paid"
+                    ? state.orders.filter((order) => isOrderPaid(order))
+                    : state.orderFilter === "Unpaid"
+                        ? state.orders.filter((order) => !isOrderPaid(order) && order.status !== "Cancelled")
+                        : state.orders.filter((order) => order.fulfillment === state.orderFilter);
     document.querySelector("#orderList").innerHTML = filtered.length
         ? filtered.slice().reverse().map(orderCard).join("")
         : emptyState("No orders match this filter.");
     document.querySelectorAll("[data-order-filter]").forEach((button) => {
         button.classList.toggle("is-selected", button.dataset.orderFilter === state.orderFilter);
     });
+    renderReceipt();
+}
+function receiptLineHtml(item) {
+    const product = productById(item.productId);
+    if (!product)
+        return "";
+    const detail = orderItemDetailText(item);
+    return `
+    <div class="receipt-line">
+      <div>
+        <strong>${escapeHtml(product.name)}</strong>
+        <span>Qty ${item.quantity} x ${escapeHtml(money(product.price))}</span>
+        ${detail ? `<span>${escapeHtml(detail)}</span>` : ""}
+      </div>
+      <span>${escapeHtml(money(product.price * item.quantity))}</span>
+    </div>
+  `;
+}
+function renderReceipt() {
+    const container = document.querySelector("#receiptPreview");
+    if (!container)
+        return;
+    const order = orderById(state.receiptOrderId) || state.orders[state.orders.length - 1];
+    if (!order) {
+        container.innerHTML = emptyState("Select an order to show a receipt.");
+        return;
+    }
+    const settings = state.restaurantSettings;
+    const paymentSummary = getOrderPaymentSummary(order);
+    const vatBreakdown = getOrderVatBreakdown(order);
+    state.receiptOrderId = order.id;
+    container.innerHTML = `
+    <article class="receipt-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(settings.restaurantName)}</strong>
+          <span>${escapeHtml(settings.location)}</span>
+        </div>
+        <div class="ticket-pills">
+          <span class="pill ${orderStatusClass(order.status)}">${escapeHtml(order.status)}</span>
+          <span class="pill ${paymentSummary.className}">${escapeHtml(paymentSummary.statusLabel)}</span>
+        </div>
+      </header>
+      <div class="receipt-meta">
+        <span>Order #${escapeHtml(order.number)}</span>
+        <span>${escapeHtml(formatDateTime(order.createdAtMs, order.createdAt))}</span>
+        <span>${escapeHtml(orderTypeLabel(order))}</span>
+        <span>${escapeHtml(orderLocationLabel(order))}</span>
+        <span>Staff: ${escapeHtml(getOrderStaffName(order))}</span>
+      </div>
+      <div class="receipt-lines">
+        ${order.items.map(receiptLineHtml).join("")}
+      </div>
+      ${order.notes ? `<p class="receipt-note">Order note: ${escapeHtml(order.notes)}</p>` : ""}
+      <div class="receipt-totals">
+        <div class="receipt-total receipt-subtotal">
+          <span>Subtotal excl. VAT</span>
+          <strong>${escapeHtml(money(getOrderSubtotalExcludingVat(order)))}</strong>
+        </div>
+        ${vatBreakdown.map((row) => `
+          <div class="receipt-total receipt-tax">
+            <span>${escapeHtml(getVatLabel(row.vatSetting))} (${Math.round(row.rate * 100)}%)</span>
+            <strong>${escapeHtml(money(row.tax))}</strong>
+          </div>
+        `).join("")}
+        <div class="receipt-total">
+          <span>Total</span>
+          <strong>${escapeHtml(money(getOrderTotal(order)))}</strong>
+        </div>
+      </div>
+      <div class="receipt-meta">
+        <span>Payment method: ${escapeHtml(paymentSummary.method)}</span>
+        ${paymentSummary.paid && order.paidAt ? `<span>Paid ${escapeHtml(formatDateTime(order.paidAtMs, order.paidAt))}</span>` : ""}
+        ${paymentSummary.paid ? `<span>Paid by: ${escapeHtml(getOrderPaidByName(order))}</span>` : ""}
+      </div>
+      <div class="mini-actions receipt-actions">
+        ${can("canCreateOrders") && !paymentSummary.paid && order.status !== "Cancelled" ? paymentCaptureHtml(order) : ""}
+        <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Print Receipt</button>
+      </div>
+    </article>
+  `;
 }
 function renderKitchen() {
     const tabs = document.querySelector("#stationTabs");
+    const stationSummary = document.querySelector("#kitchenStationSummary");
+    const activeStation = getStationNames().includes(state.activeStation) ? state.activeStation : "All";
+    state.activeStation = activeStation;
     tabs.innerHTML = getStationNames()
-        .map((station) => `<button type="button" class="${state.activeStation === station ? "is-selected" : ""}" data-station="${escapeHtml(station)}">${escapeHtml(station)}</button>`)
+        .map((station) => {
+        const count = station === "All"
+            ? getOpenTickets().length
+            : getOpenTickets().filter((ticket) => ticket.station === station).length;
+        return `
+        <button type="button" class="${state.activeStation === station ? "is-selected" : ""}" data-station="${escapeHtml(station)}">
+          ${escapeHtml(station)}
+          ${count ? `<span class="tab-count">${count}</span>` : ""}
+        </button>
+      `;
+    })
         .join("");
     const tickets = state.activeStation === "All"
         ? getOpenTickets()
         : getOpenTickets().filter((ticket) => ticket.station === state.activeStation);
+    const sortedTickets = sortKitchenTickets(tickets);
+    if (stationSummary) {
+        stationSummary.innerHTML = kitchenStationSummaryCards(tickets, state.activeStation);
+    }
     document.querySelector("#ticketBoard").innerHTML = tickets.length
-        ? tickets.map(ticketCard).join("")
+        ? sortedTickets.map(ticketCard).join("")
         : emptyState("This screen is clear.");
+    renderKitchenOrderProgress();
+}
+function sortKitchenTickets(tickets) {
+    const statusRank = {
+        Delayed: 0,
+        Queued: 1,
+        Accepted: 2,
+        Preparing: 3,
+        Ready: 4,
+        Done: 5
+    };
+    return tickets.slice().sort((first, second) => {
+        const priorityRank = getTicketPriority(first).label === "Urgent" ? 0 : getTicketPriority(first).label === "High" ? 1 : 2;
+        const nextPriorityRank = getTicketPriority(second).label === "Urgent" ? 0 : getTicketPriority(second).label === "High" ? 1 : 2;
+        return priorityRank - nextPriorityRank
+            || (statusRank[first.status] ?? 9) - (statusRank[second.status] ?? 9)
+            || first.createdAtMs - second.createdAtMs;
+    });
+}
+function kitchenStationSummaryCards(tickets, station) {
+    const stationLabel = station === "All" ? "All stations" : station;
+    const counts = tickets.reduce((summary, ticket) => {
+        summary[ticket.status] = (summary[ticket.status] || 0) + 1;
+        return summary;
+    }, {});
+    const ready = (counts.Ready || 0);
+    const active = (counts.Accepted || 0) + (counts.Preparing || 0) + (counts.Delayed || 0);
+    const newCount = counts.Queued || 0;
+    return [
+        { label: "Screen", value: stationLabel, note: `${tickets.length} open station ${tickets.length === 1 ? "task" : "tasks"}`, className: "info" },
+        { label: "New orders", value: newCount, note: "Waiting for accept", className: newCount ? "warning" : "ok" },
+        { label: "Active", value: active, note: `${counts.Delayed || 0} delayed`, className: counts.Delayed ? "danger" : active ? "info" : "ok" },
+        { label: "Ready", value: ready, note: "Awaiting completion", className: ready ? "ok" : "info" }
+    ].map((card) => `
+    <article class="kds-summary-card">
+      <span>${escapeHtml(card.label)}</span>
+      <strong>${escapeHtml(card.value)}</strong>
+      <small class="${escapeHtml(card.className)}">${escapeHtml(card.note)}</small>
+    </article>
+  `).join("");
+}
+function ticketActionButtons(ticket) {
+    if (!can("canAdvanceTickets"))
+        return "";
+    const done = ticket.status === "Done";
+    const ready = ticket.status === "Ready";
+    return `
+    <div class="mini-actions kds-actions">
+      ${ticket.status === "Queued" ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Accepted">Accept order</button>` : ""}
+      ${!["Preparing", "Ready", "Done"].includes(ticket.status) ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Preparing">Preparing</button>` : ""}
+      ${!ready && !done ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Ready">Ready</button>` : ""}
+      ${!["Delayed", "Ready", "Done"].includes(ticket.status) ? `<button class="mini-btn danger-action" type="button" data-delay-ticket="${escapeHtml(ticket.id)}">Delayed</button>` : ""}
+      ${!done ? `<button class="mini-btn" type="button" data-issue-ticket="${escapeHtml(ticket.id)}">Issue note</button>` : ""}
+      ${ready ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Done">Complete task</button>` : ""}
+    </div>
+  `;
 }
 function ticketCard(ticket) {
     const product = productById(ticket.productId);
     const order = orderById(ticket.orderId);
     const sla = getTicketSla(ticket);
-    const statusClass = ticket.status === "Ready" ? "ok" : ticket.status === "Preparing" ? "info" : "warning";
+    const priority = getTicketPriority(ticket);
+    const statusClass = ticketStatusClass(ticket.status);
+    const orderAge = getTicketOrderAgeMinutes(ticket);
+    const orderLabel = order ? `#${order.number} ${orderLocationLabel(order)}` : ticket.orderId;
+    const notes = ticket.notes || "No notes or modifiers";
     return `
-    <article class="ticket-card ${sla.cardClass}">
+    <article class="ticket-card ${sla.cardClass} status-${escapeHtml(slugify(ticket.status))}">
       <header>
         <div>
-          <strong>${ticket.quantity}x ${escapeHtml(product?.name || "Unknown item")}</strong>
-          <p>${escapeHtml(order ? `#${order.number} ${order.customer}` : ticket.orderId)}</p>
+          <span class="ticket-kicker">${escapeHtml(ticket.station)}</span>
+          <strong>${escapeHtml(orderLabel)}</strong>
+          <p>${ticket.quantity}x ${escapeHtml(product?.name || "Unknown item")}</p>
         </div>
         <div class="ticket-pills">
-          <span class="pill ${statusClass}">${escapeHtml(ticket.status)}</span>
+          <span class="pill ${statusClass}">${escapeHtml(getTicketStatusLabel(ticket.status))}</span>
+          <span class="pill ${priority.className}">${escapeHtml(priority.label)}</span>
           <span class="pill ${sla.pillClass}">${escapeHtml(sla.label)}</span>
         </div>
       </header>
-      <p>${escapeHtml(ticket.notes || "No notes")}</p>
+      <div class="ticket-notes">
+        <span>Notes/modifiers</span>
+        <p>${escapeHtml(notes)}</p>
+      </div>
+      ${ticket.issueNote ? `
+        <div class="ticket-issue">
+          <span>Issue</span>
+          <p>${escapeHtml(ticket.issueNote)}</p>
+        </div>
+      ` : ""}
       <div class="ticket-timing">
         <div class="meta-line">
-          <span>Age ${escapeHtml(formatDuration(sla.ageMinutes))}</span>
+          <span>Placed ${escapeHtml(formatDuration(orderAge))} ago</span>
+          <span>Kitchen ${escapeHtml(formatDuration(sla.ageMinutes))}</span>
           <span>Target ${sla.targetMinutes}m</span>
           <span>${escapeHtml(sla.detail)}</span>
         </div>
@@ -1870,11 +3911,100 @@ function ticketCard(ticket) {
           <div class="progress-bar" style="--value: ${sla.progress}%"></div>
         </div>
       </div>
-      <div class="mini-actions">
-        ${can("canAdvanceTickets") ? `<button class="mini-btn" type="button" data-next-ticket="${escapeHtml(ticket.id)}">Next</button>` : ""}
+      ${ticketActionButtons(ticket)}
+    </article>
+  `;
+}
+function getOrderProgressSummary(order) {
+    const tickets = state.tickets.filter((ticket) => ticket.orderId === order.id);
+    const finished = tickets.filter((ticket) => ticket.status === "Ready" || ticket.status === "Done").length;
+    const completed = tickets.filter((ticket) => ticket.status === "Done").length;
+    const delayed = tickets.filter((ticket) => ticket.status === "Delayed").length;
+    const preparing = tickets.filter((ticket) => ticket.status === "Preparing").length;
+    const accepted = tickets.filter((ticket) => ticket.status === "Accepted").length;
+    const total = tickets.length;
+    const percent = total ? Math.round((finished / total) * 100) : 0;
+    let status = order.status;
+    if (delayed)
+        status = "Delayed";
+    else if (total && completed === total)
+        status = "Complete";
+    else if (total && finished === total)
+        status = "Ready";
+    else if (preparing)
+        status = "Preparing";
+    else if (accepted)
+        status = "Accepted";
+    else if (finished)
+        status = "In progress";
+    else if (total)
+        status = "New";
+    const className = status === "Delayed" ? "danger" : status === "Ready" || status === "Complete" ? "ok" : status === "New" ? "warning" : "info";
+    return { tickets, finished, completed, delayed, preparing, accepted, total, percent, status, className };
+}
+function getStationProgressRows(order) {
+    const tickets = state.tickets.filter((ticket) => ticket.orderId === order.id);
+    const byStation = new Map();
+    tickets.forEach((ticket) => {
+        const rows = byStation.get(ticket.station) || [];
+        rows.push(ticket);
+        byStation.set(ticket.station, rows);
+    });
+    return [...byStation.entries()].map(([station, stationTickets]) => {
+        const summary = getKitchenSlaSummary(stationTickets.filter((ticket) => ticket.status !== "Done"));
+        const ready = stationTickets.filter((ticket) => ticket.status === "Ready" || ticket.status === "Done").length;
+        const completed = stationTickets.filter((ticket) => ticket.status === "Done").length;
+        const status = stationTickets.some((ticket) => ticket.status === "Delayed")
+            ? "Delayed"
+            : completed === stationTickets.length
+                ? "Complete"
+                : ready === stationTickets.length
+                    ? "Ready"
+                    : stationTickets.some((ticket) => ticket.status === "Preparing")
+                        ? "Preparing"
+                        : stationTickets.some((ticket) => ticket.status === "Accepted")
+                            ? "Accepted"
+                            : "New";
+        const className = status === "Delayed" || summary.escalated ? "danger" : status === "Ready" || status === "Complete" ? "ok" : status === "New" ? "warning" : "info";
+        return { station, status, className, ready, total: stationTickets.length };
+    });
+}
+function orderProgressCard(order) {
+    const summary = getOrderProgressSummary(order);
+    const stationRows = getStationProgressRows(order);
+    return `
+    <article class="order-progress-card">
+      <header>
+        <div>
+          <strong>#${order.number} ${escapeHtml(orderLocationLabel(order))}</strong>
+          <p>${summary.finished}/${summary.total} station ${summary.total === 1 ? "task" : "tasks"} ready · ${escapeHtml(orderTypeLabel(order))}</p>
+        </div>
+        <span class="pill ${summary.className}">${escapeHtml(summary.status)}</span>
+      </header>
+      <div class="progress-track"><div class="progress-bar" style="--value: ${summary.percent}%"></div></div>
+      <div class="station-progress-list">
+        ${stationRows.map((row) => `
+          <div class="station-progress-row">
+            <span>${escapeHtml(row.station)}</span>
+            <strong>${row.ready}/${row.total} · ${escapeHtml(row.status)}</strong>
+          </div>
+        `).join("")}
       </div>
     </article>
   `;
+}
+function renderKitchenOrderProgress() {
+    const container = document.querySelector("#kitchenOrderProgress");
+    if (!container)
+        return;
+    const kitchenOrders = state.orders
+        .filter((order) => ["Sent to kitchen", "Preparing", "Delayed", "Ready", "Served"].includes(order.status))
+        .filter((order) => state.tickets.some((ticket) => ticket.orderId === order.id))
+        .slice()
+        .sort((first, second) => (second.createdAtMs || 0) - (first.createdAtMs || 0));
+    container.innerHTML = kitchenOrders.length
+        ? kitchenOrders.map(orderProgressCard).join("")
+        : emptyState("No kitchen progress to show.");
 }
 function getRecipeMeasureOptionsForIngredient(ingredient) {
     const measure = unitTypeDefinition(ingredient?.unitType).recipeMeasure;
@@ -1884,13 +4014,20 @@ function getRecipeMeasureOptionsForIngredient(ingredient) {
         return [{ id: "milliliters", label: "milliliters" }];
     return [{ id: "units", label: unitTypeDefinition(ingredient?.unitType).label }];
 }
-function buildRecipeLine(ingredientId, quantity, measureKey) {
+function buildRecipeLine(ingredientId, quantity, measureKey, station, wastePercent = 0, appliesTo = "all", notes = "") {
     const amount = Math.max(0, Number(quantity) || 0);
+    const base = {
+        ingredientId,
+        wastePercent: normalizeRecipeWastePercent(wastePercent),
+        station: normalizeKitchenStation(station || "Main kitchen"),
+        appliesTo: normalizeRecipeAppliesTo(appliesTo),
+        notes: String(notes || "").trim()
+    };
     if (measureKey === "grams")
-        return { ingredientId, grams: amount };
+        return { ...base, grams: amount };
     if (measureKey === "milliliters")
-        return { ingredientId, milliliters: amount };
-    return { ingredientId, units: amount };
+        return { ...base, milliliters: amount };
+    return { ...base, units: amount };
 }
 function renderProductManagement() {
     document.querySelectorAll(".admin-product-only").forEach((panel) => {
@@ -1898,6 +4035,56 @@ function renderProductManagement() {
     });
     renderSellableProductForm();
     renderPurchasedProductForm();
+}
+function renderSellableRecipeCostPreview() {
+    const form = document.querySelector("#sellableProductForm");
+    const summary = document.querySelector("#sellableRecipeSummary");
+    if (!form || !summary)
+        return;
+    const price = Math.max(0, Number(form.elements.price.value) || 0);
+    const targetMargin = normalizeMarginPercent(form.elements.targetMargin?.value, DEFAULT_MARGIN_TARGET);
+    const minMargin = Math.min(targetMargin, normalizeMarginPercent(form.elements.minMargin?.value, DEFAULT_MARGIN_MINIMUM));
+    const draftProduct = {
+        price,
+        targetMargin,
+        minMargin,
+        recipe: state.productRecipeDraft
+    };
+    const baseCost = getProductCost(draftProduct, DEFAULT_RECIPE_ORDER_CONTEXT);
+    const takeawayCost = getProductCost(draftProduct, TAKEAWAY_DELIVERY_RECIPE_CONTEXT);
+    const baseMargin = price ? getProductMargin(draftProduct, DEFAULT_RECIPE_ORDER_CONTEXT) : 0;
+    const takeawayMargin = price ? getProductMargin(draftProduct, TAKEAWAY_DELIVERY_RECIPE_CONTEXT) : 0;
+    const hasConditionalLines = productHasConditionalRecipeLines(draftProduct);
+    const worstMargin = hasConditionalLines ? Math.min(baseMargin, takeawayMargin) : baseMargin;
+    const pillClass = !price || !state.productRecipeDraft.length
+        ? "info"
+        : worstMargin < minMargin
+            ? "danger"
+            : worstMargin < targetMargin
+                ? "warning"
+                : "ok";
+    const pillText = !price || !state.productRecipeDraft.length
+        ? "Waiting"
+        : worstMargin < minMargin
+            ? "Below minimum"
+            : worstMargin < targetMargin
+                ? "Below target"
+                : "On target";
+    summary.innerHTML = `
+    <div class="cost-preview-title">
+      <strong>Recipe cost preview</strong>
+      <span class="pill ${pillClass}">${escapeHtml(pillText)}</span>
+    </div>
+    <div class="cost-grid">
+      <span>Base cost</span><strong>${escapeHtml(money(baseCost))}</strong>
+      <span>Gross margin</span><strong>${escapeHtml(money(Math.max(0, price - baseCost)))}</strong>
+      <span>Margin %</span><strong>${baseMargin.toFixed(1)}%</strong>
+      ${hasConditionalLines ? `
+        <span>Takeaway/delivery cost</span><strong>${escapeHtml(money(takeawayCost))}</strong>
+        <span>Takeaway/delivery margin</span><strong>${takeawayMargin.toFixed(1)}%</strong>
+      ` : ""}
+    </div>
+  `;
 }
 function renderSellableProductForm() {
     const form = document.querySelector("#sellableProductForm");
@@ -1907,10 +4094,12 @@ function renderSellableProductForm() {
     const availabilityChecks = document.querySelector("#sellableAvailabilityChecks");
     const ingredientSelect = document.querySelector("#sellableRecipeIngredient");
     const measureSelect = document.querySelector("#sellableRecipeMeasure");
+    const recipeStationSelect = document.querySelector("#sellableRecipeStation");
+    const appliesSelect = document.querySelector("#sellableRecipeAppliesTo");
     const draftPanel = document.querySelector("#sellableRecipeDraft");
     const addRecipeButton = document.querySelector("#addRecipeLineBtn");
     const createButton = document.querySelector("#createSellableProductBtn");
-    if (!form || !categorySelect || !stationSelect || !vatSelect || !availabilityChecks || !ingredientSelect || !measureSelect || !draftPanel || !addRecipeButton || !createButton)
+    if (!form || !categorySelect || !stationSelect || !vatSelect || !availabilityChecks || !ingredientSelect || !measureSelect || !recipeStationSelect || !appliesSelect || !draftPanel || !addRecipeButton || !createButton)
         return;
     const editable = can("canManageProducts");
     const selectedCategory = categorySelect.value || PRODUCT_CATEGORIES[0];
@@ -1918,12 +4107,17 @@ function renderSellableProductForm() {
         .map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
         .join("");
     categorySelect.value = PRODUCT_CATEGORIES.includes(selectedCategory) ? selectedCategory : PRODUCT_CATEGORIES[0];
-    const stations = [...new Set([...KITCHEN_STATIONS, ...state.products.map((product) => product.station).filter(Boolean)])];
-    const selectedStation = stationSelect.value || stations[0];
+    const stations = [...new Set([...KITCHEN_STATIONS, ...state.products.map((product) => normalizeKitchenStation(product.station)).filter(Boolean)])];
+    const selectedStation = normalizeKitchenStation(stationSelect.value || stations[0]);
     stationSelect.innerHTML = stations
         .map((station) => `<option value="${escapeHtml(station)}">${escapeHtml(station)}</option>`)
         .join("");
     stationSelect.value = stations.includes(selectedStation) ? selectedStation : stations[0];
+    const selectedRecipeStation = normalizeKitchenStation(recipeStationSelect.value || stationSelect.value || stations[0]);
+    recipeStationSelect.innerHTML = stations
+        .map((station) => `<option value="${escapeHtml(station)}">${escapeHtml(station)}</option>`)
+        .join("");
+    recipeStationSelect.value = stations.includes(selectedRecipeStation) ? selectedRecipeStation : stationSelect.value || stations[0];
     const selectedVat = vatSelect.value || VAT_OPTIONS[0].id;
     vatSelect.innerHTML = VAT_OPTIONS
         .map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`)
@@ -1954,6 +4148,11 @@ function renderSellableProductForm() {
         .map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`)
         .join("");
     measureSelect.value = measureOptions.some((option) => option.id === selectedMeasure) ? selectedMeasure : measureOptions[0]?.id || "units";
+    const selectedAppliesTo = appliesSelect.value || "all";
+    appliesSelect.innerHTML = RECIPE_APPLIES_OPTIONS
+        .map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`)
+        .join("");
+    appliesSelect.value = RECIPE_APPLIES_OPTIONS.some((option) => option.id === selectedAppliesTo) ? selectedAppliesTo : "all";
     draftPanel.innerHTML = state.productRecipeDraft.length
         ? `
       <div class="draft-summary">
@@ -1970,6 +4169,7 @@ function renderSellableProductForm() {
               <div>
                 <strong>${escapeHtml(ingredient.name)}</strong>
                 <p>${escapeHtml(getRecipeUsageLabel(line))} · ${escapeHtml(money(getLineCost(line)))} cost</p>
+                <p class="line-detail">${escapeHtml(line.station || "Main kitchen")} · ${escapeHtml(RECIPE_APPLIES_OPTIONS.find((option) => option.id === line.appliesTo)?.label || "Every order")}${line.notes ? ` · ${escapeHtml(line.notes)}` : ""}</p>
               </div>
               <button class="mini-btn" type="button" data-remove-recipe-line="${index}" aria-label="Remove ${escapeHtml(ingredient.name)}">Remove</button>
             </div>
@@ -1983,8 +4183,11 @@ function renderSellableProductForm() {
     });
     ingredientSelect.disabled = !editable || !activeIngredients.length;
     measureSelect.disabled = !editable || !activeIngredients.length;
+    recipeStationSelect.disabled = !editable || !activeIngredients.length;
+    appliesSelect.disabled = !editable || !activeIngredients.length;
     addRecipeButton.disabled = !editable || !activeIngredients.length;
     createButton.disabled = !editable || !state.productRecipeDraft.length;
+    renderSellableRecipeCostPreview();
 }
 function renderPurchasedProductForm() {
     const form = document.querySelector("#purchasedProductForm");
@@ -1997,7 +4200,7 @@ function renderPurchasedProductForm() {
         .map((unitType) => `<option value="${escapeHtml(unitType.id)}">${escapeHtml(unitType.label)}</option>`)
         .join("");
     unitSelect.value = UNIT_TYPES.some((unitType) => unitType.id === selectedUnit) ? selectedUnit : "kilograms";
-    const selectedLocation = locationSelect.value || "Freezer";
+    const selectedLocation = locationSelect.value || "Fridge";
     const locations = getAllInventoryLocations();
     locationSelect.innerHTML = locations
         .map((location) => `<option value="${escapeHtml(location)}">${escapeHtml(location)}</option>`)
@@ -2057,6 +4260,133 @@ function inventoryHistoryCard(entry) {
     </article>
   `;
 }
+function wasteReasonOptionsHtml(selectedReason = "Spoiled") {
+    const selected = normalizeWasteReason(selectedReason || "Spoiled");
+    return WASTE_REASONS
+        .map((reason) => `<option value="${escapeHtml(reason.id)}" ${reason.id === selected ? "selected" : ""}>${escapeHtml(reason.label)}</option>`)
+        .join("");
+}
+function wasteStaffOptionsHtml(selectedStaffId = "") {
+    const currentStaff = currentUser();
+    const staffOptions = can("canManageInventory")
+        ? state.users.filter((user) => user.status === "Active")
+        : [currentStaff].filter(Boolean);
+    const selected = staffOptions.some((user) => user.id === selectedStaffId) ? selectedStaffId : currentStaff?.id || staffOptions[0]?.id || "";
+    return staffOptions
+        .map((user) => `<option value="${escapeHtml(user.id)}" ${user.id === selected ? "selected" : ""}>${escapeHtml(user.name)}</option>`)
+        .join("");
+}
+function getWastePreviewHtml(ingredient, quantity, unitType) {
+    if (!ingredient)
+        return emptyState("Create a purchased product before recording waste.");
+    const stockQuantity = convertWasteQuantityToStockUnits(ingredient, quantity, unitType);
+    const cost = getWasteCost(ingredient, stockQuantity);
+    const remaining = normalizeStockQuantity(ingredient.stock - stockQuantity);
+    const className = stockQuantity > ingredient.stock ? "danger" : stockQuantity > 0 ? "" : "warning";
+    const statusText = stockQuantity > ingredient.stock
+        ? `Only ${formatStockAmount(ingredient.stock, ingredient.unit)} available`
+        : `${formatStockAmount(Math.max(0, remaining), ingredient.unit)} after waste`;
+    return `
+    <div class="availability-card ${className}">
+      <header>
+        <strong>${escapeHtml(ingredient.name)}</strong>
+        <span class="pill ${className === "danger" ? "danger" : "info"}">${escapeHtml(money(cost))}</span>
+      </header>
+      <p>${escapeHtml(formatStockAmount(stockQuantity, ingredient.unit))} will leave inventory. ${escapeHtml(statusText)}.</p>
+    </div>
+  `;
+}
+function renderWasteForms() {
+    document.querySelectorAll(".staff-waste-panel").forEach((panel) => {
+        panel.hidden = !can("canRecordWaste");
+    });
+    document.querySelectorAll("[data-waste-form]").forEach((form) => {
+        const productSelect = form.querySelector("[data-waste-product]");
+        const unitSelect = form.querySelector("[data-waste-unit]");
+        const reasonSelect = form.querySelector("[data-waste-reason]");
+        const staffSelect = form.querySelector("[data-waste-staff]");
+        const dateTimeInput = form.querySelector("[data-waste-datetime]");
+        const preview = form.querySelector("[data-waste-preview]");
+        const quantityInput = form.querySelector("[name='quantity']");
+        if (!productSelect || !unitSelect || !reasonSelect || !staffSelect || !dateTimeInput || !preview || !quantityInput)
+            return;
+        const products = state.ingredients.filter((ingredient) => ingredient.active);
+        const selectedProductId = productSelect.value || (products.some((ingredient) => ingredient.id === "kefta") ? "kefta" : products[0]?.id || "");
+        productSelect.innerHTML = products
+            .map((ingredient) => `<option value="${escapeHtml(ingredient.id)}">${escapeHtml(ingredient.name)} - ${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))}</option>`)
+            .join("");
+        productSelect.value = products.some((ingredient) => ingredient.id === selectedProductId) ? selectedProductId : products[0]?.id || "";
+        const ingredient = ingredientById(productSelect.value);
+        const unitOptions = getWasteUnitOptionsForIngredient(ingredient);
+        const selectedUnit = normalizeWasteUnitType(unitSelect.value, ingredient);
+        unitSelect.innerHTML = unitOptions
+            .map((unitType) => `<option value="${escapeHtml(unitType.id)}">${escapeHtml(unitType.label)}</option>`)
+            .join("");
+        unitSelect.value = unitOptions.some((unitType) => unitType.id === selectedUnit) ? selectedUnit : unitOptions[0]?.id || "";
+        reasonSelect.innerHTML = wasteReasonOptionsHtml(reasonSelect.value);
+        staffSelect.innerHTML = wasteStaffOptionsHtml(staffSelect.value);
+        if (!dateTimeInput.value)
+            dateTimeInput.value = formatDateTimeLocalInput();
+        preview.innerHTML = getWastePreviewHtml(ingredient, quantityInput.value, unitSelect.value);
+        form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+            element.disabled = !can("canRecordWaste") || !products.length;
+        });
+    });
+}
+function wasteRecordCard(record) {
+    const ingredient = ingredientById(record.ingredientId);
+    const stockUnit = ingredient?.unit || record.stockUnit || "";
+    return `
+    <article class="log-card waste-card">
+      <div class="card-title">
+        <strong>${escapeHtml(record.ingredientName || ingredient?.name || "Product")}</strong>
+        <span class="pill danger">${escapeHtml(record.reason)}</span>
+        <span class="pill info">${escapeHtml(money(record.cost))}</span>
+      </div>
+      <div class="meta-line">
+        <span>${escapeHtml(formatDateTime(record.occurredAtMs))}</span>
+        <span>${escapeHtml(formatWasteQuantity(record))}</span>
+        <span>${escapeHtml(formatStockAmount(record.stockQuantity, stockUnit))} inventory</span>
+        <span>${escapeHtml(record.staffName || "Staff")}</span>
+      </div>
+      ${record.notes ? `<p>${escapeHtml(record.notes)}</p>` : ""}
+    </article>
+  `;
+}
+function renderWasteReport() {
+    document.querySelectorAll(".admin-waste-only").forEach((panel) => {
+        panel.hidden = !can("canManageInventory");
+    });
+    const summaryContainer = document.querySelector("#wasteReportSummary");
+    const historyContainer = document.querySelector("#wasteHistory");
+    if (!summaryContainer || !historyContainer)
+        return;
+    const summary = getWasteReportSummary();
+    summaryContainer.innerHTML = `
+    <article class="waste-summary-card">
+      <span>Total cost</span>
+      <strong>${escapeHtml(money(summary.totalCost))}</strong>
+      <small>${summary.count} ${summary.count === 1 ? "record" : "records"}</small>
+    </article>
+    <article class="waste-summary-card">
+      <span>Today</span>
+      <strong>${escapeHtml(money(summary.todayCost))}</strong>
+      <small>${summary.todayCount} ${summary.todayCount === 1 ? "item" : "items"}</small>
+    </article>
+    <article class="waste-summary-card">
+      <span>Top reason</span>
+      <strong>${escapeHtml(summary.topReason)}</strong>
+      <small>${summary.count} ${summary.count === 1 ? "waste record" : "waste records"}</small>
+    </article>
+  `;
+    historyContainer.innerHTML = state.wasteRecords.length
+        ? state.wasteRecords.slice().reverse().map(wasteRecordCard).join("")
+        : emptyState("No waste recorded yet.");
+}
+function renderWasteTracking() {
+    renderWasteForms();
+    renderWasteReport();
+}
 function renderInventoryActionForm() {
     const form = document.querySelector("#inventoryActionForm");
     const ingredientSelect = document.querySelector("#inventoryActionIngredient");
@@ -2078,9 +4408,10 @@ function renderInventoryActionForm() {
         .join("");
     ingredientSelect.value = state.ingredients.some((ingredient) => ingredient.id === selectedIngredientId) ? selectedIngredientId : state.ingredients[0]?.id || "";
     actionSelect.innerHTML = INVENTORY_ACTIONS
+        .filter((action) => action.id !== "waste")
         .map((action) => `<option value="${escapeHtml(action.id)}">${escapeHtml(action.label)}</option>`)
         .join("");
-    actionSelect.value = INVENTORY_ACTIONS.some((action) => action.id === selectedAction) ? selectedAction : "add";
+    actionSelect.value = INVENTORY_ACTIONS.some((action) => action.id === selectedAction && action.id !== "waste") ? selectedAction : "add";
     const ingredient = ingredientById(ingredientSelect.value);
     const locations = getAllInventoryLocations();
     fromSelect.innerHTML = locations
@@ -2174,7 +4505,15 @@ function renderInventory() {
         <td>${ingredient.min} / ${ingredient.max} ${escapeHtml(ingredient.unit)}</td>
         <td>${locationStockHtml(ingredient)}</td>
         <td>${escapeHtml(ingredient.supplier)}</td>
-        <td>${escapeHtml(money(ingredient.purchasePrice))} / ${escapeHtml(ingredient.unit)}</td>
+        <td>
+          ${can("canManageProducts") ? `
+            <div class="price-editor">
+              <input data-purchase-price-input="${escapeHtml(ingredient.id)}" type="number" min="0.01" step="0.01" value="${ingredient.purchasePrice.toFixed(2)}" aria-label="Purchase price for ${escapeHtml(ingredient.name)}">
+              <button class="mini-btn" type="button" data-update-purchase-price="${escapeHtml(ingredient.id)}">Update</button>
+            </div>
+            <span class="table-subtext">per ${escapeHtml(ingredient.unit)}</span>
+          ` : `${escapeHtml(money(ingredient.purchasePrice))} / ${escapeHtml(ingredient.unit)}`}
+        </td>
         <td>
           <span>${escapeHtml(expiryText)}</span>
           <span class="table-subtext">${escapeHtml(barcodeText)}</span>
@@ -2187,11 +4526,13 @@ function renderInventory() {
     `;
     }).join("");
     document.querySelector("#recipeList").innerHTML = state.products.map((product) => {
-        const cost = getProductCost(product);
-        const margin = getProductMargin(product);
+        const baseCost = getProductCost(product, DEFAULT_RECIPE_ORDER_CONTEXT);
+        const takeawayCost = getProductCost(product, TAKEAWAY_DELIVERY_RECIPE_CONTEXT);
+        const hasConditionalLines = productHasConditionalRecipeLines(product);
+        const marginProfile = getProductMarginProfile(product);
         const vatLabel = VAT_OPTIONS.find((option) => option.id === product.vatSetting)?.label || "Standard VAT";
         return `
-      <article class="recipe-card ${product.active ? "" : "is-inactive"}">
+      <article class="recipe-card ${product.active ? "" : "is-inactive"} ${marginProfile.className === "danger" ? "is-low-margin" : ""}">
         <header>
           <div>
             <strong>${escapeHtml(product.name)}</strong>
@@ -2199,17 +4540,39 @@ function renderInventory() {
           </div>
           <div class="ticket-pills">
             <span class="pill ${product.active ? "ok" : "warning"}">${product.active ? "Active" : "Inactive"}</span>
-            <span class="pill ${margin >= product.targetMargin ? "ok" : "warning"}">${margin.toFixed(1)}%</span>
+            <span class="pill ${marginProfile.className}">${marginProfile.margin.toFixed(1)}%</span>
           </div>
         </header>
-        <p>Sale ${escapeHtml(money(product.price))} | Cost ${escapeHtml(money(cost))} | Target ${product.targetMargin}% | ${escapeHtml(vatLabel)}</p>
+        <div class="recipe-cost-grid">
+          <span>Selling price</span><strong>${escapeHtml(money(product.price))}</strong>
+          <span>Base product cost</span><strong>${escapeHtml(money(baseCost))}</strong>
+          <span>Gross margin</span><strong>${escapeHtml(money(getProductGrossMargin(product, DEFAULT_RECIPE_ORDER_CONTEXT)))}</strong>
+          <span>Margin</span><strong>${marginProfile.baseMargin.toFixed(1)}%</strong>
+          ${hasConditionalLines ? `
+            <span>Takeaway/delivery cost</span><strong>${escapeHtml(money(takeawayCost))}</strong>
+            <span>Takeaway/delivery margin</span><strong>${marginProfile.takeawayMargin.toFixed(1)}%</strong>
+          ` : ""}
+        </div>
+        ${product.lastProductionAt ? `
+          <p class="line-detail">Last batch actual cost ${escapeHtml(money(product.lastProductionCost))} (${escapeHtml(money(product.lastProductionCostDelta))} vs planned)${product.lastProductionMargin === null ? "" : ` · margin ${product.lastProductionMargin.toFixed(1)}%`} · ${escapeHtml(product.lastProductionAt)}</p>
+        ` : ""}
+        <p>Target ${product.targetMargin}% | Minimum ${product.minMargin}% | ${escapeHtml(marginProfile.label)} | ${escapeHtml(vatLabel)}</p>
         <p>${escapeHtml(productAvailabilityLabel(product))}</p>
         <div class="recipe-lines">
           ${(product.recipe || []).map((line) => {
             const ingredient = ingredientById(line.ingredientId);
             if (!ingredient)
                 return "";
-            return `<div class="recipe-line"><span>${escapeHtml(ingredient.name)}</span><strong>${escapeHtml(getRecipeUsageLabel(line))}</strong></div>`;
+            const appliesLabel = RECIPE_APPLIES_OPTIONS.find((option) => option.id === line.appliesTo)?.label || "Every order";
+            return `
+              <div class="recipe-line">
+                <span>
+                  <strong>${escapeHtml(ingredient.name)}</strong>
+                  <small>${escapeHtml(line.station || "Main kitchen")} · ${escapeHtml(appliesLabel)}${line.notes ? ` · ${escapeHtml(line.notes)}` : ""}</small>
+                </span>
+                <strong>${escapeHtml(getRecipeUsageLabel(line))} · ${escapeHtml(money(getLineCost(line)))}</strong>
+              </div>
+            `;
         }).join("")}
         </div>
         ${can("canManageProducts") ? `
@@ -2225,57 +4588,544 @@ function renderInventory() {
         ? supplierOrders.map(supplierOrderCard).join("")
         : emptyState("No supplier order needed.");
 }
-function renderProcedures() {
-    document.querySelector("#procedureList").innerHTML = state.procedures.map((procedure) => `
-    <article class="procedure-card ${procedure.done ? "is-done" : ""}">
-      <input type="checkbox" ${procedure.done ? "checked" : ""} ${can("canManageProcedures") ? "" : "disabled"} data-procedure="${escapeHtml(procedure.id)}" aria-label="Mark procedure done">
-      <div>
-        <div class="card-title">
-          <strong>${escapeHtml(procedure.owner)}</strong>
-          <span class="pill ${procedure.done ? "ok" : "warning"}">${procedure.done ? "Done" : "Open"}</span>
-        </div>
-        <p>${escapeHtml(procedure.text)}</p>
-      </div>
+function procedureById(id) {
+    return state.procedures.find((procedure) => procedure.id === id);
+}
+function languageLabel(languageId) {
+    return LANGUAGE_OPTIONS.find((language) => language.id === languageId)?.label || "Language";
+}
+function procedureStatusClass(status) {
+    if (status === "Done" || status === "Completed")
+        return "ok";
+    if (status === "Problem")
+        return "danger";
+    if (status === "Skipped" || status === "Missed")
+        return "warning";
+    return "info";
+}
+function procedureFrequencyWindowMs(frequency) {
+    if (frequency === "Weekly")
+        return 7 * 24 * 60 * MINUTE_MS;
+    if (frequency === "Monthly")
+        return 31 * 24 * 60 * MINUTE_MS;
+    if (frequency === "Per shift")
+        return 12 * 60 * MINUTE_MS;
+    return 24 * 60 * MINUTE_MS;
+}
+function getProcedureCompletions(procedureId, statuses = PROCEDURE_COMPLETION_STATUSES) {
+    return state.procedureCompletions
+        .filter((completion) => completion.procedureId === procedureId && statuses.includes(completion.status))
+        .slice()
+        .sort((first, second) => (second.completedAtMs || 0) - (first.completedAtMs || 0));
+}
+function latestProcedureCompletion(procedure, statuses = PROCEDURE_COMPLETION_STATUSES) {
+    return getProcedureCompletions(procedure.id, statuses)[0] || null;
+}
+function procedurePeriodStatus(procedure) {
+    const cutoff = Date.now() - procedureFrequencyWindowMs(procedure.frequency);
+    const recentDone = getProcedureCompletions(procedure.id, ["Done"]).find((completion) => completion.completedAtMs >= cutoff);
+    if (recentDone) {
+        return {
+            status: "Completed",
+            label: "Completed",
+            className: "ok",
+            detail: `${recentDone.completedByName} at ${formatDateTime(recentDone.completedAtMs, recentDone.completedAt)}`
+        };
+    }
+    const recentIssue = getProcedureCompletions(procedure.id, ["Problem", "Skipped"]).find((completion) => completion.completedAtMs >= cutoff);
+    if (recentIssue) {
+        return {
+            status: recentIssue.status,
+            label: recentIssue.status,
+            className: procedureStatusClass(recentIssue.status),
+            detail: `${recentIssue.completedByName}: ${recentIssue.notes || "No note"}`
+        };
+    }
+    return {
+        status: "Missed",
+        label: "Due now",
+        className: "warning",
+        detail: `${procedure.frequency} procedure has no completion in the current window.`
+    };
+}
+function isSameLocalDay(timestamp) {
+    return new Date(timestamp).toDateString() === new Date().toDateString();
+}
+function procedureAssignmentAliases(user = currentUser()) {
+    const aliases = new Set(["All staff"]);
+    if (!user)
+        return aliases;
+    const roleInfo = roleDefinition(user.role);
+    aliases.add(roleInfo.operationalRole);
+    aliases.add(roleInfo.label);
+    if (user.role === "owner_admin")
+        aliases.add("Owner/Admin");
+    if (user.role === "manager")
+        aliases.add("Manager");
+    if (user.role === "waiter_cashier") {
+        aliases.add("Front");
+        aliases.add("Cashier");
+    }
+    if (user.role === "kitchen_staff")
+        aliases.add("Kitchen");
+    if (user.role === "driver")
+        aliases.add("Driver");
+    return aliases;
+}
+function procedureAssignedToUser(procedure, user = currentUser()) {
+    if (!user)
+        return false;
+    if (can("canReviewProcedures"))
+        return true;
+    return procedureAssignmentAliases(user).has(procedure.assignedRole);
+}
+function getCurrentUserProcedures() {
+    const user = currentUser();
+    return state.procedures
+        .filter((procedure) => procedure.active && procedureAssignedToUser(procedure, user))
+        .sort((first, second) => {
+        const firstStatus = procedurePeriodStatus(first);
+        const secondStatus = procedurePeriodStatus(second);
+        const firstRank = firstStatus.status === "Completed" ? 1 : 0;
+        const secondRank = secondStatus.status === "Completed" ? 1 : 0;
+        return firstRank - secondRank || first.department.localeCompare(second.department) || first.title.localeCompare(second.title);
+    });
+}
+function procedureProgressKey(procedureId, userId = currentUser()?.id || "") {
+    return `${userId}:${procedureId}`;
+}
+function getProcedureStepProgress(procedureId, userId = currentUser()?.id || "") {
+    const key = procedureProgressKey(procedureId, userId);
+    return new Set(state.procedureProgress?.[key] || []);
+}
+function procedureStepsComplete(procedure, userId = currentUser()?.id || "") {
+    if (!procedure.steps.length)
+        return true;
+    const checkedSteps = getProcedureStepProgress(procedure.id, userId);
+    return procedure.steps.every((_, index) => checkedSteps.has(index));
+}
+function listText(items, fallback = "None") {
+    return items?.length ? items.join(", ") : fallback;
+}
+function procedureRequirementHtml(label, items) {
+    return `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(listText(items))}</strong>
+    </div>
+  `;
+}
+function procedureMediaHtml(media) {
+    if (!media?.length)
+        return "";
+    return `
+    <div class="procedure-media">
+      ${media.map((url, index) => `
+        <a class="mini-btn" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Media ${index + 1}</a>
+      `).join("")}
+    </div>
+  `;
+}
+function procedureSummaryCards(procedures) {
+    const due = procedures.filter((procedure) => procedurePeriodStatus(procedure).status !== "Completed").length;
+    const completedToday = state.procedureCompletions.filter((completion) => completion.status === "Done" && isSameLocalDay(completion.completedAtMs)).length;
+    const issuesToday = state.procedureCompletions.filter((completion) => completion.status !== "Done" && isSameLocalDay(completion.completedAtMs)).length;
+    const languages = new Set(procedures.map((procedure) => procedure.language)).size;
+    return [
+        { label: "Assigned", value: procedures.length, note: "Visible to this role", className: "info" },
+        { label: "Due", value: due, note: "Needs staff action", className: due ? "warning" : "ok" },
+        { label: "Completed today", value: completedToday, note: "All roles", className: "ok" },
+        { label: "Issues today", value: issuesToday, note: "Problems and skips", className: issuesToday ? "danger" : "info" },
+        { label: "Languages", value: languages, note: "Arabic, Dutch, Turkish, English supported", className: "info" }
+    ].map((card) => `
+    <article class="procedure-summary-card">
+      <span>${escapeHtml(card.label)}</span>
+      <strong>${escapeHtml(card.value)}</strong>
+      <small class="${escapeHtml(card.className)}">${escapeHtml(card.note)}</small>
     </article>
   `).join("");
-    document.querySelector("#productionLog").innerHTML = state.productionLog.length
-        ? state.productionLog.slice().reverse().map((log) => `
+}
+function procedureCard(procedure) {
+    const periodStatus = procedurePeriodStatus(procedure);
+    const checkedSteps = getProcedureStepProgress(procedure.id);
+    const canComplete = can("canCompleteProcedures") && procedureAssignedToUser(procedure);
+    const doneDisabled = !canComplete || !procedureStepsComplete(procedure);
+    const latestCompletion = latestProcedureCompletion(procedure);
+    const progressText = `${checkedSteps.size}/${procedure.steps.length} steps checked`;
+    return `
+    <article class="procedure-card procedure-sop-card status-${escapeHtml(slugify(periodStatus.status))}">
+      <header>
+        <div>
+          <span class="procedure-kicker">${escapeHtml(procedure.department)} · ${escapeHtml(languageLabel(procedure.language))}</span>
+          <strong>${escapeHtml(procedure.title)}</strong>
+          <p>${escapeHtml(procedure.frequency)} · Assigned to ${escapeHtml(procedure.assignedRole)} · ${escapeHtml(progressText)}</p>
+        </div>
+        <span class="pill ${escapeHtml(periodStatus.className)}">${escapeHtml(periodStatus.label)}</span>
+      </header>
+      <div class="procedure-step-list">
+        ${procedure.steps.map((step, index) => `
+          <label class="procedure-step">
+            <input
+              type="checkbox"
+              ${checkedSteps.has(index) ? "checked" : ""}
+              ${canComplete ? "" : "disabled"}
+              data-procedure-step="${escapeHtml(procedure.id)}"
+              data-step-index="${index}"
+            >
+            <span>${escapeHtml(step)}</span>
+          </label>
+        `).join("")}
+      </div>
+      <div class="procedure-detail-grid">
+        ${procedureRequirementHtml("Tools", procedure.requiredTools)}
+        ${procedureRequirementHtml("Products", procedure.requiredProducts)}
+      </div>
+      ${procedureMediaHtml(procedure.media)}
+      ${latestCompletion ? `
+        <p class="procedure-last-run">Last activity: ${escapeHtml(latestCompletion.status)} by ${escapeHtml(latestCompletion.completedByName)} at ${escapeHtml(formatDateTime(latestCompletion.completedAtMs, latestCompletion.completedAt))}</p>
+      ` : `<p class="procedure-last-run">${escapeHtml(periodStatus.detail)}</p>`}
+      <div class="mini-actions procedure-actions">
+        <button class="mini-btn" type="button" ${doneDisabled ? "disabled" : ""} data-procedure-done="${escapeHtml(procedure.id)}">Done</button>
+        <button class="mini-btn danger-action" type="button" ${canComplete ? "" : "disabled"} data-procedure-problem="${escapeHtml(procedure.id)}">Problem</button>
+        <button class="mini-btn" type="button" ${canComplete ? "" : "disabled"} data-procedure-skip="${escapeHtml(procedure.id)}">Skip with reason</button>
+      </div>
+    </article>
+  `;
+}
+function procedureHistoryCard(completion) {
+    const procedure = procedureById(completion.procedureId);
+    const stepCount = procedure?.steps?.length || 0;
+    const checkedCount = completion.checkedSteps?.length || 0;
+    return `
+    <article class="log-card procedure-history-card">
+      <div class="card-title">
+        <strong>${escapeHtml(procedure?.title || "Procedure")}</strong>
+        <span class="pill ${escapeHtml(procedureStatusClass(completion.status))}">${escapeHtml(completion.status)}</span>
+      </div>
+      <div class="meta-line">
+        <span>${escapeHtml(completion.completedByName)}</span>
+        <span>${escapeHtml(completion.assignedRole)}</span>
+        <span>${escapeHtml(formatDateTime(completion.completedAtMs, completion.completedAt))}</span>
+        <span>${checkedCount}/${stepCount} steps</span>
+      </div>
+      ${completion.notes ? `<p>${escapeHtml(completion.notes)}</p>` : ""}
+    </article>
+  `;
+}
+function productionBatchCard(batch) {
+    const product = productById(batch.productId);
+    const outputIngredient = ingredientById(batch.outputIngredientId);
+    const costDeltaClass = batch.costDelta > 0 ? "warning" : batch.costDelta < 0 ? "ok" : "info";
+    const marginClass = batch.marginDelta === null ? "info" : batch.marginDelta < -0.1 ? "danger" : batch.marginDelta < 0 ? "warning" : "ok";
+    const marginText = batch.actualMargin === null
+        ? (batch.outputUnitCost ? `${money(batch.outputUnitCost)} / ${outputIngredient?.unit || unitTypeDefinition(batch.outputUnitType).shortLabel}` : "No margin")
+        : `${batch.actualMargin.toFixed(1)}% (${formatSignedAmount(batch.marginDelta, " pts")})`;
+    return `
+    <article class="log-card production-batch-card">
+      <div class="card-title">
+        <strong>${escapeHtml(batch.productName || product?.name || "Batch")}</strong>
+        <span class="pill ${escapeHtml(batch.outputIngredientId ? "ok" : "info")}">${escapeHtml(batch.outputIngredientId ? "Prepared stock" : "Assembly")}</span>
+      </div>
+      <div class="recipe-cost-grid">
+        <span>Actual cost</span><strong>${escapeHtml(money(batch.actualCost))}</strong>
+        <span>Variance</span><strong><span class="inline-status ${escapeHtml(costDeltaClass)}">${escapeHtml(money(batch.costDelta))}</span></strong>
+        <span>${batch.actualMargin === null ? "Unit cost" : "Margin impact"}</span><strong><span class="inline-status ${escapeHtml(marginClass)}">${escapeHtml(marginText)}</span></strong>
+        ${outputIngredient ? `<span>Added to inventory</span><strong>${escapeHtml(formatStockAmount(batch.outputStockQuantity, outputIngredient.unit))} ${escapeHtml(outputIngredient.name)}</strong>` : ""}
+      </div>
+      <div class="production-usage-list">
+        ${batch.lines.map((line) => `
+          <div class="production-usage-row">
+            <span>${escapeHtml(line.ingredientName || ingredientById(line.ingredientId)?.name || "Ingredient")}</span>
+            <strong>${escapeHtml(formatActualUsageLabel(line.actualUsage, line.measure))} · ${escapeHtml(money(line.actualCost))}</strong>
+          </div>
+        `).join("")}
+      </div>
+      <p><strong>${escapeHtml(batch.completedAt)}</strong> ${escapeHtml(batch.completedByName)} saved this batch.</p>
+    </article>
+  `;
+}
+function missedProcedureCard(procedure) {
+    const status = procedurePeriodStatus(procedure);
+    const latestCompletion = latestProcedureCompletion(procedure);
+    return `
+    <article class="alert-card warning">
+      <div class="card-title">
+        <strong>${escapeHtml(procedure.title)}</strong>
+        <span class="pill ${escapeHtml(status.className)}">${escapeHtml(status.label)}</span>
+      </div>
+      <p>${escapeHtml(procedure.department)} · ${escapeHtml(procedure.frequency)} · Assigned to ${escapeHtml(procedure.assignedRole)}</p>
+      <p>${escapeHtml(latestCompletion ? `Last activity ${latestCompletion.status} by ${latestCompletion.completedByName}` : "No completion recorded yet.")}</p>
+    </article>
+  `;
+}
+function renderProcedureFormControls() {
+    const form = document.querySelector("#procedureForm");
+    if (!form)
+        return;
+    const departmentSelect = document.querySelector("#procedureDepartment");
+    const languageSelect = document.querySelector("#procedureLanguage");
+    const frequencySelect = document.querySelector("#procedureFrequency");
+    const assignedRoleSelect = document.querySelector("#procedureAssignedRole");
+    const editable = can("canCreateProcedures");
+    if (departmentSelect) {
+        const selected = departmentSelect.value || "Front of house";
+        departmentSelect.innerHTML = PROCEDURE_DEPARTMENTS
+            .map((department) => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`)
+            .join("");
+        departmentSelect.value = PROCEDURE_DEPARTMENTS.includes(selected) ? selected : "Front of house";
+    }
+    if (languageSelect) {
+        const selected = languageSelect.value || state.restaurantSettings.defaultLanguage;
+        languageSelect.innerHTML = LANGUAGE_OPTIONS
+            .map((language) => `<option value="${escapeHtml(language.id)}">${escapeHtml(language.label)}</option>`)
+            .join("");
+        languageSelect.value = LANGUAGE_OPTIONS.some((language) => language.id === selected) ? selected : state.restaurantSettings.defaultLanguage;
+    }
+    if (frequencySelect) {
+        const selected = frequencySelect.value || "Daily";
+        frequencySelect.innerHTML = PROCEDURE_FREQUENCIES
+            .map((frequency) => `<option value="${escapeHtml(frequency)}">${escapeHtml(frequency)}</option>`)
+            .join("");
+        frequencySelect.value = PROCEDURE_FREQUENCIES.includes(selected) ? selected : "Daily";
+    }
+    if (assignedRoleSelect) {
+        const selected = assignedRoleSelect.value || "Front";
+        assignedRoleSelect.innerHTML = PROCEDURE_ASSIGNED_ROLES
+            .map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(role)}</option>`)
+            .join("");
+        assignedRoleSelect.value = PROCEDURE_ASSIGNED_ROLES.includes(selected) ? selected : "Front";
+    }
+    form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+        element.disabled = !editable;
+    });
+}
+function renderProcedureManagerView() {
+    const managerPanel = document.querySelector("#procedureManagerPanel");
+    const managerSummary = document.querySelector("#procedureManagerSummary");
+    const missedList = document.querySelector("#missedProcedureList");
+    const history = document.querySelector("#procedureHistory");
+    if (!managerPanel || !managerSummary || !missedList || !history)
+        return;
+    const canReview = can("canReviewProcedures");
+    managerPanel.hidden = !canReview;
+    if (!canReview)
+        return;
+    const completed = state.procedureCompletions.filter((completion) => completion.status === "Done");
+    const issues = state.procedureCompletions.filter((completion) => completion.status !== "Done");
+    const missed = state.procedures.filter((procedure) => procedure.active && procedurePeriodStatus(procedure).status !== "Completed");
+    managerSummary.innerHTML = [
+        { label: "Completed", value: completed.length, note: "All completion records", className: "ok" },
+        { label: "Missed", value: missed.length, note: "No completion in current window", className: missed.length ? "warning" : "ok" },
+        { label: "Notes/issues", value: issues.length, note: "Problems and skips", className: issues.length ? "danger" : "info" }
+    ].map((card) => `
+    <article class="procedure-summary-card">
+      <span>${escapeHtml(card.label)}</span>
+      <strong>${escapeHtml(card.value)}</strong>
+      <small class="${escapeHtml(card.className)}">${escapeHtml(card.note)}</small>
+    </article>
+  `).join("");
+    missedList.innerHTML = missed.length
+        ? missed.map(missedProcedureCard).join("")
+        : emptyState("No missed procedures in the current window.");
+    history.innerHTML = state.procedureCompletions.length
+        ? state.procedureCompletions
+            .slice()
+            .sort((first, second) => (second.completedAtMs || 0) - (first.completedAtMs || 0))
+            .slice(0, 30)
+            .map(procedureHistoryCard)
+            .join("")
+        : emptyState("No procedure completion history yet.");
+}
+function renderProcedures() {
+    document.querySelectorAll(".admin-procedure-only").forEach((panel) => {
+        panel.hidden = !can("canCreateProcedures");
+    });
+    document.querySelectorAll(".manager-procedure-only").forEach((panel) => {
+        panel.hidden = !can("canReviewProcedures");
+    });
+    renderProcedureFormControls();
+    const visibleProcedures = getCurrentUserProcedures();
+    const summaryGrid = document.querySelector("#procedureSummaryGrid");
+    if (summaryGrid)
+        summaryGrid.innerHTML = procedureSummaryCards(visibleProcedures);
+    const procedureList = document.querySelector("#procedureList");
+    if (procedureList) {
+        procedureList.innerHTML = visibleProcedures.length
+            ? visibleProcedures.map(procedureCard).join("")
+            : emptyState("No procedures are assigned to this role.");
+    }
+    renderProcedureManagerView();
+    const productionPanel = document.querySelector("#procedureProductionPanel");
+    if (productionPanel)
+        productionPanel.hidden = !can("canManageProcedures");
+    const batchCards = state.productionBatches
+        .slice()
+        .reverse()
+        .map(productionBatchCard);
+    const productionLogCards = state.productionLog.slice().reverse().map((log) => `
       <article class="log-card">
         <p><strong>${escapeHtml(log.time)}</strong> ${escapeHtml(log.text)}</p>
       </article>
-    `).join("")
+    `);
+    document.querySelector("#productionLog").innerHTML = batchCards.length || productionLogCards.length
+        ? [...batchCards, ...productionLogCards].join("")
         : emptyState("No production changes yet.");
     document.querySelectorAll("#productionForm input, #productionForm select, #productionForm button").forEach((element) => {
-        element.disabled = !can("canManageProcedures");
+        if (!can("canManageProcedures"))
+            element.disabled = true;
     });
+    updateProductionCostPreview();
 }
-function renderProductionRecipeFields() {
+function renderProductionRecipeFields(options = {}) {
+    const form = document.querySelector("#productionForm");
     const container = document.querySelector("#productionRecipeFields");
+    const stepList = document.querySelector("#productionStepList");
     const productionProduct = document.querySelector("#productionProduct");
+    const outputIngredientSelect = document.querySelector("#productionOutputIngredient");
+    const outputQuantityInput = document.querySelector("#productionOutputQuantity");
+    const outputUnitSelect = document.querySelector("#productionOutputUnit");
+    const outputLocationSelect = document.querySelector("#productionOutputLocation");
     const product = productionProduct ? productById(productionProduct.value) : null;
     if (!container)
         return;
+    const previousActuals = new Map([...container.querySelectorAll("input[name^='actual-']")]
+        .map((input) => [input.name, input.value]));
+    const previousStepChecks = new Set([...(stepList?.querySelectorAll("[data-production-step]") || [])]
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.productionStep));
     container.innerHTML = product?.recipe?.length
         ? product.recipe.map((line, index) => {
             const ingredient = ingredientById(line.ingredientId);
             if (!ingredient)
                 return "";
             const measure = getRecipeMeasure(line);
-            const plannedUsage = getRecipeLineQuantity(line);
+            const plannedUsage = Number((getRecipeLineQuantity(line) * getRecipeLineWasteMultiplier(line)).toFixed(3));
+            const fieldName = getProductionFieldName(line, index);
+            const actualValue = options.reset ? plannedUsage : previousActuals.get(fieldName) ?? plannedUsage;
+            const plannedCost = getLineCost(line);
             return `
-        <label>
-          Actual ${escapeHtml(ingredient.name)} used (${escapeHtml(measure.label)})
+        <label class="production-ingredient-line">
+          <span>
+            <strong>${escapeHtml(ingredient.name)}</strong>
+            <small>Required ${escapeHtml(getRecipeUsageLabel(line))} · ${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))} on hand · planned ${escapeHtml(money(plannedCost))}</small>
+          </span>
           <input
-            name="${escapeHtml(getProductionFieldName(line, index))}"
+            name="${escapeHtml(fieldName)}"
             type="number"
             min="0"
             step="${measure.step}"
-            value="${plannedUsage}"
+            value="${escapeHtml(actualValue)}"
+            aria-label="Actual ${escapeHtml(ingredient.name)} used"
           >
         </label>
       `;
         }).join("")
         : emptyState("No recipe lines are attached to this product.");
+    if (stepList) {
+        stepList.innerHTML = product?.recipe?.length
+            ? product.recipe.map((line, index) => {
+                const ingredient = ingredientById(line.ingredientId);
+                const note = String(line.notes || "").trim();
+                const stepText = note || `Prepare ${getRecipeUsageLabel(line)} ${ingredient?.name || "ingredient"}.`;
+                return `
+          <label class="procedure-step production-step">
+            <input type="checkbox" data-production-step="${index}" ${!options.reset && previousStepChecks.has(String(index)) ? "checked" : ""}>
+            <span>${escapeHtml(stepText)}</span>
+          </label>
+        `;
+            }).join("")
+            : emptyState("No preparation steps are attached to this recipe.");
+    }
+    if (outputIngredientSelect && outputQuantityInput && outputUnitSelect && outputLocationSelect) {
+        const outputDefault = getProductionOutputDefault(product);
+        const selectedOutputIngredient = options.reset
+            ? outputDefault.ingredientId || ""
+            : outputIngredientSelect.value || outputDefault.ingredientId || "";
+        outputIngredientSelect.innerHTML = [
+            `<option value="">No inventory output</option>`,
+            ...state.ingredients
+                .filter((ingredient) => ingredient.active)
+                .map((ingredient) => `<option value="${escapeHtml(ingredient.id)}">${escapeHtml(ingredient.name)} - ${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))}</option>`)
+        ].join("");
+        outputIngredientSelect.value = ingredientById(selectedOutputIngredient) ? selectedOutputIngredient : "";
+        const outputIngredient = ingredientById(outputIngredientSelect.value);
+        const outputQuantity = options.reset
+            ? outputDefault.quantity || ""
+            : outputQuantityInput.value || outputDefault.quantity || "";
+        outputQuantityInput.value = outputQuantity;
+        outputQuantityInput.disabled = !outputIngredient || !can("canManageProcedures");
+        if (outputIngredient) {
+            const allowedUnits = getWasteUnitOptionsForIngredient(outputIngredient);
+            const selectedUnit = getProductionOutputUnitType(outputIngredient, options.reset ? outputDefault.unitType : outputUnitSelect.value, outputDefault.unitType);
+            outputUnitSelect.innerHTML = allowedUnits
+                .map((unit) => `<option value="${escapeHtml(unit.id)}">${escapeHtml(unit.label)}</option>`)
+                .join("");
+            outputUnitSelect.value = selectedUnit;
+        }
+        else {
+            outputUnitSelect.innerHTML = `<option value="">No output</option>`;
+            outputUnitSelect.value = "";
+        }
+        outputUnitSelect.disabled = !outputIngredient || !can("canManageProcedures");
+        const locations = getAllInventoryLocations();
+        const selectedLocation = options.reset
+            ? outputDefault.location || outputIngredient?.location || "Fridge"
+            : outputLocationSelect.value || outputDefault.location || outputIngredient?.location || "Fridge";
+        outputLocationSelect.innerHTML = locations
+            .map((location) => `<option value="${escapeHtml(location)}">${escapeHtml(location)}</option>`)
+            .join("");
+        outputLocationSelect.value = locations.includes(selectedLocation) ? selectedLocation : locations[0] || "Dry storage";
+        outputLocationSelect.disabled = !outputIngredient || !can("canManageProcedures");
+    }
+    document.querySelectorAll("#productionForm input, #productionForm select").forEach((element) => {
+        if (!can("canManageProcedures"))
+            element.disabled = true;
+    });
+    updateProductionCostPreview();
+}
+function updateProductionCostPreview() {
+    const form = document.querySelector("#productionForm");
+    const preview = document.querySelector("#productionCostPreview");
+    const submitButton = document.querySelector("#saveProductionBatchBtn");
+    if (!form || !preview)
+        return;
+    const draft = getProductionExecutionDraft(form);
+    const readiness = getProductionReadiness(draft, form);
+    const costDeltaClass = draft.costDelta > 0 ? "warning" : draft.costDelta < 0 ? "ok" : "info";
+    const marginClass = draft.marginDelta === null ? "info" : draft.marginDelta < -0.1 ? "danger" : draft.marginDelta < 0 ? "warning" : "ok";
+    preview.innerHTML = draft.product ? `
+    <div class="cost-preview-title">
+      <strong>Batch result preview</strong>
+      <span class="pill ${escapeHtml(readiness.className)}">${escapeHtml(readiness.label)}</span>
+    </div>
+    <div class="cost-grid">
+      <span>Planned cost</span><strong>${escapeHtml(money(draft.plannedCost))}</strong>
+      <span>Actual cost</span><strong>${escapeHtml(money(draft.actualCost))}</strong>
+      <span>Cost variance</span><strong><span class="inline-status ${escapeHtml(costDeltaClass)}">${escapeHtml(money(draft.costDelta))}</span></strong>
+      ${draft.actualMargin === null ? `
+        <span>Batch unit cost</span><strong>${draft.outputIngredient ? `${escapeHtml(money(draft.outputUnitCost))} / ${escapeHtml(draft.outputIngredient.unit)}` : "Output not set"}</strong>
+      ` : `
+        <span>Actual margin</span><strong><span class="inline-status ${escapeHtml(marginClass)}">${draft.actualMargin.toFixed(1)}%</span></strong>
+      `}
+      ${draft.outputIngredient ? `
+        <span>Prepared output</span><strong>${escapeHtml(formatStockAmount(draft.outputStockQuantity, draft.outputIngredient.unit))}</strong>
+      ` : ""}
+    </div>
+    <div class="production-usage-list">
+      ${draft.lines.map((line) => {
+        const lineClass = line.shortage > 0 ? "danger" : line.actualCost > line.plannedCost ? "warning" : "ok";
+        return `
+          <div class="production-usage-row ${lineClass}">
+            <span>${escapeHtml(line.ingredient.name)}</span>
+            <strong>${escapeHtml(formatActualUsageLabel(line.actualUsage, line.measure))} · ${escapeHtml(money(line.actualCost))}</strong>
+          </div>
+        `;
+    }).join("")}
+    </div>
+    <p class="production-preview-note">${escapeHtml(readiness.detail)}</p>
+  ` : emptyState("Select a recipe before saving a batch result.");
+    if (submitButton)
+        submitButton.disabled = !can("canManageProcedures") || !readiness.ok;
 }
 function renderTeam() {
     const isDriverRole = currentRoleKey() === "driver";
@@ -2383,7 +5233,11 @@ function renderSettings() {
         purchased_products: state.ingredients.length,
         orders: state.orders.length,
         kitchen_tickets: state.tickets.length,
-        reservations: state.reservations.length
+        table_qr_codes: state.tableQrCodes.length,
+        reservations: state.reservations.length,
+        procedures: state.procedures.length,
+        procedure_completions: state.procedureCompletions.length,
+        recipes: state.products.reduce((sum, product) => sum + (product.recipe?.length || 0), 0)
     };
     schemaGrid.innerHTML = DATA_MODEL
         .map((collection) => `
@@ -2396,6 +5250,81 @@ function renderSettings() {
       </article>
     `)
         .join("");
+    renderQrCodeManagement();
+}
+function tableOptionsHtml(selectedTableId) {
+    return state.tables
+        .map((table) => `<option value="${escapeHtml(table.id)}" ${table.id === selectedTableId ? "selected" : ""}>${escapeHtml(table.name)} - ${escapeHtml(table.zone)}</option>`)
+        .join("");
+}
+function renderQrCodeManagement() {
+    const form = document.querySelector("#qrCodeForm");
+    const tableSelect = document.querySelector("#qrTableSelect");
+    const areaInput = document.querySelector("#qrAreaInput");
+    const list = document.querySelector("#qrCodeList");
+    if (!form || !tableSelect || !areaInput || !list)
+        return;
+    const editable = can("canEditSettings");
+    const selectedTable = tableById(tableSelect.value) || state.tables[0];
+    tableSelect.innerHTML = tableOptionsHtml(selectedTable?.id || "");
+    tableSelect.value = selectedTable?.id || "";
+    if (!areaInput.value && selectedTable)
+        areaInput.value = selectedTable.zone;
+    form.querySelectorAll("input, select, button").forEach((element) => {
+        element.disabled = !editable;
+    });
+    const sortedCodes = state.tableQrCodes.slice().sort((first, second) => {
+        const firstTable = tableById(first.tableId)?.name || "";
+        const secondTable = tableById(second.tableId)?.name || "";
+        return firstTable.localeCompare(secondTable) || first.createdAt.localeCompare(second.createdAt);
+    });
+    list.innerHTML = sortedCodes.length
+        ? sortedCodes.map((code) => {
+            const table = tableById(code.tableId);
+            const url = getQrOrderUrl(code);
+            const disabled = code.status !== "Active";
+            return `
+        <article class="qr-admin-card ${disabled ? "is-disabled" : ""}">
+          <header>
+            <div>
+              <strong>${escapeHtml(table?.name || "Unassigned table")}</strong>
+              <p>${escapeHtml(code.area || table?.zone || "Dining room")} · ${escapeHtml(code.token)}</p>
+            </div>
+            <span class="pill ${disabled ? "warning" : "ok"}">${escapeHtml(code.status)}</span>
+          </header>
+          <div class="qr-admin-body">
+            <div class="qr-code-box">
+              ${qrCodeSvg(url, `${table?.name || "Table"} QR order code`)}
+            </div>
+            <div class="qr-admin-controls">
+              <div class="form-row">
+                <label>
+                  Table
+                  <select data-qr-table="${escapeHtml(code.id)}" ${!editable ? "disabled" : ""}>
+                    ${tableOptionsHtml(code.tableId)}
+                  </select>
+                </label>
+                <label>
+                  Area
+                  <input data-qr-area="${escapeHtml(code.id)}" type="text" value="${escapeHtml(code.area || table?.zone || "")}" ${!editable ? "disabled" : ""}>
+                </label>
+              </div>
+              <label>
+                Customer URL
+                <input type="text" value="${escapeHtml(url)}" readonly>
+              </label>
+              <div class="mini-actions qr-actions">
+                <button class="mini-btn" type="button" data-open-qr="${escapeHtml(code.id)}">Open</button>
+                <button class="mini-btn" type="button" data-assign-qr="${escapeHtml(code.id)}" ${!editable ? "disabled" : ""}>Assign</button>
+                <button class="mini-btn" type="button" data-regenerate-qr="${escapeHtml(code.id)}" ${!editable ? "disabled" : ""}>Regenerate</button>
+                <button class="mini-btn ${disabled ? "" : "danger-action"}" type="button" data-toggle-qr="${escapeHtml(code.id)}" ${!editable ? "disabled" : ""}>${disabled ? "Enable" : "Disable"}</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+        }).join("")
+        : emptyState("Create table QR codes to enable customer ordering.");
 }
 function renderReservationPlanner() {
     const form = document.querySelector("#reservationForm");
@@ -2507,7 +5436,7 @@ function uniqueRecordId(base, collections) {
     }
     return nextId;
 }
-function addSellableRecipeLine(ingredientId, quantity, measureKey) {
+function addSellableRecipeLine(ingredientId, quantity, measureKey, station, wastePercent, appliesTo, notes) {
     if (!can("canManageProducts")) {
         showToast("Only Owner/Admin can manage products.");
         return;
@@ -2518,7 +5447,7 @@ function addSellableRecipeLine(ingredientId, quantity, measureKey) {
         showToast("Choose an active purchased product and a usage amount.");
         return;
     }
-    const line = buildRecipeLine(ingredient.id, amount, measureKey);
+    const line = buildRecipeLine(ingredient.id, amount, measureKey, station, wastePercent, appliesTo, notes);
     const normalizedLine = normalizeRecipeLine(line, new Set(state.ingredients.map((item) => item.id)));
     if (!normalizedLine) {
         showToast("Choose a valid recipe amount.");
@@ -2526,7 +5455,12 @@ function addSellableRecipeLine(ingredientId, quantity, measureKey) {
     }
     const measure = getRecipeMeasure(normalizedLine);
     const existing = state.productRecipeDraft.find((draftLine) => {
-        return draftLine.ingredientId === normalizedLine.ingredientId && getRecipeMeasure(draftLine).key === measure.key;
+        return draftLine.ingredientId === normalizedLine.ingredientId
+            && getRecipeMeasure(draftLine).key === measure.key
+            && draftLine.appliesTo === normalizedLine.appliesTo
+            && draftLine.station === normalizedLine.station
+            && normalizeRecipeWastePercent(draftLine.wastePercent) === normalizeRecipeWastePercent(normalizedLine.wastePercent)
+            && String(draftLine.notes || "") === String(normalizedLine.notes || "");
     });
     if (existing) {
         existing[measure.key] = Number((getRecipeLineQuantity(existing) + getRecipeLineQuantity(normalizedLine)).toFixed(3));
@@ -2553,10 +5487,12 @@ function createSellableProduct(formData) {
     const name = String(formData.get("name") || "").trim();
     const code = String(formData.get("code") || "").trim();
     const category = String(formData.get("category") || "Other");
-    const station = String(formData.get("station") || "Main Kitchen").trim();
+    const station = normalizeKitchenStation(formData.get("station") || "Main kitchen");
     const price = Math.max(0, Number(formData.get("price")) || 0);
     const vatSetting = String(formData.get("vatSetting") || "standard");
     const active = formData.get("active") === "true";
+    const targetMargin = normalizeMarginPercent(formData.get("targetMargin"), DEFAULT_MARGIN_TARGET);
+    const minMargin = Math.min(targetMargin, normalizeMarginPercent(formData.get("minMargin"), DEFAULT_MARGIN_MINIMUM));
     const selectedAvailability = new Set(formData.getAll("availability"));
     const recipe = normalizeRecipeLines(state.productRecipeDraft, new Set(state.ingredients.map((ingredient) => ingredient.id)));
     if (!name || !code || !station || price <= 0) {
@@ -2589,7 +5525,8 @@ function createSellableProduct(formData) {
         vatSetting: VAT_OPTIONS.some((option) => option.id === vatSetting) ? vatSetting : "standard",
         active,
         availability,
-        targetMargin: 65,
+        targetMargin,
+        minMargin,
         recipe
     });
     state.productRecipeDraft = [];
@@ -2679,9 +5616,119 @@ function togglePurchasedProduct(ingredientId) {
     render();
     showToast(`${ingredient.name} marked ${ingredient.active ? "active" : "inactive"}.`);
 }
+function updateIngredientPurchasePrice(ingredientId, value) {
+    if (!can("canManageProducts")) {
+        showToast("Only Owner/Admin can update purchase prices.");
+        return;
+    }
+    const ingredient = ingredientById(ingredientId);
+    const purchasePrice = Math.max(0, Number(value) || 0);
+    if (!ingredient || purchasePrice <= 0) {
+        showToast("Enter a purchase price above zero.");
+        return;
+    }
+    ingredient.purchasePrice = Number(purchasePrice.toFixed(2));
+    saveState();
+    render();
+    showToast(`${ingredient.name} price updated; product costs recalculated.`);
+}
 function getSelectedInventoryLocation(formData, selectName, customName = "") {
     const customLocation = customName ? normalizeInventoryLocationName(formData.get(customName), "") : "";
     return customLocation || normalizeInventoryLocationName(formData.get(selectName), "");
+}
+function getFormDateTimeTimestamp(value) {
+    const timestamp = Date.parse(String(value || ""));
+    return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now();
+}
+function pushWasteRecord({ ingredient, quantity, unitType, stockQuantity, reason, staffId, occurredAtMs, notes = "", fromLocation = "" }) {
+    const staff = state.users.find((user) => user.id === staffId) || currentUser();
+    const normalizedUnitType = normalizeWasteUnitType(unitType, ingredient);
+    const normalizedQuantity = normalizeStockQuantity(quantity);
+    const normalizedStockQuantity = normalizeStockQuantity(stockQuantity);
+    const cost = getWasteCost(ingredient, normalizedStockQuantity);
+    const record = {
+        id: `WST-${Date.now()}-${state.wasteRecords.length + 1}`,
+        ingredientId: ingredient.id,
+        ingredientName: ingredient.name,
+        quantity: normalizedQuantity,
+        unitType: normalizedUnitType,
+        stockQuantity: normalizedStockQuantity,
+        stockUnit: ingredient.unit,
+        reason: normalizeWasteReason(reason),
+        staffId: staff?.id || "",
+        staffName: staff?.name || "Staff",
+        occurredAtMs: normalizeOptionalTimestamp(occurredAtMs) || Date.now(),
+        notes: String(notes || "").trim(),
+        fromLocation: normalizeInventoryLocationName(fromLocation, ""),
+        cost
+    };
+    const detailParts = [
+        `${record.reason} waste recorded by ${record.staffName}: ${formatWasteQuantity(record)} ${ingredient.name}`,
+        `${money(cost)} cost`
+    ];
+    if (record.notes)
+        detailParts.push(record.notes);
+    state.wasteRecords.push(record);
+    state.wasteRecords = state.wasteRecords.slice(-120);
+    pushInventoryHistory({
+        ingredient,
+        type: "waste",
+        quantity: normalizedStockQuantity,
+        fromLocation: record.fromLocation,
+        detail: detailParts.join(". ")
+    });
+    state.productionLog.push({
+        id: `LOG-${Date.now()}`,
+        time: timeNow(),
+        text: `Waste logged: ${formatWasteQuantity(record)} ${ingredient.name} (${record.reason}) cost ${money(cost)}.`
+    });
+    return record;
+}
+function recordWaste(formData, form = null) {
+    if (!can("canRecordWaste")) {
+        showToast("This role cannot record waste.");
+        return;
+    }
+    const ingredient = ingredientById(formData.get("ingredientId"));
+    if (!ingredient) {
+        showToast("Choose a product before recording waste.");
+        return;
+    }
+    const quantity = normalizeStockQuantity(formData.get("quantity"));
+    const unitType = normalizeWasteUnitType(formData.get("unitType"), ingredient);
+    const stockQuantity = convertWasteQuantityToStockUnits(ingredient, quantity, unitType);
+    if (quantity <= 0 || stockQuantity <= 0) {
+        showToast("Enter a waste quantity above zero.");
+        return;
+    }
+    if (stockQuantity > ingredient.stock) {
+        showToast(`Only ${formatStockAmount(ingredient.stock, ingredient.unit)} ${ingredient.name} is available.`);
+        return;
+    }
+    const result = deductIngredientStock(ingredient, stockQuantity);
+    const fromLocation = result.removals.map((removal) => removal.location).join(", ");
+    const record = pushWasteRecord({
+        ingredient,
+        quantity,
+        unitType,
+        stockQuantity: result.removed,
+        reason: formData.get("reason"),
+        staffId: formData.get("staffId"),
+        occurredAtMs: getFormDateTimeTimestamp(formData.get("occurredAt")),
+        notes: formData.get("notes"),
+        fromLocation
+    });
+    saveState();
+    render();
+    if (form) {
+        form.elements.notes.value = "";
+        form.elements.occurredAt.value = formatDateTimeLocalInput();
+    }
+    let toastText = `${formatWasteQuantity(record)} ${ingredient.name} waste recorded; ${formatStockAmount(ingredient.stock, ingredient.unit)} remains.`;
+    if (getIngredientStatus(ingredient) === "danger") {
+        toastText += ` Low-stock alert: reorder ${formatStockAmount(getSupplierOrderQuantity(ingredient), ingredient.unit)}.`;
+    }
+    showToast(toastText);
 }
 function applyInventoryAction(formData) {
     if (!can("canManageInventory")) {
@@ -2729,18 +5776,26 @@ function applyInventoryAction(formData) {
             return;
         }
         const removed = removeStockFromLocation(ingredient, fromLocation, quantity);
-        pushInventoryHistory({
-            ingredient,
-            type: action,
-            quantity: removed,
-            fromLocation,
-            detail: `${action === "waste" ? "Wasted" : "Removed"} ${formatStockAmount(removed, ingredient.unit)} from ${fromLocation}.`
-        });
         if (action === "waste") {
-            state.productionLog.push({
-                id: `LOG-${Date.now()}`,
-                time: timeNow(),
-                text: `Waste logged: ${formatStockAmount(removed, ingredient.unit)} ${ingredient.name} removed from ${fromLocation}.`
+            pushWasteRecord({
+                ingredient,
+                quantity: removed,
+                unitType: ingredient.unitType,
+                stockQuantity: removed,
+                reason: "Other",
+                staffId: currentUser()?.id,
+                occurredAtMs: Date.now(),
+                notes: "Marked wasted from stock action.",
+                fromLocation
+            });
+        }
+        else {
+            pushInventoryHistory({
+                ingredient,
+                type: action,
+                quantity: removed,
+                fromLocation,
+                detail: `Removed ${formatStockAmount(removed, ingredient.unit)} from ${fromLocation}.`
             });
         }
         toastText = `${ingredient.name} ${action === "waste" ? "waste" : "stock"} updated.`;
@@ -2862,6 +5917,107 @@ function saveRestaurantSettings(formData) {
     render();
     showToast("Restaurant settings saved.");
 }
+function createTableQrCode(formData) {
+    if (!can("canEditSettings")) {
+        showToast("This role cannot manage QR codes.");
+        return;
+    }
+    const table = tableById(formData.get("tableId"));
+    if (!table) {
+        showToast("Choose a table before creating a QR code.");
+        return;
+    }
+    state.tableQrCodes
+        .filter((code) => code.tableId === table.id && code.status === "Active")
+        .forEach((code) => {
+        code.status = "Disabled";
+    });
+    const token = createQrToken(table.id, new Set(state.tableQrCodes.map((code) => code.token)));
+    state.tableQrCodes.push({
+        id: `qr-${table.id}-${Date.now()}`,
+        tableId: table.id,
+        area: String(formData.get("area") || table.zone || "Dining room").trim(),
+        token,
+        status: "Active",
+        createdAt: timeNow(),
+        regeneratedAt: ""
+    });
+    saveState();
+    render();
+    showToast(`${table.name} QR code created.`);
+}
+function assignQrCode(qrCodeId) {
+    if (!can("canEditSettings")) {
+        showToast("This role cannot manage QR codes.");
+        return;
+    }
+    const code = qrCodeById(qrCodeId);
+    const tableSelect = document.querySelector(`[data-qr-table="${qrCodeId}"]`);
+    const areaInput = document.querySelector(`[data-qr-area="${qrCodeId}"]`);
+    const table = tableById(tableSelect?.value);
+    if (!code || !table) {
+        showToast("Choose a valid table for that QR code.");
+        return;
+    }
+    code.tableId = table.id;
+    code.area = String(areaInput?.value || table.zone || "Dining room").trim();
+    if (code.status === "Active") {
+        state.tableQrCodes
+            .filter((item) => item.id !== code.id && item.tableId === code.tableId && item.status === "Active")
+            .forEach((item) => {
+            item.status = "Disabled";
+        });
+    }
+    saveState();
+    render();
+    showToast(`${code.token} assigned to ${table.name}.`);
+}
+function toggleQrCode(qrCodeId) {
+    if (!can("canEditSettings")) {
+        showToast("This role cannot manage QR codes.");
+        return;
+    }
+    const code = qrCodeById(qrCodeId);
+    if (!code)
+        return;
+    code.status = code.status === "Active" ? "Disabled" : "Active";
+    if (code.status === "Active") {
+        state.tableQrCodes
+            .filter((item) => item.id !== code.id && item.tableId === code.tableId && item.status === "Active")
+            .forEach((item) => {
+            item.status = "Disabled";
+        });
+    }
+    saveState();
+    render();
+    showToast(`QR code ${code.status.toLowerCase()}.`);
+}
+function regenerateQrCode(qrCodeId) {
+    if (!can("canEditSettings")) {
+        showToast("This role cannot manage QR codes.");
+        return;
+    }
+    const code = qrCodeById(qrCodeId);
+    if (!code)
+        return;
+    code.token = createQrToken(code.tableId, new Set(state.tableQrCodes.filter((item) => item.id !== code.id).map((item) => item.token)));
+    code.status = "Active";
+    code.regeneratedAt = timeNow();
+    state.tableQrCodes
+        .filter((item) => item.id !== code.id && item.tableId === code.tableId && item.status === "Active")
+        .forEach((item) => {
+        item.status = "Disabled";
+    });
+    saveState();
+    render();
+    showToast("QR code regenerated; the previous link is disabled.");
+}
+function openQrCustomerUrl(qrCodeId) {
+    const code = qrCodeById(qrCodeId);
+    if (!code)
+        return;
+    window.open(getQrOrderUrl(code), "_blank", "noopener");
+}
 function setView(view) {
     if (!canView(view)) {
         showToast("That page is not available for this role.");
@@ -2943,8 +6099,9 @@ function pushInventoryHistory({ ingredient, type, quantity, fromLocation = "", t
     });
     state.inventoryHistory = state.inventoryHistory.slice(-80);
 }
-function deductInventoryForItems(items) {
-    getStockRequirementsForItems(items).forEach((required, ingredientId) => {
+function deductInventoryForItems(items, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
+    const changes = [];
+    getStockRequirementsForItems(items, orderContext).forEach((required, ingredientId) => {
         const ingredient = ingredientById(ingredientId);
         if (!ingredient)
             return;
@@ -2956,7 +6113,31 @@ function deductInventoryForItems(items) {
             fromLocation: result.removals.map((removal) => removal.location).join(", "),
             detail: `Order used ${formatStockAmount(result.removed, ingredient.unit)} ${ingredient.name}.`
         });
+        changes.push({
+            ingredient,
+            required,
+            removed: result.removed,
+            resultingStock: ingredient.stock
+        });
     });
+    return changes;
+}
+function getOrderCompletionToast(number, stations, stockChanges, items, orderContext) {
+    const stationText = stations.length === 1 ? stations[0] : `${stations.length} stations`;
+    const product = items.length === 1 ? productById(items[0].productId) : null;
+    const primaryChange = stockChanges.length === 1 ? stockChanges[0] : null;
+    let message = `Order #${number} sent to ${stationText}; inventory updated automatically.`;
+    if (product && primaryChange) {
+        message = `Order #${number} sent to ${stationText}; ${primaryChange.ingredient.name} stock is now ${formatStockAmount(primaryChange.resultingStock, primaryChange.ingredient.unit)}. ${product.name} margin ${getProductMargin(product, orderContext).toFixed(1)}%.`;
+    }
+    const lowStockChanges = stockChanges.filter((change) => getIngredientStatus(change.ingredient) === "danger");
+    if (lowStockChanges.length) {
+        const lowStockText = lowStockChanges
+            .map((change) => `${change.ingredient.name} ${formatStockAmount(change.resultingStock, change.ingredient.unit)}`)
+            .join(", ");
+        message += ` Low-stock alert: ${lowStockText}.`;
+    }
+    return message;
 }
 function markSupplierOrderOrdered(supplier) {
     if (!can("canManageInventory")) {
@@ -3024,15 +6205,33 @@ function receiveSupplierOrder(supplier) {
     render();
     showToast(`${supplier} delivery received and inventory updated.`);
 }
-function addOrderDraftLine(productId, quantity) {
+function getSelectedLineModifiers() {
+    const checked = [...document.querySelectorAll("input[name='lineModifier']:checked")]
+        .map((input) => input.value);
+    const customModifier = String(document.querySelector("#orderCustomModifier")?.value || "").trim();
+    return normalizeLineModifiers(customModifier ? [...checked, customModifier] : checked);
+}
+function clearLineDetailFields() {
+    document.querySelectorAll("input[name='lineModifier']:checked").forEach((input) => {
+        input.checked = false;
+    });
+    const noteInput = document.querySelector("#orderLineNote");
+    const customModifierInput = document.querySelector("#orderCustomModifier");
+    if (noteInput)
+        noteInput.value = "";
+    if (customModifierInput)
+        customModifierInput.value = "";
+}
+function addOrderDraftLine(productId, quantity, note = "", modifiers = []) {
     if (!can("canCreateOrders")) {
         showToast("This role cannot create orders.");
         return;
     }
     const product = productById(productId);
-    const channel = document.querySelector("#orderForm")?.elements.channel.value || "Dine-in";
+    const channel = normalizeOrderType(document.querySelector("#orderForm")?.elements.channel.value || "Dine-in");
+    const orderContext = getCurrentOrderContext();
     const requestedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
-    const availability = getProductAvailability(product);
+    const availability = getProductAvailability(product, state.orderDraft, orderContext);
     if (!product)
         return;
     if (!productCanBeOrdered(product, channel)) {
@@ -3045,13 +6244,23 @@ function addOrderDraftLine(productId, quantity) {
         renderOrderBuilder();
         return;
     }
-    state.orderDraft = normalizeOrderItems([...state.orderDraft, { productId: product.id, quantity: requestedQuantity }]);
+    state.orderDraft = normalizeOrderItems([
+        ...state.orderDraft,
+        {
+            productId: product.id,
+            quantity: requestedQuantity,
+            note: String(note || "").trim(),
+            modifiers: normalizeLineModifiers(modifiers)
+        }
+    ]);
     saveState();
+    clearLineDetailFields();
     render();
     showToast(`${requestedQuantity}x ${product.name} added to basket.`);
 }
-function removeOrderDraftLine(productId) {
-    state.orderDraft = state.orderDraft.filter((item) => item.productId !== productId);
+function removeOrderDraftLine(index) {
+    state.orderDraft.splice(Number(index), 1);
+    state.orderDraft = normalizeOrderItems(state.orderDraft);
     saveState();
     render();
 }
@@ -3060,83 +6269,103 @@ function clearOrderDraft() {
     saveState();
     render();
 }
-function createOrder(formData) {
-    if (!can("canCreateOrders")) {
-        showToast("This role cannot create orders.");
-        return;
+function getOrderCustomerLabel(channel, tableId, customerName) {
+    const orderType = orderTypeDefinition(channel);
+    const table = tableById(tableId);
+    if (orderType.requiresTable && table)
+        return table.name;
+    return String(customerName || "").trim() || (orderType.requiresTable ? "Unassigned table" : "Walk-in");
+}
+function getKitchenTicketNotes(order, item) {
+    return [
+        order.notes,
+        item.modifiers?.length ? `Modifiers: ${item.modifiers.join(", ")}` : "",
+        item.note ? `Line note: ${item.note}` : ""
+    ].filter(Boolean).join(" | ");
+}
+function createKitchenTicketsForOrder(order) {
+    const existingTickets = state.tickets.filter((ticket) => ticket.orderId === order.id);
+    if (existingTickets.length)
+        return existingTickets;
+    const createdAt = order.sentAt || timeNow();
+    const createdAtMs = Date.now();
+    const tickets = order.items.map((item, index) => {
+        const product = productById(item.productId);
+        return {
+            id: `TCK-${order.number}-${index + 1}`,
+            orderId: order.id,
+            productId: product.id,
+            quantity: item.quantity,
+            station: normalizeKitchenStation(product.station),
+            status: "Queued",
+            createdAt,
+            createdAtMs,
+            acceptedAtMs: "",
+            startedAtMs: "",
+            delayedAtMs: "",
+            readyAtMs: "",
+            completedAtMs: "",
+            notes: getKitchenTicketNotes(order, item),
+            issueNote: ""
+        };
+    });
+    state.tickets.push(...tickets);
+    return tickets;
+}
+function validateOrderForKitchen(order) {
+    const orderContext = {
+        channel: order.channel,
+        fulfillment: order.fulfillment
+    };
+    const shortages = getStockShortages(order.items, orderContext);
+    if (shortages.length) {
+        const missing = shortages.map((item) => `${formatStockAmount(item.shortage, item.ingredient.unit)} ${item.ingredient.name}`).join(", ");
+        return { ok: false, message: `Cannot send order; missing ${missing}.` };
     }
-    const channel = formData.get("channel");
-    const items = state.orderDraft.length
-        ? normalizeOrderItems(state.orderDraft)
-        : normalizeOrderItems([{ productId: formData.get("productId"), quantity: formData.get("quantity") }]);
-    const shortages = getStockShortages(items);
-    const unavailableItem = items.find((item) => !productCanBeOrdered(productById(item.productId), channel));
-    const inactiveIngredientItem = items.find((item) => {
+    const unavailableItem = order.items.find((item) => !productCanBeOrdered(productById(item.productId), order.channel));
+    if (unavailableItem) {
+        const unavailableProduct = productById(unavailableItem.productId);
+        return { ok: false, message: `${unavailableProduct?.name || "That product"} is not available for ${order.channel}.` };
+    }
+    const inactiveIngredientItem = order.items.find((item) => {
         const product = productById(item.productId);
         return (product?.recipe || []).some((line) => {
+            if (!recipeLineAppliesToOrder(line, orderContext))
+                return false;
             const ingredient = ingredientById(line.ingredientId);
             return !ingredient?.active;
         });
     });
-    if (!items.length) {
-        showToast("Add an item before sending the order.");
-        return;
-    }
-    if (unavailableItem) {
-        const unavailableProduct = productById(unavailableItem.productId);
-        showToast(`${unavailableProduct?.name || "That product"} is not available for ${channel}.`);
-        state.orderDraft = state.orderDraft.filter((item) => productCanBeOrdered(productById(item.productId), channel));
-        renderOrderBuilder();
-        return;
-    }
     if (inactiveIngredientItem) {
         const product = productById(inactiveIngredientItem.productId);
-        showToast(`${product?.name || "That product"} has an inactive purchased product in its recipe.`);
-        renderOrderBuilder();
-        return;
+        return { ok: false, message: `${product?.name || "That product"} has an inactive purchased product in its recipe.` };
     }
-    if (shortages.length) {
-        const missing = shortages.map((item) => `${formatStockAmount(item.shortage, item.ingredient.unit)} ${item.ingredient.name}`).join(", ");
-        showToast(`Cannot send order; missing ${missing}.`);
-        renderOrderBuilder();
-        return;
+    return { ok: true, orderContext };
+}
+function sendOrderToKitchen(orderId, options = {}) {
+    if (!options.skipPermission && !can("canCreateOrders")) {
+        showToast("This role cannot send orders.");
+        return false;
     }
-    const number = state.nextOrderNumber;
-    const orderId = `ORD-${number}`;
-    const createdAt = timeNow();
-    const createdAtMs = Date.now();
-    const order = {
-        id: orderId,
-        number,
-        channel,
-        customer: formData.get("customer") || "Walk-in",
-        paymentStatus: formData.get("paymentStatus"),
-        fulfillment: formData.get("fulfillment"),
-        status: "Queued",
-        createdAt,
-        createdAtMs,
-        notes: formData.get("notes"),
-        items: items.map((item) => ({ ...item }))
-    };
-    const stations = [...new Set(items.map((item) => productById(item.productId).station))];
-    state.orders.push(order);
-    items.forEach((item, index) => {
-        const product = productById(item.productId);
-        state.tickets.push({
-            id: `TCK-${number}-${index + 1}`,
-            orderId,
-            productId: product.id,
-            quantity: item.quantity,
-            station: product.station,
-            status: "Queued",
-            createdAt,
-            createdAtMs,
-            notes: order.notes
-        });
-    });
-    state.nextOrderNumber += 1;
-    state.orderDraft = [];
-    deductInventoryForItems(items);
+    const order = orderById(orderId);
+    if (!order)
+        return false;
+    if (order.status === "Cancelled" || order.status === "Paid") {
+        showToast(`Order #${order.number} cannot be sent from ${order.status}.`);
+        return false;
+    }
+    const validation = validateOrderForKitchen(order);
+    if (!validation.ok) {
+        showToast(validation.message);
+        renderOrderBuilder();
+        return false;
+    }
+    order.sentAt = order.sentAt || timeNow();
+    order.status = "Sent to kitchen";
+    const tickets = createKitchenTicketsForOrder(order);
+    const stations = [...new Set(tickets.map((ticket) => ticket.station))];
+    const stockChanges = order.inventoryDeducted ? [] : deductInventoryForItems(order.items, validation.orderContext);
+    order.inventoryDeducted = true;
     if (order.fulfillment === "Delivery") {
         const availableDriver = state.drivers.find((driver) => driver.status === "Available");
         if (availableDriver) {
@@ -3149,21 +6378,222 @@ function createOrder(formData) {
     }
     saveState();
     render();
-    showToast(`Order #${number} sent to ${stations.length === 1 ? stations[0] : `${stations.length} stations`}; inventory updated automatically.`);
+    if (!options.silent) {
+        showToast(getOrderCompletionToast(order.number, stations, stockChanges, order.items, validation.orderContext));
+    }
+    return true;
+}
+function createOrder(formData, mode = "kitchen") {
+    if (!can("canCreateOrders")) {
+        showToast("This role cannot create orders.");
+        return;
+    }
+    const channel = normalizeOrderType(formData.get("channel"));
+    const orderType = orderTypeDefinition(channel);
+    const orderContext = {
+        channel,
+        fulfillment: formData.get("fulfillment") || orderType.fulfillment
+    };
+    const paymentMethod = normalizePaymentMethod(formData.get("paymentMethod") || formData.get("paymentStatus"));
+    const paymentStatus = getPaymentStatusForMethod(paymentMethod, formData.get("paymentStatus"));
+    const items = state.orderDraft.length
+        ? normalizeOrderItems(state.orderDraft)
+        : normalizeOrderItems([{ productId: formData.get("productId"), quantity: formData.get("quantity") }]);
+    const tableId = formData.get("tableId");
+    if (!items.length) {
+        showToast("Add an item before sending the order.");
+        return;
+    }
+    if (orderType.requiresTable && !tableById(tableId)) {
+        showToast("Select a table before creating the dine-in order.");
+        return;
+    }
+    const number = state.nextOrderNumber;
+    const orderId = `ORD-${number}`;
+    const createdAt = timeNow();
+    const createdAtMs = Date.now();
+    const staff = currentUser();
+    const order = {
+        id: orderId,
+        number,
+        channel,
+        orderType: channel,
+        tableId: tableById(tableId) ? tableId : "",
+        customer: getOrderCustomerLabel(channel, tableId, formData.get("customer")),
+        paymentStatus,
+        paymentMethod,
+        fulfillment: orderContext.fulfillment,
+        status: "New",
+        createdAt,
+        createdAtMs,
+        sentAt: "",
+        paidAt: paymentStatus === "Paid" ? createdAt : "",
+        paidAtMs: paymentStatus === "Paid" ? createdAtMs : "",
+        staffId: staff?.id || "",
+        staffName: staff?.name || "",
+        paidByUserId: paymentStatus === "Paid" ? staff?.id || "" : "",
+        paidByName: paymentStatus === "Paid" ? staff?.name || "" : "",
+        inventoryDeducted: false,
+        notes: String(formData.get("notes") || "").trim(),
+        items: items.map((item) => ({ ...item }))
+    };
+    const validation = validateOrderForKitchen(order);
+    if (!validation.ok) {
+        showToast(validation.message);
+        renderOrderBuilder();
+        return;
+    }
+    state.orders.push(order);
+    state.nextOrderNumber += 1;
+    state.orderDraft = [];
+    state.receiptOrderId = order.id;
+    if (mode === "kitchen") {
+        sendOrderToKitchen(order.id);
+        return;
+    }
+    saveState();
+    render();
+    showToast(`Order #${number} saved as New.`);
+}
+function addCustomerCartItem(productId) {
+    const session = getCustomerQrSession();
+    if (!session || session.error)
+        return;
+    const product = productById(productId);
+    if (!product || !productCanBeOrdered(product, CUSTOMER_QR_CHANNEL)) {
+        showToast("That item is not available for QR ordering.");
+        return;
+    }
+    const cartItems = getCustomerCartItems();
+    const availability = getProductAvailability(product, cartItems, CUSTOMER_QR_ORDER_CONTEXT);
+    if (availability.maxQuantity < 1) {
+        showToast(`${product.name} is not available with current stock.`);
+        renderCustomerQrScreen();
+        return;
+    }
+    state.customerCart = normalizeOrderItems([...cartItems, { productId: product.id, quantity: 1, note: "", modifiers: [] }]);
+    state.customerLastOrderId = "";
+    saveState();
+    render();
+    showToast(`${product.name} added.`);
+}
+function adjustCustomerCartItem(index, delta) {
+    const cartItems = getCustomerCartItems();
+    const item = cartItems[Number(index)];
+    if (!item)
+        return;
+    const product = productById(item.productId);
+    if (!product)
+        return;
+    if (delta > 0) {
+        const otherItems = cartItems.filter((_, itemIndex) => itemIndex !== Number(index));
+        const availability = getProductAvailability(product, otherItems, CUSTOMER_QR_ORDER_CONTEXT);
+        if (item.quantity + 1 > availability.maxQuantity) {
+            showToast(`Only ${availability.maxQuantity} ${product.name} can be ordered with current stock.`);
+            return;
+        }
+    }
+    item.quantity += delta;
+    state.customerCart = normalizeOrderItems(cartItems.filter((line) => line.quantity > 0));
+    saveState();
+    render();
+}
+function removeCustomerCartItem(index) {
+    state.customerCart = getCustomerCartItems().filter((_, itemIndex) => itemIndex !== Number(index));
+    saveState();
+    render();
+}
+function startNewCustomerOrder() {
+    state.customerCart = [];
+    state.customerLastOrderId = "";
+    saveState();
+    render();
+}
+function submitCustomerQrOrder(formData) {
+    const session = getCustomerQrSession();
+    if (!session || session.error || !session.table) {
+        showToast("Ask staff for an active table QR code.");
+        renderCustomerQrScreen();
+        return;
+    }
+    const items = getCustomerCartItems();
+    if (!items.length) {
+        showToast("Add an item before placing the order.");
+        return;
+    }
+    const paymentOption = String(formData.get("paymentOption") || "online");
+    const paymentMethod = paymentOption === "later" ? UNPAID_PAYMENT_METHOD : "Online payment";
+    const paymentStatus = getPaymentStatusForMethod(paymentMethod);
+    const number = state.nextOrderNumber;
+    const orderId = `ORD-${number}`;
+    const createdAt = timeNow();
+    const createdAtMs = Date.now();
+    const order = {
+        id: orderId,
+        number,
+        channel: CUSTOMER_QR_CHANNEL,
+        orderType: CUSTOMER_QR_CHANNEL,
+        tableId: session.table.id,
+        customer: session.table.name,
+        paymentStatus,
+        paymentMethod,
+        fulfillment: "Kitchen",
+        status: "New",
+        createdAt,
+        createdAtMs,
+        sentAt: "",
+        paidAt: paymentStatus === "Paid" ? createdAt : "",
+        paidAtMs: paymentStatus === "Paid" ? createdAtMs : "",
+        staffId: "",
+        staffName: "QR guest",
+        paidByUserId: "",
+        paidByName: paymentStatus === "Paid" ? "QR online checkout" : "",
+        inventoryDeducted: false,
+        notes: String(formData.get("notes") || "").trim(),
+        qrCodeId: session.code?.id || "",
+        items: items.map((item) => ({ ...item }))
+    };
+    const validation = validateOrderForKitchen(order);
+    if (!validation.ok) {
+        showToast(validation.message);
+        renderCustomerQrScreen();
+        return;
+    }
+    state.orders.push(order);
+    state.nextOrderNumber += 1;
+    state.customerCart = [];
+    state.customerLastOrderId = order.id;
+    state.receiptOrderId = order.id;
+    sendOrderToKitchen(order.id, { silent: true, skipPermission: true });
+    showToast(`Order #${number} sent to the kitchen.`);
 }
 function advanceStatus(current) {
+    if (current === "Delayed")
+        return "Preparing";
     return TICKET_STATUS_FLOW[Math.min(TICKET_STATUS_FLOW.indexOf(current) + 1, TICKET_STATUS_FLOW.length - 1)] || "Queued";
 }
 function setTicketStatus(ticket, status) {
+    if (!TICKET_STATUSES.includes(status))
+        return;
     const now = Date.now();
     ticket.status = status;
+    if (["Accepted", "Preparing", "Delayed", "Ready", "Done"].includes(status) && !ticket.acceptedAtMs) {
+        ticket.acceptedAtMs = now;
+    }
     if (status === "Preparing" && !ticket.startedAtMs) {
         ticket.startedAtMs = now;
     }
+    if (status === "Delayed" && !ticket.delayedAtMs) {
+        ticket.delayedAtMs = now;
+    }
     if (status === "Ready" && !ticket.readyAtMs) {
+        if (!ticket.startedAtMs)
+            ticket.startedAtMs = now;
         ticket.readyAtMs = now;
     }
     if (status === "Done" && !ticket.completedAtMs) {
+        if (!ticket.startedAtMs)
+            ticket.startedAtMs = now;
         if (!ticket.readyAtMs)
             ticket.readyAtMs = now;
         ticket.completedAtMs = now;
@@ -3174,14 +6604,18 @@ function syncOrderStatus(orderId) {
     const order = orderById(orderId);
     if (!order || !tickets.length)
         return;
+    if (order.status === "Paid" || order.status === "Cancelled")
+        return;
     if (tickets.every((ticket) => ticket.status === "Done"))
-        order.status = "Done";
+        order.status = isOrderPaid(order) ? "Paid" : "Served";
     else if (tickets.every((ticket) => ticket.status === "Ready" || ticket.status === "Done"))
         order.status = "Ready";
-    else if (tickets.some((ticket) => ticket.status === "Preparing"))
+    else if (tickets.some((ticket) => ticket.status === "Delayed"))
+        order.status = "Delayed";
+    else if (tickets.some((ticket) => ["Accepted", "Preparing"].includes(ticket.status)))
         order.status = "Preparing";
     else
-        order.status = "Queued";
+        order.status = "Sent to kitchen";
 }
 function advanceTicket(ticketId) {
     if (!can("canAdvanceTickets")) {
@@ -3197,9 +6631,72 @@ function advanceTicket(ticketId) {
     render();
     showToast(`Ticket moved to ${ticket.status}.`);
 }
+function updateTicketStatus(ticketId, status) {
+    if (!can("canAdvanceTickets")) {
+        showToast("This role cannot update kitchen tickets.");
+        return;
+    }
+    const ticket = state.tickets.find((item) => item.id === ticketId);
+    if (!ticket || !TICKET_STATUSES.includes(status))
+        return;
+    setTicketStatus(ticket, status);
+    syncOrderStatus(ticket.orderId);
+    saveState();
+    render();
+    showToast(`Kitchen task marked ${getTicketStatusLabel(ticket.status).toLowerCase()}.`);
+}
+function markTicketDelayed(ticketId) {
+    if (!can("canAdvanceTickets")) {
+        showToast("This role cannot update kitchen tickets.");
+        return;
+    }
+    const ticket = state.tickets.find((item) => item.id === ticketId);
+    if (!ticket)
+        return;
+    const issueNote = window.prompt("Issue note for the delay", ticket.issueNote || "");
+    if (issueNote === null)
+        return;
+    ticket.issueNote = String(issueNote || "").trim();
+    setTicketStatus(ticket, "Delayed");
+    syncOrderStatus(ticket.orderId);
+    saveState();
+    render();
+    showToast("Kitchen task marked delayed.");
+}
+function addTicketIssueNote(ticketId) {
+    if (!can("canAdvanceTickets")) {
+        showToast("This role cannot update kitchen tickets.");
+        return;
+    }
+    const ticket = state.tickets.find((item) => item.id === ticketId);
+    if (!ticket)
+        return;
+    const issueNote = window.prompt("Issue note", ticket.issueNote || "");
+    if (issueNote === null)
+        return;
+    ticket.issueNote = String(issueNote || "").trim();
+    saveState();
+    render();
+    showToast(ticket.issueNote ? "Issue note added." : "Issue note cleared.");
+}
 function advanceOrder(orderId) {
     if (!can("canCreateOrders") && !can("canAdvanceTickets")) {
         showToast("This role cannot update orders.");
+        return;
+    }
+    const order = orderById(orderId);
+    if (!order)
+        return;
+    if (order.status === "New") {
+        sendOrderToKitchen(orderId);
+        return;
+    }
+    if (order.status === "Ready") {
+        markOrderServed(orderId);
+        return;
+    }
+    if (order.status === "Served") {
+        markOrderPaid(orderId);
         return;
     }
     const orderTickets = state.tickets.filter((ticket) => ticket.orderId === orderId && ticket.status !== "Done");
@@ -3211,65 +6708,320 @@ function advanceOrder(orderId) {
     render();
     showToast("Order status updated.");
 }
+function markOrderServed(orderId) {
+    if (!can("canCreateOrders")) {
+        showToast("This role cannot update orders.");
+        return;
+    }
+    const order = orderById(orderId);
+    if (!order || order.status === "Cancelled" || order.status === "Paid")
+        return;
+    state.tickets
+        .filter((ticket) => ticket.orderId === orderId)
+        .forEach((ticket) => setTicketStatus(ticket, "Done"));
+    order.status = isOrderPaid(order) ? "Paid" : "Served";
+    saveState();
+    render();
+    showToast(`Order #${order.number} marked served.`);
+}
+function markOrderPaid(orderId, paymentMethod = DEFAULT_PAID_PAYMENT_METHOD) {
+    if (!can("canCreateOrders")) {
+        showToast("This role cannot take payment.");
+        return;
+    }
+    const order = orderById(orderId);
+    if (!order || order.status === "Cancelled")
+        return;
+    const method = normalizePaymentMethod(paymentMethod);
+    const staff = currentUser();
+    order.paymentStatus = "Paid";
+    order.paymentMethod = isPaidPaymentMethod(method) ? method : DEFAULT_PAID_PAYMENT_METHOD;
+    if (order.status === "Served")
+        order.status = "Paid";
+    order.paidAt = order.paidAt || timeNow();
+    order.paidAtMs = order.paidAtMs || Date.now();
+    order.paidByUserId = staff?.id || order.paidByUserId || "";
+    order.paidByName = staff?.name || order.paidByName || "";
+    state.receiptOrderId = order.id;
+    saveState();
+    render();
+    showToast(`Payment recorded for order #${order.number}.`);
+}
+function cancelOrder(orderId) {
+    if (!can("canCreateOrders")) {
+        showToast("This role cannot cancel orders.");
+        return;
+    }
+    const order = orderById(orderId);
+    if (!order || order.status !== "New") {
+        showToast("Only New orders can be cancelled in this phase.");
+        return;
+    }
+    order.status = "Cancelled";
+    order.paymentStatus = "Unpaid";
+    order.paymentMethod = UNPAID_PAYMENT_METHOD;
+    order.paidAt = "";
+    order.paidAtMs = "";
+    order.paidByUserId = "";
+    order.paidByName = "";
+    saveState();
+    render();
+    showToast(`Order #${order.number} cancelled.`);
+}
+function showOrderReceipt(orderId) {
+    const order = orderById(orderId);
+    if (!order)
+        return;
+    state.receiptOrderId = order.id;
+    if (canView("orders"))
+        state.activeView = "orders";
+    saveState();
+    render();
+}
+function printOrderReceipt(orderId) {
+    showOrderReceipt(orderId);
+    window.setTimeout(() => window.print(), 50);
+}
 function logWaste() {
-    if (!can("canManageInventory")) {
-        showToast("This role cannot change inventory.");
+    if (!can("canRecordWaste")) {
+        showToast("This role cannot record waste.");
         return;
     }
     const ingredient = ingredientById("kefta");
     if (!ingredient)
         return;
     const location = getIngredientPrimaryLocation(ingredient);
+    if (ingredient.stock < 0.25) {
+        showToast(`Only ${formatStockAmount(ingredient.stock, ingredient.unit)} Kefta is available.`);
+        return;
+    }
     const result = deductIngredientStock(ingredient, 0.25, location);
-    pushInventoryHistory({
+    pushWasteRecord({
         ingredient,
-        type: "waste",
         quantity: result.removed,
+        unitType: "kilograms",
+        stockQuantity: result.removed,
+        reason: "Dropped",
+        staffId: currentUser()?.id,
+        occurredAtMs: Date.now(),
+        notes: "Quick kefta waste shortcut.",
         fromLocation: location,
-        detail: `Waste logged: ${formatStockAmount(result.removed, ingredient.unit)} kefta removed from ${location}.`
-    });
-    state.productionLog.push({
-        id: `LOG-${Date.now()}`,
-        time: timeNow(),
-        text: `Waste logged: ${formatStockAmount(result.removed, ingredient.unit)} kefta removed from ${location}. Stock and reorder status updated.`
     });
     saveState();
     render();
     showToast("Waste logged and stock recalculated.");
 }
-function recordProduction(formData) {
+function recordProduction(form) {
     if (!can("canManageProcedures")) {
         showToast("This role cannot record production.");
         return;
     }
-    const product = productById(formData.get("productId"));
-    if (!product)
+    const draft = getProductionExecutionDraft(form);
+    const readiness = getProductionReadiness(draft, form);
+    const product = draft.product;
+    if (!readiness.ok) {
+        showToast(readiness.detail);
+        updateProductionCostPreview();
         return;
-    const actualUsages = product.recipe.map((line, index) => {
-        const ingredient = ingredientById(line.ingredientId);
-        if (!ingredient)
-            return null;
-        const measure = getRecipeMeasure(line);
-        const actualUsage = Math.max(0, Number(formData.get(getProductionFieldName(line, index))) || 0);
-        const usedStock = convertActualUsageToStockUnits(line, actualUsage);
-        const result = deductIngredientStock(ingredient, usedStock);
+    }
+    const batchId = `BAT-${Date.now()}-${state.productionBatches.length + 1}`;
+    const completedAt = timeNow();
+    const completedAtMs = Date.now();
+    const staff = currentUser();
+    const actualUsages = draft.lines.map((line) => {
+        const result = deductIngredientStock(line.ingredient, line.actualStockQuantity, getIngredientPrimaryLocation(line.ingredient));
         pushInventoryHistory({
-            ingredient,
+            ingredient: line.ingredient,
             type: "remove",
             quantity: result.removed,
             fromLocation: result.removals.map((removal) => removal.location).join(", "),
-            detail: `${product.name} batch used ${formatActualUsageLabel(actualUsage, measure)} ${ingredient.name}.`
+            detail: `${product.name} batch ${batchId} used ${formatActualUsageLabel(line.actualUsage, line.measure)} ${line.ingredient.name} (${money(line.actualCost)} actual cost).`
         });
-        return `${formatActualUsageLabel(actualUsage, measure)} ${ingredient.name}`;
-    }).filter(Boolean);
+        return `${formatActualUsageLabel(line.actualUsage, line.measure)} ${line.ingredient.name}`;
+    });
+    if (draft.outputIngredient && draft.outputStockQuantity > 0) {
+        addStockToLocation(draft.outputIngredient, draft.outputLocation, draft.outputStockQuantity);
+        if (draft.outputUnitCost > 0)
+            draft.outputIngredient.purchasePrice = draft.outputUnitCost;
+        pushInventoryHistory({
+            ingredient: draft.outputIngredient,
+            type: "add",
+            quantity: draft.outputStockQuantity,
+            toLocation: draft.outputLocation,
+            detail: `${product.name} batch ${batchId} produced ${formatStockAmount(draft.outputStockQuantity, draft.outputIngredient.unit)} at ${money(draft.outputUnitCost)} per ${draft.outputIngredient.unit}.`
+        });
+    }
+    product.lastProductionCost = draft.actualCost;
+    product.lastProductionPlannedCost = draft.plannedCost;
+    product.lastProductionMargin = draft.actualMargin;
+    product.lastProductionCostDelta = draft.costDelta;
+    product.lastProductionAt = completedAt;
+    product.lastProductionAtMs = completedAtMs;
+    state.productionBatches.push({
+        id: batchId,
+        productId: product.id,
+        productName: product.name,
+        completedById: staff?.id || "",
+        completedByName: staff?.name || "Staff",
+        completedAt,
+        completedAtMs,
+        plannedCost: draft.plannedCost,
+        actualCost: draft.actualCost,
+        costDelta: draft.costDelta,
+        plannedMargin: draft.plannedMargin,
+        actualMargin: draft.actualMargin,
+        marginDelta: draft.marginDelta,
+        outputIngredientId: draft.outputIngredient?.id || "",
+        outputIngredientName: draft.outputIngredient?.name || "",
+        outputQuantity: draft.outputQuantity,
+        outputUnitType: draft.outputUnitType,
+        outputStockQuantity: draft.outputStockQuantity,
+        outputUnitCost: draft.outputUnitCost,
+        outputLocation: draft.outputLocation,
+        lines: draft.lines.map((line) => ({
+            ingredientId: line.ingredient.id,
+            ingredientName: line.ingredient.name,
+            measure: line.measure,
+            plannedUsage: line.plannedUsage,
+            actualUsage: line.actualUsage,
+            plannedStockQuantity: line.plannedStockQuantity,
+            actualStockQuantity: line.actualStockQuantity,
+            plannedCost: line.plannedCost,
+            actualCost: line.actualCost
+        }))
+    });
+    state.productionBatches = state.productionBatches.slice(-80);
+    const outputText = draft.outputIngredient
+        ? ` Added ${formatStockAmount(draft.outputStockQuantity, draft.outputIngredient.unit)} ${draft.outputIngredient.name} at ${money(draft.outputUnitCost)} per ${draft.outputIngredient.unit}.`
+        : "";
+    const marginText = draft.actualMargin === null ? "" : ` Margin ${draft.actualMargin.toFixed(1)}% (${formatSignedAmount(draft.marginDelta, " pts")}).`;
     state.productionLog.push({
         id: `LOG-${Date.now()}`,
-        time: timeNow(),
-        text: `${product.name} batch used actual ${actualUsages.join(", ")}. Ingredient stock and cost trace updated.`
+        time: completedAt,
+        text: `${product.name} batch complete: ${actualUsages.join(", ")}. Actual cost ${money(draft.actualCost)} (${money(draft.costDelta)} vs planned).${marginText}${outputText}`
     });
     saveState();
     render();
-    showToast("Recipe execution recorded.");
+    renderProductionRecipeFields({ reset: true });
+    const productionForm = document.querySelector("#productionForm");
+    if (productionForm?.elements?.prepComplete)
+        productionForm.elements.prepComplete.checked = false;
+    updateProductionCostPreview();
+    showToast("Batch result saved; inventory and actual cost updated.");
+}
+function createProcedure(formData) {
+    if (!can("canCreateProcedures")) {
+        showToast("Only Owner/Admin can create procedures.");
+        return false;
+    }
+    const title = String(formData.get("title") || "").trim();
+    const department = normalizeProcedureDepartment(formData.get("department"));
+    const language = normalizeProcedureLanguage(formData.get("language"));
+    const frequency = normalizeProcedureFrequency(formData.get("frequency"));
+    const assignedRole = normalizeProcedureAssignedRole(formData.get("assignedRole"), department);
+    const steps = normalizeProcedureSteps(String(formData.get("steps") || "").split(/\n/));
+    const requiredTools = normalizeListInput(formData.get("requiredTools"));
+    const requiredProducts = normalizeListInput(formData.get("requiredProducts"));
+    const media = normalizeProcedureMedia(formData.get("media"));
+    const user = currentUser();
+    if (!title || !steps.length) {
+        showToast("Add a procedure title and at least one step.");
+        return false;
+    }
+    state.procedures.push({
+        id: uniqueRecordId(title, [state.procedures]),
+        title,
+        department,
+        language,
+        steps,
+        requiredTools,
+        requiredProducts,
+        media,
+        frequency,
+        assignedRole,
+        active: true,
+        createdById: user?.id || "",
+        createdByName: user?.name || "",
+        createdAtMs: Date.now()
+    });
+    saveState();
+    render();
+    showToast(`${title} procedure created.`);
+    return true;
+}
+function setProcedureStepProgress(procedureId, stepIndex, checked) {
+    const procedure = procedureById(procedureId);
+    if (!procedure || !can("canCompleteProcedures") || !procedureAssignedToUser(procedure)) {
+        showToast("This role cannot update that procedure.");
+        return;
+    }
+    const index = Math.floor(Number(stepIndex) || 0);
+    if (index < 0 || index >= procedure.steps.length)
+        return;
+    state.procedureProgress = state.procedureProgress || {};
+    const key = procedureProgressKey(procedure.id);
+    const progress = getProcedureStepProgress(procedure.id);
+    if (checked)
+        progress.add(index);
+    else
+        progress.delete(index);
+    const nextProgress = [...progress].sort((first, second) => first - second);
+    if (nextProgress.length)
+        state.procedureProgress[key] = nextProgress;
+    else
+        delete state.procedureProgress[key];
+    saveState();
+    render();
+}
+function recordProcedureCompletion(procedureId, status = "Done", notes = "") {
+    const procedure = procedureById(procedureId);
+    const user = currentUser();
+    if (!procedure || !user || !can("canCompleteProcedures") || !procedureAssignedToUser(procedure)) {
+        showToast("This role cannot complete that procedure.");
+        return false;
+    }
+    const normalizedStatus = PROCEDURE_COMPLETION_STATUSES.includes(status) ? status : "Done";
+    const normalizedNotes = String(notes || "").trim();
+    if (normalizedStatus === "Done" && !procedureStepsComplete(procedure)) {
+        showToast("Check each step before marking the procedure done.");
+        return false;
+    }
+    if (normalizedStatus !== "Done" && !normalizedNotes) {
+        showToast("Add a reason before saving this procedure status.");
+        return false;
+    }
+    const checkedSteps = [...getProcedureStepProgress(procedure.id)].sort((first, second) => first - second);
+    const roleInfo = roleDefinition(user.role);
+    state.procedureCompletions.push({
+        id: `PROC-CMP-${Date.now()}-${state.procedureCompletions.length + 1}`,
+        procedureId: procedure.id,
+        status: normalizedStatus,
+        completedById: user.id,
+        completedByName: user.name,
+        assignedRole: normalizeProcedureAssignedRole(procedure.assignedRole, roleInfo.operationalRole),
+        completedAtMs: Date.now(),
+        completedAt: timeNow(),
+        checkedSteps,
+        notes: normalizedNotes
+    });
+    state.procedureCompletions = state.procedureCompletions.slice(-180);
+    delete state.procedureProgress?.[procedureProgressKey(procedure.id)];
+    saveState();
+    render();
+    showToast(`${procedure.title} marked ${normalizedStatus.toLowerCase()}.`);
+    return true;
+}
+function promptAndRecordProcedureStatus(procedureId, status) {
+    const procedure = procedureById(procedureId);
+    if (!procedure)
+        return;
+    const promptText = status === "Problem"
+        ? `What problem happened with ${procedure.title}?`
+        : `Why are you skipping ${procedure.title}?`;
+    const note = window.prompt(promptText, "");
+    if (note === null)
+        return;
+    recordProcedureCompletion(procedureId, status, note);
 }
 function addReservation(formData) {
     if (!can("canManageReservations")) {
@@ -3300,6 +7052,10 @@ function addReservation(formData) {
     showToast(`Reservation booked for ${reservation.name} at ${tableById(tableId).name}.`);
 }
 function renderTimingSurfaces() {
+    if (getCustomerQrSession()) {
+        renderCustomerQrScreen();
+        return;
+    }
     if (!currentUser())
         return;
     ensureActiveViewAccess();
@@ -3307,6 +7063,7 @@ function renderTimingSurfaces() {
     renderMetrics();
     renderDashboard();
     renderKitchen();
+    renderProcedures();
 }
 export function initApp() {
     document.addEventListener("click", (event) => {
@@ -3338,6 +7095,15 @@ export function initApp() {
         const nextTicket = event.target.closest("[data-next-ticket]");
         if (nextTicket)
             advanceTicket(nextTicket.dataset.nextTicket);
+        const ticketStatus = event.target.closest("[data-ticket-status][data-ticket-id]");
+        if (ticketStatus)
+            updateTicketStatus(ticketStatus.dataset.ticketId, ticketStatus.dataset.ticketStatus);
+        const delayTicket = event.target.closest("[data-delay-ticket]");
+        if (delayTicket)
+            markTicketDelayed(delayTicket.dataset.delayTicket);
+        const issueTicket = event.target.closest("[data-issue-ticket]");
+        if (issueTicket)
+            addTicketIssueNote(issueTicket.dataset.issueTicket);
         const nextOrder = event.target.closest("[data-next-order]");
         if (nextOrder)
             advanceOrder(nextOrder.dataset.nextOrder);
@@ -3347,9 +7113,27 @@ export function initApp() {
         const supplierReceived = event.target.closest("[data-supplier-received]");
         if (supplierReceived)
             receiveSupplierOrder(supplierReceived.dataset.supplierReceived);
-        const removeDraft = event.target.closest("[data-remove-draft]");
+        const removeDraft = event.target.closest("[data-remove-draft-index]");
         if (removeDraft)
-            removeOrderDraftLine(removeDraft.dataset.removeDraft);
+            removeOrderDraftLine(removeDraft.dataset.removeDraftIndex);
+        const sendKitchen = event.target.closest("[data-send-kitchen]");
+        if (sendKitchen)
+            sendOrderToKitchen(sendKitchen.dataset.sendKitchen);
+        const markServed = event.target.closest("[data-mark-served]");
+        if (markServed)
+            markOrderServed(markServed.dataset.markServed);
+        const markPaid = event.target.closest("[data-mark-paid]");
+        if (markPaid)
+            markOrderPaid(markPaid.dataset.markPaid, getSelectedPaymentMethodFromAction(markPaid));
+        const cancelButton = event.target.closest("[data-cancel-order]");
+        if (cancelButton)
+            cancelOrder(cancelButton.dataset.cancelOrder);
+        const showReceipt = event.target.closest("[data-show-receipt]");
+        if (showReceipt)
+            showOrderReceipt(showReceipt.dataset.showReceipt);
+        const printReceipt = event.target.closest("[data-print-receipt]");
+        if (printReceipt)
+            printOrderReceipt(printReceipt.dataset.printReceipt);
         const removeRecipeLine = event.target.closest("[data-remove-recipe-line]");
         if (removeRecipeLine)
             removeSellableRecipeLine(removeRecipeLine.dataset.removeRecipeLine);
@@ -3359,11 +7143,70 @@ export function initApp() {
         const togglePurchased = event.target.closest("[data-toggle-purchased]");
         if (togglePurchased)
             togglePurchasedProduct(togglePurchased.dataset.togglePurchased);
+        const updatePurchasePrice = event.target.closest("[data-update-purchase-price]");
+        if (updatePurchasePrice) {
+            const input = document.querySelector(`[data-purchase-price-input="${updatePurchasePrice.dataset.updatePurchasePrice}"]`);
+            updateIngredientPurchasePrice(updatePurchasePrice.dataset.updatePurchasePrice, input?.value);
+        }
+        const procedureDone = event.target.closest("[data-procedure-done]");
+        if (procedureDone)
+            recordProcedureCompletion(procedureDone.dataset.procedureDone, "Done");
+        const procedureProblem = event.target.closest("[data-procedure-problem]");
+        if (procedureProblem)
+            promptAndRecordProcedureStatus(procedureProblem.dataset.procedureProblem, "Problem");
+        const procedureSkip = event.target.closest("[data-procedure-skip]");
+        if (procedureSkip)
+            promptAndRecordProcedureStatus(procedureSkip.dataset.procedureSkip, "Skipped");
+        const openQr = event.target.closest("[data-open-qr]");
+        if (openQr)
+            openQrCustomerUrl(openQr.dataset.openQr);
+        const assignQr = event.target.closest("[data-assign-qr]");
+        if (assignQr)
+            assignQrCode(assignQr.dataset.assignQr);
+        const regenerateQr = event.target.closest("[data-regenerate-qr]");
+        if (regenerateQr)
+            regenerateQrCode(regenerateQr.dataset.regenerateQr);
+        const toggleQr = event.target.closest("[data-toggle-qr]");
+        if (toggleQr)
+            toggleQrCode(toggleQr.dataset.toggleQr);
+        const customerAdd = event.target.closest("[data-customer-add]");
+        if (customerAdd)
+            addCustomerCartItem(customerAdd.dataset.customerAdd);
+        const customerIncrease = event.target.closest("[data-customer-increase]");
+        if (customerIncrease)
+            adjustCustomerCartItem(customerIncrease.dataset.customerIncrease, 1);
+        const customerDecrease = event.target.closest("[data-customer-decrease]");
+        if (customerDecrease)
+            adjustCustomerCartItem(customerDecrease.dataset.customerDecrease, -1);
+        const customerRemove = event.target.closest("[data-customer-remove]");
+        if (customerRemove)
+            removeCustomerCartItem(customerRemove.dataset.customerRemove);
+        const customerNewOrder = event.target.closest("[data-customer-new-order]");
+        if (customerNewOrder)
+            startNewCustomerOrder();
     });
     document.addEventListener("change", (event) => {
         const productionProduct = event.target.closest("#productionProduct");
         if (productionProduct) {
+            renderProductionRecipeFields({ reset: true });
+            return;
+        }
+        const productionOutputIngredient = event.target.closest("#productionOutputIngredient");
+        if (productionOutputIngredient) {
             renderProductionRecipeFields();
+            return;
+        }
+        const productionForm = event.target.closest("#productionForm");
+        if (productionForm) {
+            updateProductionCostPreview();
+            return;
+        }
+        const qrTableSelect = event.target.closest("#qrTableSelect");
+        if (qrTableSelect) {
+            const table = tableById(qrTableSelect.value);
+            const areaInput = document.querySelector("#qrAreaInput");
+            if (areaInput && table)
+                areaInput.value = table.zone;
             return;
         }
         const sellableRecipeIngredient = event.target.closest("#sellableRecipeIngredient");
@@ -3371,29 +7214,33 @@ export function initApp() {
             renderSellableProductForm();
             return;
         }
-        const procedureToggle = event.target.closest("[data-procedure]");
-        if (!procedureToggle)
+        const procedureStep = event.target.closest("[data-procedure-step]");
+        if (!procedureStep)
             return;
-        if (!can("canManageProcedures")) {
-            procedureToggle.checked = !procedureToggle.checked;
+        if (!can("canCompleteProcedures")) {
+            procedureStep.checked = !procedureStep.checked;
             showToast("This role cannot update procedures.");
             return;
         }
-        const procedure = state.procedures.find((item) => item.id === procedureToggle.dataset.procedure);
-        procedure.done = procedureToggle.checked;
-        saveState();
-        render();
+        setProcedureStepProgress(procedureStep.dataset.procedureStep, procedureStep.dataset.stepIndex, procedureStep.checked);
     });
     document.querySelector("#loginForm").addEventListener("submit", (event) => {
         event.preventDefault();
         login(new FormData(event.currentTarget));
     });
+    document.addEventListener("submit", (event) => {
+        const customerOrderForm = event.target.closest("#customerOrderForm");
+        if (!customerOrderForm)
+            return;
+        event.preventDefault();
+        submitCustomerQrOrder(new FormData(customerOrderForm));
+    });
     document.querySelector("#orderForm").addEventListener("submit", (event) => {
         event.preventDefault();
-        createOrder(new FormData(event.currentTarget));
+        createOrder(new FormData(event.currentTarget), event.submitter?.dataset.orderMode || "kitchen");
     });
     document.querySelector("#addOrderLineBtn").addEventListener("click", () => {
-        addOrderDraftLine(document.querySelector("#productSelect").value, document.querySelector("#orderQuantity").value);
+        addOrderDraftLine(document.querySelector("#productSelect").value, document.querySelector("#orderQuantity").value, document.querySelector("#orderLineNote")?.value, getSelectedLineModifiers());
     });
     document.querySelector("#clearOrderDraftBtn").addEventListener("click", clearOrderDraft);
     document.querySelector("#productSelect").addEventListener("change", renderOrderBuilder);
@@ -3402,8 +7249,14 @@ export function initApp() {
         renderProductsInSelects();
         renderOrderBuilder();
     });
+    document.querySelector("#orderForm").elements.fulfillment?.addEventListener("change", renderOrderBuilder);
     document.querySelector("#addRecipeLineBtn").addEventListener("click", () => {
-        addSellableRecipeLine(document.querySelector("#sellableRecipeIngredient").value, document.querySelector("#sellableRecipeQuantity").value, document.querySelector("#sellableRecipeMeasure").value);
+        addSellableRecipeLine(document.querySelector("#sellableRecipeIngredient").value, document.querySelector("#sellableRecipeQuantity").value, document.querySelector("#sellableRecipeMeasure").value, document.querySelector("#sellableRecipeStation").value, document.querySelector("#sellableRecipeWaste").value, document.querySelector("#sellableRecipeAppliesTo").value, document.querySelector("#sellableRecipeNotes").value);
+    });
+    document.querySelector("#sellableProductForm").addEventListener("input", (event) => {
+        if (event.target.closest("[name='price'], [name='targetMargin'], [name='minMargin']")) {
+            renderSellableRecipeCostPreview();
+        }
     });
     document.querySelector("#sellableProductForm").addEventListener("submit", (event) => {
         event.preventDefault();
@@ -3418,10 +7271,26 @@ export function initApp() {
         applyInventoryAction(new FormData(event.currentTarget));
     });
     document.querySelector("#inventoryActionForm").addEventListener("change", renderInventoryActionForm);
+    document.querySelectorAll("[data-waste-form]").forEach((form) => {
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            recordWaste(new FormData(event.currentTarget), event.currentTarget);
+        });
+        form.addEventListener("input", renderWasteForms);
+        form.addEventListener("change", renderWasteForms);
+    });
+    document.querySelector("#procedureForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (createProcedure(new FormData(event.currentTarget))) {
+            event.currentTarget.reset();
+            renderProcedureFormControls();
+        }
+    });
     document.querySelector("#productionForm").addEventListener("submit", (event) => {
         event.preventDefault();
-        recordProduction(new FormData(event.currentTarget));
+        recordProduction(event.currentTarget);
     });
+    document.querySelector("#productionForm").addEventListener("input", updateProductionCostPreview);
     document.querySelector("#reservationForm").addEventListener("submit", (event) => {
         event.preventDefault();
         addReservation(new FormData(event.currentTarget));
@@ -3435,6 +7304,10 @@ export function initApp() {
     document.querySelector("#settingsForm").addEventListener("submit", (event) => {
         event.preventDefault();
         saveRestaurantSettings(new FormData(event.currentTarget));
+    });
+    document.querySelector("#qrCodeForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        createTableQrCode(new FormData(event.currentTarget));
     });
     document.querySelector("#logoutBtn").addEventListener("click", logout);
     document.querySelector("#quickOrderBtn").addEventListener("click", () => {

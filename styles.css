@@ -44,6 +44,231 @@ button {
   display: none !important;
 }
 
+.customer-qr-screen {
+  min-height: 100vh;
+  background: #f6f8f5;
+}
+
+.customer-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  min-height: 72px;
+  padding: 14px max(16px, calc((100vw - 1180px) / 2));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--line);
+}
+
+.customer-topbar .brand span {
+  color: var(--muted);
+}
+
+.customer-table-badge {
+  min-height: 46px;
+  padding: 7px 12px;
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.customer-table-badge span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-table-badge strong {
+  font-size: 1rem;
+}
+
+.customer-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 18px 16px 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 14px;
+  align-items: start;
+}
+
+.customer-error-shell {
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 460px);
+  place-content: center;
+}
+
+.customer-error-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.customer-error-card h1,
+.customer-error-card p {
+  margin: 0;
+}
+
+.customer-error-card p {
+  color: var(--muted);
+}
+
+.customer-confirmation,
+.customer-menu-panel,
+.customer-cart-panel {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.customer-confirmation {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  border-left: 4px solid var(--ok);
+}
+
+.customer-confirmation h2,
+.customer-confirmation p {
+  margin: 0;
+}
+
+.customer-confirmation p {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.customer-menu-panel h1 {
+  margin: 3px 0 0;
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.customer-menu-groups,
+.customer-menu-group,
+.customer-product-grid,
+.customer-cart-panel,
+.customer-cart-lines,
+.customer-payment-options {
+  display: grid;
+  gap: 12px;
+}
+
+.customer-menu-group h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.customer-product-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.customer-product-card {
+  min-height: 118px;
+  padding: 13px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.customer-product-card strong {
+  display: block;
+  margin: 4px 0;
+  font-size: 1.02rem;
+  line-height: 1.2;
+}
+
+.customer-product-card p,
+.customer-product-kicker,
+.customer-cart-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.customer-product-kicker {
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-product-actions {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.customer-add-btn {
+  background: var(--brand);
+  color: #ffffff;
+  border-color: var(--brand);
+}
+
+.customer-cart-panel {
+  position: sticky;
+  top: 86px;
+}
+
+.customer-cart-line {
+  min-height: 58px;
+  padding: 10px 0;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.customer-cart-line:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.customer-cart-line > div:first-child,
+.customer-cart-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.customer-cart-line span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.customer-quantity-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.customer-payment-options .check-row {
+  font-size: 0.86rem;
+}
+
+.customer-cart-total {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 1.12rem;
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;
@@ -430,7 +655,7 @@ button:disabled {
 .flow-map {
   min-height: 94px;
   display: grid;
-  grid-template-columns: minmax(80px, 1fr) 34px minmax(80px, 1fr) 34px minmax(80px, 1fr) 34px minmax(80px, 1fr);
+  grid-template-columns: minmax(72px, 1fr) 24px minmax(72px, 1fr) 24px minmax(72px, 1fr) 24px minmax(72px, 1fr) 24px minmax(72px, 1fr) 24px minmax(72px, 1fr);
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
@@ -473,6 +698,79 @@ button:disabled {
   border-left: 8px solid var(--brand-2);
 }
 
+.phase-loop-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand-2);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.phase-loop-card.danger {
+  border-color: #efaaa5;
+  border-left-color: var(--danger);
+  background: #fff4f3;
+}
+
+.phase-loop-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.phase-loop-card h3,
+.phase-loop-card p {
+  margin: 0;
+}
+
+.phase-loop-card h3 {
+  margin-top: 3px;
+  font-size: 1.05rem;
+}
+
+.phase-loop-card p {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.phase-loop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.phase-loop-metric {
+  min-height: 86px;
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.phase-loop-metric span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.phase-loop-metric strong {
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+
+.phase-loop-metric small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .stacked-form {
   display: grid;
   gap: 14px;
@@ -481,6 +779,122 @@ button:disabled {
 .production-fields {
   display: grid;
   gap: 14px;
+}
+
+.production-execution-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.production-guide {
+  min-width: 0;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.production-guide h3 {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.production-ingredient-line {
+  min-height: 76px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 150px);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.production-ingredient-line span {
+  display: grid;
+  gap: 3px;
+}
+
+.production-ingredient-line small,
+.production-preview-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.production-complete {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+}
+
+.production-complete input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--brand);
+}
+
+.production-usage-list {
+  display: grid;
+  gap: 6px;
+}
+
+.production-usage-row {
+  min-height: 32px;
+  padding: 7px 9px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.production-usage-row strong {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.production-usage-row.warning {
+  border-color: #efcf80;
+  background: #fffaf0;
+}
+
+.production-usage-row.danger {
+  border-color: #efaaa5;
+  background: #fff4f3;
+}
+
+.production-batch-card {
+  display: grid;
+  gap: 10px;
+}
+
+.inline-status {
+  font-weight: 900;
+}
+
+.inline-status.ok {
+  color: var(--ok);
+}
+
+.inline-status.warning {
+  color: #855f10;
+}
+
+.inline-status.danger {
+  color: var(--danger);
+}
+
+.inline-status.info {
+  color: var(--info);
 }
 
 .form-row {
@@ -545,6 +959,7 @@ textarea {
 .tabs {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   border-radius: 8px;
@@ -569,6 +984,19 @@ textarea {
   box-shadow: 0 1px 4px rgba(29, 36, 38, 0.08);
 }
 
+.tab-count {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f3c05f;
+  color: #173d36;
+  font-size: 0.72rem;
+}
+
 .order-stream,
 .order-list,
 .station-list,
@@ -582,7 +1010,9 @@ textarea {
 .activity-log,
 .user-list,
 .schema-grid,
-.language-checks {
+.language-checks,
+.waste-summary-grid,
+.procedure-summary-grid {
   display: grid;
   gap: 10px;
 }
@@ -594,6 +1024,104 @@ textarea {
 .recipe-builder {
   display: grid;
   gap: 12px;
+}
+
+.cost-preview {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.cost-preview-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.cost-grid,
+.recipe-cost-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.cost-grid strong,
+.recipe-cost-grid strong {
+  color: var(--ink);
+  text-align: right;
+}
+
+.waste-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.procedure-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  margin-bottom: 12px;
+}
+
+.waste-summary-card {
+  min-height: 104px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.procedure-summary-card {
+  min-height: 98px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.waste-summary-card span,
+.waste-summary-card small,
+.procedure-summary-card span,
+.procedure-summary-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.waste-summary-card strong,
+.procedure-summary-card strong {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.procedure-summary-card small.ok {
+  color: var(--ok);
+}
+
+.procedure-summary-card small.warning {
+  color: #855f10;
+}
+
+.procedure-summary-card small.danger {
+  color: var(--danger);
+}
+
+.procedure-summary-card small.info {
+  color: var(--info);
+}
+
+.waste-card p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .check-row {
@@ -610,6 +1138,38 @@ textarea {
   width: 18px;
   height: 18px;
   min-height: 18px;
+  accent-color: var(--brand);
+}
+
+.modifier-fieldset {
+  display: grid;
+  gap: 10px;
+}
+
+.modifier-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modifier-chip {
+  min-height: 34px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfdfc;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.modifier-chip input {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
   accent-color: var(--brand);
 }
 
@@ -707,6 +1267,12 @@ textarea {
   border-top: 1px solid var(--line);
 }
 
+.line-detail {
+  margin-top: 3px !important;
+  color: var(--muted);
+  font-size: 0.8rem !important;
+}
+
 .order-card,
 .ticket-card,
 .station-card,
@@ -741,6 +1307,77 @@ textarea {
   font-size: 0.86rem;
 }
 
+.qr-create-form {
+  margin-bottom: 12px;
+}
+
+.qr-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.qr-admin-card {
+  padding: 13px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.qr-admin-card.is-disabled {
+  background: #f3f5f3;
+}
+
+.qr-admin-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.qr-admin-card header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.qr-admin-body {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.qr-code-box {
+  width: 148px;
+  aspect-ratio: 1;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.qr-code-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.qr-admin-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.qr-actions {
+  justify-content: flex-start;
+}
+
 .reservation-card.is-conflict {
   border-color: #efaaa5;
   background: #fff4f3;
@@ -751,6 +1388,17 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
+}
+
+.order-progress-mini {
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .card-title {
@@ -821,6 +1469,165 @@ textarea {
   color: var(--brand);
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.mini-select {
+  width: auto;
+  min-width: 124px;
+  min-height: 32px;
+  padding: 5px 28px 5px 9px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.payment-capture {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.danger-action {
+  color: var(--danger);
+  background: #fde7e5;
+}
+
+.receipt-preview {
+  margin-top: 14px;
+}
+
+.receipt-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.receipt-card header,
+.receipt-line,
+.receipt-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.receipt-card header strong,
+.receipt-card header span,
+.receipt-line strong,
+.receipt-line span {
+  display: block;
+}
+
+.receipt-card header span,
+.receipt-line span,
+.receipt-meta,
+.receipt-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.receipt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.receipt-lines {
+  display: grid;
+  gap: 9px;
+  padding: 12px 0;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+}
+
+.receipt-line > span {
+  color: var(--ink);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.receipt-note {
+  margin: 0;
+}
+
+.receipt-totals {
+  display: grid;
+  gap: 7px;
+}
+
+.receipt-total {
+  align-items: center;
+  font-size: 1.05rem;
+}
+
+.receipt-subtotal,
+.receipt-tax {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.receipt-subtotal strong,
+.receipt-tax strong {
+  color: var(--ink);
+}
+
+.receipt-actions {
+  justify-content: flex-start;
+}
+
+.kds-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.kds-summary-card {
+  min-height: 86px;
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.kds-summary-card span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.kds-summary-card strong {
+  font-size: 1.1rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.kds-summary-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.kds-summary-card small.ok {
+  color: var(--ok);
+}
+
+.kds-summary-card small.warning {
+  color: #855f10;
+}
+
+.kds-summary-card small.danger {
+  color: var(--danger);
+}
+
+.kds-summary-card small.info {
+  color: var(--info);
 }
 
 .ticket-board {
@@ -905,8 +1712,47 @@ textarea {
   background: #fff4f3;
 }
 
+.ticket-card.sla-delayed,
+.ticket-card.status-delayed {
+  border-color: #efaaa5;
+  border-left-color: var(--danger);
+  background: #fff4f3;
+}
+
 .ticket-card.sla-ready {
   border-left-color: var(--ok);
+}
+
+.ticket-kicker,
+.ticket-notes span,
+.ticket-issue span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ticket-notes,
+.ticket-issue {
+  display: grid;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.ticket-issue {
+  color: var(--danger);
+}
+
+.ticket-issue p {
+  color: var(--danger);
+  font-weight: 800;
+}
+
+.kds-actions {
+  justify-content: flex-start;
+  padding-top: 2px;
 }
 
 .ticket-pills {
@@ -942,6 +1788,56 @@ textarea {
 
 .sla-meter.ready .progress-bar {
   background: var(--ok);
+}
+
+.sla-meter.delayed .progress-bar {
+  background: var(--danger);
+}
+
+.kitchen-progress-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.order-progress-card {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.order-progress-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.order-progress-card p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.station-progress-list {
+  display: grid;
+  gap: 7px;
+}
+
+.station-progress-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.station-progress-row strong {
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .alert-card {
@@ -1042,8 +1938,26 @@ textarea {
   white-space: nowrap;
 }
 
+.price-editor {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 180px;
+}
+
+.price-editor input {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
 .recipe-card.is-inactive {
   background: #f2f4f2;
+}
+
+.recipe-card.is-low-margin {
+  border-color: #efaaa5;
+  background: #fff4f3;
 }
 
 .recipe-lines {
@@ -1060,6 +1974,33 @@ textarea {
   gap: 8px;
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.recipe-line {
+  align-items: flex-start;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.recipe-line:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.recipe-line span {
+  display: grid;
+  gap: 3px;
+}
+
+.recipe-line small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.recipe-line > strong {
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
 }
 
 .supplier-card {
@@ -1120,6 +2061,133 @@ textarea {
 
 .procedure-card.is-done {
   background: #eef8f1;
+}
+
+.procedure-sop-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.procedure-sop-card.status-completed {
+  border-color: #b8d9c1;
+  background: #eef8f1;
+}
+
+.procedure-sop-card.status-problem {
+  border-color: #efaaa5;
+  background: #fff4f3;
+}
+
+.procedure-sop-card.status-skipped,
+.procedure-sop-card.status-missed {
+  border-color: #efcf80;
+  background: #fffaf0;
+}
+
+.procedure-sop-card header,
+.procedure-manager-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.procedure-sop-card header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.procedure-kicker {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.procedure-sop-card header strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 1.04rem;
+  line-height: 1.2;
+}
+
+.procedure-step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.procedure-step {
+  min-height: 42px;
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.procedure-step input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin-top: 1px;
+  accent-color: var(--brand);
+}
+
+.procedure-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.procedure-detail-grid div {
+  min-height: 66px;
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.procedure-detail-grid span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.procedure-detail-grid strong {
+  color: var(--ink);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.procedure-media,
+.procedure-actions {
+  justify-content: flex-start;
+}
+
+.procedure-last-run {
+  padding-top: 2px;
+}
+
+.procedure-manager-grid {
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1fr);
+}
+
+.inline-panel-header {
+  margin-bottom: 10px;
+}
+
+.procedure-history-card {
+  border-left: 4px solid var(--brand-2);
 }
 
 .driver-map {
@@ -1234,8 +2302,13 @@ textarea {
   .procedure-layout,
   .team-layout,
   .split-layout,
-  .settings-layout {
+  .settings-layout,
+  .customer-shell {
     grid-template-columns: 1fr;
+  }
+
+  .customer-cart-panel {
+    position: static;
   }
 
   .dashboard-grid .wide-panel {
@@ -1244,6 +2317,13 @@ textarea {
 
   .ticket-board {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
+  .kds-summary-grid,
+  .kitchen-progress-list,
+  .production-execution-grid,
+  .procedure-manager-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1294,8 +2374,35 @@ textarea {
   .metric-grid,
   .form-row,
   .language-checks,
-  .ticket-board {
+  .waste-summary-grid,
+  .procedure-summary-grid,
+  .procedure-detail-grid,
+  .procedure-manager-grid,
+    .phase-loop-grid,
+    .kds-summary-grid,
+    .kitchen-progress-list,
+    .production-execution-grid,
+    .production-ingredient-line,
+    .ticket-board,
+    .customer-product-grid,
+    .qr-admin-grid,
+    .qr-admin-body {
     grid-template-columns: 1fr;
+  }
+
+  .customer-topbar,
+  .customer-confirmation {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .customer-table-badge {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .qr-code-box {
+    width: min(100%, 220px);
   }
 
   .flow-map {
@@ -1327,6 +2434,10 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .order-progress-mini {
+    grid-template-columns: 1fr;
+  }
+
   .mini-actions {
     justify-content: flex-start;
   }
@@ -1351,5 +2462,44 @@ textarea {
   .segmented button,
   .tabs button {
     flex: 1 0 auto;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .login-screen,
+  .sidebar,
+  .topbar,
+  .view:not(#view-orders),
+  #view-orders .form-panel,
+  #view-orders .panel-header,
+  #orderList,
+  .toast,
+  .receipt-actions {
+    display: none !important;
+  }
+
+  .app-shell,
+  .workspace,
+  .split-layout,
+  #view-orders {
+    display: block !important;
+    padding: 0;
+  }
+
+  #view-orders .panel {
+    padding: 0;
+  }
+
+  .receipt-preview {
+    margin: 0;
+  }
+
+  .receipt-card {
+    border: 0;
+    box-shadow: none;
   }
 }

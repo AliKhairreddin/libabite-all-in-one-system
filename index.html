@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <section class="customer-qr-screen" id="customerQrScreen" aria-label="QR table ordering" hidden></section>
+
     <section class="login-screen" id="loginScreen" aria-label="Login">
       <div class="login-card">
         <div class="brand login-brand">
@@ -76,19 +78,24 @@
               <div class="panel-header">
                 <div>
                   <p class="eyebrow">Single input flow</p>
-                  <h2>Orders drive kitchen, stock, drivers, and purchasing</h2>
+                  <h2>Kefta Plate proves the complete product loop</h2>
                 </div>
                 <button class="ghost-btn" type="button" data-view-link="orders">Open Orders</button>
               </div>
               <div class="flow-map" aria-label="Connected workflow map">
+                <div class="flow-node">Product</div>
+                <div class="flow-line"></div>
                 <div class="flow-node">Order</div>
                 <div class="flow-line"></div>
                 <div class="flow-node">Kitchen</div>
                 <div class="flow-line"></div>
                 <div class="flow-node">Inventory</div>
                 <div class="flow-line"></div>
-                <div class="flow-node">Supplier</div>
+                <div class="flow-node">Alert</div>
+                <div class="flow-line"></div>
+                <div class="flow-node">Margin</div>
               </div>
+              <div class="phase-loop-card" id="keftaLoopProof" aria-live="polite"></div>
               <div class="order-stream" id="dashboardOrderStream"></div>
             </section>
 
@@ -111,6 +118,51 @@
               </div>
               <div class="alert-list" id="dashboardAlerts"></div>
             </section>
+
+            <section class="panel form-panel staff-waste-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Waste tracking</p>
+                  <h2>Record waste</h2>
+                </div>
+              </div>
+              <form class="stacked-form" data-waste-form>
+                <label>
+                  Product
+                  <select name="ingredientId" data-waste-product></select>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Quantity
+                    <input name="quantity" type="number" min="0.01" step="0.01" value="0.25" required>
+                  </label>
+                  <label>
+                    Unit
+                    <select name="unitType" data-waste-unit></select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Reason
+                    <select name="reason" data-waste-reason></select>
+                  </label>
+                  <label>
+                    Staff member
+                    <select name="staffId" data-waste-staff></select>
+                  </label>
+                </div>
+                <label>
+                  Date/time
+                  <input name="occurredAt" type="datetime-local" data-waste-datetime required>
+                </label>
+                <label>
+                  Notes
+                  <textarea name="notes" rows="3" placeholder="Optional detail"></textarea>
+                </label>
+                <div data-waste-preview></div>
+                <button class="primary-btn" type="submit">Record Waste</button>
+              </form>
+            </section>
           </div>
         </section>
 
@@ -125,30 +177,30 @@
               </div>
               <form id="orderForm" class="stacked-form">
                 <label>
-                  Channel
-                  <select name="channel">
-                    <option value="Dine-in">Dine-in POS</option>
-                    <option value="QR">Table QR</option>
-                    <option value="Website">Website</option>
-                    <option value="Phone">Phone</option>
-                    <option value="Uber Eats">Uber Eats</option>
-                    <option value="Takeaway">Takeaway</option>
-                  </select>
+                  Order type
+                  <select name="channel" id="orderTypeSelect"></select>
                 </label>
                 <div class="form-row">
-                  <label>
-                    Guest or table
-                    <input name="customer" type="text" value="Table 7" autocomplete="off">
+                  <label id="orderTableLabel">
+                    Table
+                    <select name="tableId" id="orderTableSelect"></select>
                   </label>
                   <label>
-                    Payment
-                    <select name="paymentStatus">
-                      <option value="Paid">Paid</option>
-                      <option value="Unpaid">Unpaid</option>
-                      <option value="Pay later">Pay later</option>
+                    Payment method
+                    <select name="paymentMethod" id="orderPaymentMethod">
+                      <option value="Unpaid / pay later">Unpaid / pay later</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Card">Card</option>
+                      <option value="Online payment">Online payment</option>
+                      <option value="External delivery app payment">External delivery app payment</option>
                     </select>
                   </label>
                 </div>
+                <input name="fulfillment" id="orderFulfillment" type="hidden" value="Kitchen">
+                <label>
+                  Customer/contact
+                  <input name="customer" type="text" placeholder="Optional for dine-in" autocomplete="off">
+                </label>
                 <label>
                   Product
                   <select name="productId" id="productSelect"></select>
@@ -159,14 +211,15 @@
                     <input name="quantity" id="orderQuantity" type="number" min="1" max="20" value="1">
                   </label>
                   <label>
-                    Fulfillment
-                    <select name="fulfillment">
-                      <option value="Kitchen">Kitchen</option>
-                      <option value="Delivery">Delivery</option>
-                      <option value="Pickup">Pickup</option>
-                    </select>
+                    Item note
+                    <input name="lineNote" id="orderLineNote" type="text" placeholder="No onions, allergy, extra sauce" autocomplete="off">
                   </label>
                 </div>
+                <fieldset class="modifier-fieldset">
+                  <legend>Modifiers</legend>
+                  <div class="modifier-checks" id="orderModifierChecks"></div>
+                  <input name="customModifier" id="orderCustomModifier" type="text" placeholder="Custom modifier" autocomplete="off">
+                </fieldset>
                 <div class="availability-card" id="orderAvailability" aria-live="polite"></div>
                 <div class="line-actions">
                   <button class="ghost-btn" type="button" id="addOrderLineBtn">Add Item</button>
@@ -178,9 +231,10 @@
                   <textarea name="notes" rows="3" placeholder="No onions, extra sauce, allergy note"></textarea>
                 </label>
                 <div class="form-actions">
-                  <button class="primary-btn" id="sendOrderBtn" type="submit">
+                  <button class="ghost-btn" id="saveOrderBtn" type="submit" data-order-mode="new">Save New</button>
+                  <button class="primary-btn" id="sendOrderBtn" type="submit" data-order-mode="kitchen">
                     <span aria-hidden="true">+</span>
-                    Send Order
+                    Send to Kitchen
                   </button>
                 </div>
               </form>
@@ -194,11 +248,14 @@
                 </div>
                 <div class="segmented" role="group" aria-label="Order filter">
                   <button type="button" class="is-selected" data-order-filter="All">All</button>
+                  <button type="button" data-order-filter="Dine-in">Dine-in</button>
                   <button type="button" data-order-filter="Kitchen">Kitchen</button>
-                  <button type="button" data-order-filter="Delivery">Delivery</button>
+                  <button type="button" data-order-filter="Paid">Paid</button>
+                  <button type="button" data-order-filter="Unpaid">Unpaid</button>
                 </div>
               </div>
               <div class="order-list" id="orderList"></div>
+              <div class="receipt-preview" id="receiptPreview" aria-live="polite"></div>
             </section>
           </div>
         </section>
@@ -212,7 +269,17 @@
               </div>
               <div class="tabs" id="stationTabs" role="tablist" aria-label="Kitchen stations"></div>
             </div>
+            <div class="kds-summary-grid" id="kitchenStationSummary" aria-live="polite"></div>
             <div class="ticket-board" id="ticketBoard"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">Manager view</p>
+                <h2>Full order progress</h2>
+              </div>
+            </div>
+            <div class="kitchen-progress-list" id="kitchenOrderProgress"></div>
           </div>
         </section>
 
@@ -228,12 +295,12 @@
               <form id="sellableProductForm" class="stacked-form">
                 <label>
                   Product name
-                  <input name="name" type="text" value="Kefta Sandwich" autocomplete="off" required>
+                  <input name="name" type="text" value="Kefta Plate" autocomplete="off" required>
                 </label>
                 <div class="form-row">
                   <label>
                     Product code/SKU
-                    <input name="code" type="text" value="KS-001" autocomplete="off" required>
+                    <input name="code" type="text" value="KP-001" autocomplete="off" required>
                   </label>
                   <label>
                     Category
@@ -247,7 +314,17 @@
                   </label>
                   <label>
                     Selling price
-                    <input name="price" type="number" min="0.01" step="0.01" value="9.50" required>
+                    <input name="price" type="number" min="0.01" step="0.01" value="14.50" required>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Target margin %
+                    <input name="targetMargin" type="number" min="0" max="100" step="0.1" value="68" required>
+                  </label>
+                  <label>
+                    Minimum margin %
+                    <input name="minMargin" type="number" min="0" max="100" step="0.1" value="58" required>
                   </label>
                 </div>
                 <div class="form-row">
@@ -275,16 +352,38 @@
                     </label>
                     <label>
                       Usage quantity
-                      <input name="recipeQuantity" id="sellableRecipeQuantity" type="number" min="0.01" step="0.01" value="1">
+                      <input name="recipeQuantity" id="sellableRecipeQuantity" type="number" min="0.01" step="0.01" value="200">
                     </label>
                   </div>
-                  <div class="form-row align-end">
+                  <div class="form-row">
                     <label>
                       Usage unit
                       <select name="recipeMeasure" id="sellableRecipeMeasure"></select>
                     </label>
+                    <label>
+                      Preparation station
+                      <select name="recipeStation" id="sellableRecipeStation"></select>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Waste %
+                      <input name="recipeWaste" id="sellableRecipeWaste" type="number" min="0" max="100" step="0.1" value="0">
+                    </label>
+                    <label>
+                      Applies to
+                      <select name="recipeAppliesTo" id="sellableRecipeAppliesTo"></select>
+                    </label>
+                  </div>
+                  <label>
+                    Recipe notes
+                    <input name="recipeNotes" id="sellableRecipeNotes" type="text" value="200g kefta per plate" autocomplete="off" placeholder="Optional prep note">
+                  </label>
+                  <div class="form-row align-end">
+                    <span></span>
                     <button class="ghost-btn" type="button" id="addRecipeLineBtn">Add Ingredient</button>
                   </div>
+                  <div class="cost-preview" id="sellableRecipeSummary"></div>
                   <div class="order-draft" id="sellableRecipeDraft"></div>
                 </div>
                 <button class="primary-btn" id="createSellableProductBtn" type="submit">Create Sellable Product</button>
@@ -301,7 +400,7 @@
               <form id="purchasedProductForm" class="stacked-form">
                 <label>
                   Ingredient name
-                  <input name="name" type="text" value="Kefta Meat" autocomplete="off" required>
+                  <input name="name" type="text" value="Kefta" autocomplete="off" required>
                 </label>
                 <div class="form-row">
                   <label>
@@ -329,17 +428,17 @@
                 <div class="form-row">
                   <label>
                     Current stock
-                    <input name="stock" type="number" min="0" step="0.01" value="4.2" required>
+                    <input name="stock" type="number" min="0" step="0.01" value="30" required>
                   </label>
                   <label>
                     Minimum stock
-                    <input name="min" type="number" min="0" step="0.01" value="3" required>
+                    <input name="min" type="number" min="0" step="0.01" value="5" required>
                   </label>
                 </div>
                 <div class="form-row">
                   <label>
                     Maximum stock
-                    <input name="max" type="number" min="0" step="0.01" value="12" required>
+                    <input name="max" type="number" min="0" step="0.01" value="50" required>
                   </label>
                   <label>
                     Storage location
@@ -406,6 +505,51 @@
               </form>
             </section>
 
+            <section class="panel form-panel staff-waste-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Waste tracking</p>
+                  <h2>Record waste</h2>
+                </div>
+              </div>
+              <form class="stacked-form" data-waste-form>
+                <label>
+                  Product
+                  <select name="ingredientId" data-waste-product></select>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Quantity
+                    <input name="quantity" type="number" min="0.01" step="0.01" value="0.25" required>
+                  </label>
+                  <label>
+                    Unit
+                    <select name="unitType" data-waste-unit></select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Reason
+                    <select name="reason" data-waste-reason></select>
+                  </label>
+                  <label>
+                    Staff member
+                    <select name="staffId" data-waste-staff></select>
+                  </label>
+                </div>
+                <label>
+                  Date/time
+                  <input name="occurredAt" type="datetime-local" data-waste-datetime required>
+                </label>
+                <label>
+                  Notes
+                  <textarea name="notes" rows="3" placeholder="Optional detail"></textarea>
+                </label>
+                <div data-waste-preview></div>
+                <button class="primary-btn" type="submit">Record Waste</button>
+              </form>
+            </section>
+
             <section class="panel" id="inventoryLowStockPanel">
               <div class="panel-header compact">
                 <div>
@@ -453,6 +597,17 @@
               <div class="activity-log" id="inventoryHistory"></div>
             </section>
 
+            <section class="panel wide-panel admin-waste-only">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Waste report</p>
+                  <h2>History and cost</h2>
+                </div>
+              </div>
+              <div class="waste-summary-grid" id="wasteReportSummary"></div>
+              <div class="activity-log" id="wasteHistory"></div>
+            </section>
+
             <section class="panel">
               <div class="panel-header compact">
                 <div>
@@ -475,19 +630,105 @@
           </div>
         </section>
 
-        <section class="view" id="view-procedures" data-title="Procedures & Production">
+        <section class="view" id="view-procedures" data-title="Procedures & SOPs">
           <div class="procedure-layout">
-            <section class="panel">
+            <section class="panel form-panel admin-procedure-only">
               <div class="panel-header compact">
                 <div>
-                  <p class="eyebrow">Shift checklist</p>
-                  <h2>Closing procedure</h2>
+                  <p class="eyebrow">Admin setup</p>
+                  <h2>Create procedure</h2>
                 </div>
               </div>
-              <div class="procedure-list" id="procedureList"></div>
+              <form id="procedureForm" class="stacked-form">
+                <label>
+                  Title
+                  <input name="title" type="text" value="Closing procedure" autocomplete="off" required>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Department
+                    <select name="department" id="procedureDepartment"></select>
+                  </label>
+                  <label>
+                    Language
+                    <select name="language" id="procedureLanguage"></select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Frequency
+                    <select name="frequency" id="procedureFrequency"></select>
+                  </label>
+                  <label>
+                    Assigned role
+                    <select name="assignedRole" id="procedureAssignedRole"></select>
+                  </label>
+                </div>
+                <label>
+                  Steps
+                  <textarea name="steps" rows="6" required>Close open tables and unpaid orders.
+Count cash drawer and compare payment totals.
+Clean counter, POS, payment terminal, and customer area.
+Switch off signs and lock the restaurant.</textarea>
+                </label>
+                <label>
+                  Required tools
+                  <input name="requiredTools" type="text" value="Cash drawer key, Closing sheet" autocomplete="off">
+                </label>
+                <label>
+                  Required products
+                  <input name="requiredProducts" type="text" value="Surface cleaner, Disposable cloths" autocomplete="off">
+                </label>
+                <label>
+                  Photos/videos
+                  <textarea name="media" rows="2" placeholder="Optional URLs, one per line"></textarea>
+                </label>
+                <button class="primary-btn" type="submit">Create Procedure</button>
+              </form>
             </section>
 
             <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Staff view</p>
+                  <h2>Assigned procedures</h2>
+                </div>
+              </div>
+              <div class="procedure-summary-grid" id="procedureSummaryGrid"></div>
+              <div class="procedure-list" id="procedureList"></div>
+            </section>
+
+            <section class="panel wide-panel manager-procedure-only" id="procedureManagerPanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Manager view</p>
+                  <h2>Completion history</h2>
+                </div>
+              </div>
+              <div class="procedure-summary-grid manager-summary" id="procedureManagerSummary"></div>
+              <div class="procedure-manager-grid">
+                <div>
+                  <div class="panel-header compact inline-panel-header">
+                    <div>
+                      <p class="eyebrow">Missed procedures</p>
+                      <h2>Needs review</h2>
+                    </div>
+                  </div>
+                  <div class="alert-list" id="missedProcedureList"></div>
+                </div>
+                <div>
+                  <div class="panel-header compact inline-panel-header">
+                    <div>
+                      <p class="eyebrow">Completed procedures</p>
+                      <h2>Recent activity</h2>
+                    </div>
+                  </div>
+                  <div class="activity-log" id="procedureHistory"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel wide-panel" id="procedureProductionPanel">
               <div class="panel-header compact">
                 <div>
                   <p class="eyebrow">Actual usage</p>
@@ -496,11 +737,51 @@
               </div>
               <form id="productionForm" class="stacked-form">
                 <label>
-                  Batch
+                  Recipe
                   <select name="productId" id="productionProduct"></select>
                 </label>
-                <div class="production-fields" id="productionRecipeFields"></div>
-                <button class="primary-btn" type="submit">Record Batch</button>
+                <div class="production-execution-grid">
+                  <section class="production-guide">
+                    <div class="inline-panel-header">
+                      <p class="eyebrow">Ingredients</p>
+                      <h3>Actual usage</h3>
+                    </div>
+                    <div class="production-fields" id="productionRecipeFields"></div>
+                  </section>
+                  <section class="production-guide">
+                    <div class="inline-panel-header">
+                      <p class="eyebrow">Preparation</p>
+                      <h3>Steps</h3>
+                    </div>
+                    <div class="procedure-step-list" id="productionStepList"></div>
+                  </section>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Finished stock item
+                    <select name="outputIngredientId" id="productionOutputIngredient"></select>
+                  </label>
+                  <label>
+                    Output quantity
+                    <input name="outputQuantity" id="productionOutputQuantity" type="number" min="0" step="0.01">
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Output unit
+                    <select name="outputUnitType" id="productionOutputUnit"></select>
+                  </label>
+                  <label>
+                    Output location
+                    <select name="outputLocation" id="productionOutputLocation"></select>
+                  </label>
+                </div>
+                <div class="cost-preview" id="productionCostPreview"></div>
+                <label class="check-row production-complete">
+                  <input name="prepComplete" id="productionComplete" type="checkbox" value="true">
+                  <span>Preparation complete</span>
+                </label>
+                <button class="primary-btn" id="saveProductionBatchBtn" type="submit">Save Batch Result</button>
               </form>
               <div class="activity-log" id="productionLog"></div>
             </section>
@@ -638,6 +919,29 @@
                 </div>
               </div>
               <div class="schema-grid" id="schemaGrid"></div>
+            </section>
+
+            <section class="panel wide-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Table self-ordering</p>
+                  <h2>QR code management</h2>
+                </div>
+              </div>
+              <form id="qrCodeForm" class="stacked-form qr-create-form">
+                <div class="form-row">
+                  <label>
+                    Table
+                    <select name="tableId" id="qrTableSelect"></select>
+                  </label>
+                  <label>
+                    Area
+                    <input name="area" id="qrAreaInput" type="text" autocomplete="off">
+                  </label>
+                </div>
+                <button class="primary-btn" type="submit">Create Table QR</button>
+              </form>
+              <div class="qr-admin-grid" id="qrCodeList"></div>
             </section>
           </div>
         </section>
