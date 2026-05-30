@@ -12,6 +12,12 @@ export function formatDateTime(timestamp, fallbackClockTime = "") {
   }).format(new Date(resolvedTimestamp));
 }
 
+export function formatDateTimeLocalInput(timestamp = Date.now()) {
+  const date = new Date(normalizeOptionalTimestamp(timestamp) || Date.now());
+  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * MINUTE_MS);
+  return localTime.toISOString().slice(0, 16);
+}
+
 export function parseClockTimeToTimestamp(time) {
   if (typeof time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
 

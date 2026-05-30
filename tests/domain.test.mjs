@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { convertWasteQuantityToStockUnits, getWasteUnitOptionsForIngredient, unitTypeDefinition } from "../dist/data/normalize.js";
 import {
   findCustomerBySearchValue,
   getAddressHistoryForCustomer,
@@ -11,11 +12,18 @@ import { getProductAvailability, getStockRequirementsForItems, getStockShortages
 import { advanceStatus, getOrderProgressSummary, setTicketStatus } from "../dist/domain/kitchen.js";
 import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderItems } from "../dist/domain/orders.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../dist/domain/payments.js";
+import {
+  getProductionExecutionDraft,
+  getProductionFieldName,
+  getProductionOutputUnitType,
+  getProductionReadiness
+} from "../dist/domain/production.js";
 import { getProductMarginProfile, productAvailabilityLabel } from "../dist/domain/products.js";
 import { procedureAssignedToUser, procedureFrequencyWindowMs, procedureStatusClass } from "../dist/domain/procedures.js";
 import { convertActualUsageToStockUnits, convertRecipeLineToStockUnits, getRecipeUsageLabel, recipeLineAppliesToOrder } from "../dist/domain/recipes.js";
 import { getAvailableReservationTable, getReservationConflicts, getReservationIssues, getReservationValidation } from "../dist/domain/reservations.js";
 import { getCurrentUser, roleCan, roleDefinition, visibleViewsForRole } from "../dist/domain/users.js";
+import { formatActualUsageLabel, formatSignedAmount, formatStockAmount } from "../dist/shared/formatters.js";
 import { slugify, uniqueRecordId } from "../dist/shared/ids.js";
 import { formatMoney } from "../dist/shared/money.js";
 
@@ -231,6 +239,61 @@ test("recipe helpers handle route-specific lines and stock-unit conversion", () 
   assert.equal(getRecipeUsageLabel(line), "500g +10% waste");
 });
 
+test("production draft helpers calculate actual cost, yield, and readiness", () => {
+  const ingredients = new Map([
+    ["beef", { id: "beef", name: "Beef", unit: "kg", unitType: "kilograms", stock: 2, purchasePrice: 8, active: true, location: "Fridge" }],
+    ["spice", { id: "spice", name: "Spice", unit: "g", unitType: "grams", stock: 100, purchasePrice: 0.05, active: true, location: "Dry storage" }],
+    ["prepared", { id: "prepared", name: "Prepared Kefta", unit: "pcs", unitType: "pieces", stock: 0, purchasePrice: 1, active: true, location: "Fridge" }]
+  ]);
+  const recipe = [
+    { ingredientId: "beef", grams: 1000, wastePercent: 10 },
+    { ingredientId: "spice", grams: 20 }
+  ];
+  const products = new Map([
+    ["kefta-batch", {
+      id: "kefta-batch",
+      name: "Kefta Batch",
+      price: 20,
+      recipe,
+      batchOutput: { ingredientId: "prepared", quantity: 10, unitType: "pieces", location: "Fridge" }
+    }]
+  ]);
+  const resolveOutputUnitType = (ingredient, requested, fallback) => getProductionOutputUnitType(ingredient, requested, fallback, {
+    getWasteUnitOptionsForIngredient,
+    unitTypeDefinition
+  });
+  const deps = {
+    convertActualUsageToStockUnits: (line, actualUsage) => convertActualUsageToStockUnits(line, actualUsage, ingredients.get(line.ingredientId), unitTypeDefinition),
+    convertRecipeLineToStockUnits: (line) => convertRecipeLineToStockUnits(line, ingredients.get(line.ingredientId), unitTypeDefinition),
+    convertWasteQuantityToStockUnits,
+    getProductionOutputUnitType: resolveOutputUnitType,
+    ingredientById: (id) => ingredients.get(id),
+    productById: (id) => products.get(id)
+  };
+
+  const draft = getProductionExecutionDraft({
+    productId: "kefta-batch",
+    [getProductionFieldName(recipe[0], 0)]: 1200,
+    [getProductionFieldName(recipe[1], 1)]: 30,
+    outputIngredientId: "prepared",
+    outputQuantity: 12,
+    outputUnitType: "pieces",
+    outputLocation: "Fridge"
+  }, deps);
+
+  assert.equal(draft.lines[0].plannedUsage, 1100);
+  assert.equal(draft.lines[0].actualStockQuantity, 1.2);
+  assert.equal(draft.plannedCost, 9.8);
+  assert.equal(draft.actualCost, 11.1);
+  assert.equal(draft.costDelta, 1.3);
+  assert.equal(draft.outputStockQuantity, 12);
+  assert.equal(draft.outputUnitCost, 0.92);
+  assert.equal(draft.actualMargin, 44.5);
+  assert.equal(draft.marginDelta, -6.5);
+  assert.equal(getProductionReadiness(draft, { stepsDone: true, markedDone: true }).ok, true);
+  assert.equal(resolveOutputUnitType(ingredients.get("beef"), "pieces", "kilograms"), "kilograms");
+});
+
 test("product helpers summarize availability and margin risk", () => {
   const product = {
     price: 10,
@@ -250,6 +313,10 @@ test("product helpers summarize availability and margin risk", () => {
 
 test("shared money and id helpers are deterministic", () => {
   assert.equal(formatMoney(12.5, "EUR"), "€ 12,50");
+  assert.equal(formatStockAmount(12.345, "kg"), "12.3 kg");
+  assert.equal(formatStockAmount(4.9, "pcs"), "4 pcs");
+  assert.equal(formatActualUsageLabel(250, { key: "grams", shortLabel: "g" }), "250g");
+  assert.equal(formatSignedAmount(-3.25, " pts"), "-3.3 pts");
   assert.equal(slugify("Table 12 / Window"), "table-12-window");
   assert.equal(uniqueRecordId("New User", [[{ id: "new-user" }]]), "new-user-2");
 });
