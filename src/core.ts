@@ -36,6 +36,7 @@ import { createReservationActionsRuntime } from "./app/reservation-actions.js";
 import { createInventoryActionsRuntime } from "./app/inventory-actions.js";
 import { createAdminActionsRuntime } from "./app/admin-actions.js";
 import { createSessionActionsRuntime } from "./app/session-actions.js";
+import { createSchedulingRuntime } from "./app/scheduling-actions.js";
 import {
   normalizeKitchenStation,
   unitTypeDefinition,
@@ -837,6 +838,26 @@ const {
 });
 
 const {
+  canManageSchedule,
+  cancelStaffShiftEdit,
+  clockInShift,
+  clockOutShift,
+  createStaffShift,
+  endShiftBreak,
+  moveScheduleWeek,
+  notifyStaffShift,
+  selectStaffShiftForEdit,
+  startShiftBreak
+} = createSchedulingRuntime({
+  can,
+  currentRoleKey,
+  currentUser,
+  render: () => render(),
+  roleDefinition,
+  showToast
+});
+
+const {
   applyInventoryAction,
   deductInventoryForItems,
   getSelectedInventoryLocation,
@@ -1322,6 +1343,7 @@ const {
 } = createTeamUi({
   can,
   canManageDeliveryOperations,
+  canManageSchedule,
   currentDriverRecord,
   currentRoleKey,
   currentUser,
@@ -1475,10 +1497,13 @@ export function createAppRuntime() {
       cancelOrder,
       can,
       clearOrderDraft,
+      clockInShift,
+      clockOutShift,
       createOrder,
       createProcedure,
       createPurchasedProduct,
       createSellableProduct,
+      createStaffShift,
       createStaffUser,
       createTableQrCode,
       findCustomerBySearchValue,
@@ -1494,6 +1519,8 @@ export function createAppRuntime() {
       markOrderServed,
       markSupplierOrderOrdered,
       markTicketDelayed,
+      moveScheduleWeek,
+      notifyStaffShift,
       openQrCustomerUrl,
       printOrderReceipt,
       promptAndRecordProcedureStatus,
@@ -1518,12 +1545,14 @@ export function createAppRuntime() {
       renderWasteForms,
       saveRestaurantSettings,
       sendOrderToKitchen,
+      selectStaffShiftForEdit,
       setProcedureStepProgress,
       setView,
       setWebsiteFulfillment,
       showOrderReceipt,
       showToast,
       startNewCustomerOrder,
+      startShiftBreak,
       submitCustomerQrOrder,
       submitWebsiteOrder,
       tableById,
@@ -1534,7 +1563,9 @@ export function createAppRuntime() {
       updateIngredientPurchasePrice,
       updateProductionCostPreview,
       updateTicketStatus,
-      uploadDeliveryProof
+      uploadDeliveryProof,
+      cancelStaffShiftEdit,
+      endShiftBreak
     },
     render,
     renderTimingSurfaces

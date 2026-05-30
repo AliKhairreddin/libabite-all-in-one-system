@@ -167,6 +167,21 @@ export const DELIVERY_STATUS_ETA_MINUTES = {
     Returned: 0
 };
 export const DELIVERY_LATE_MINUTES = 35;
+export const SHIFT_GRACE_MINUTES = 5;
+export const SCHEDULE_ROLES = ["Manager", "Kitchen", "Front", "Cashier", "Driver", "Grill", "Sweets", "Packaging", "Cleaning"];
+export const SCHEDULE_STATIONS = [
+    "Restaurant floor",
+    "Cashier",
+    "Main kitchen",
+    "Grill station",
+    "Burger station",
+    "Cold mezza station",
+    "Sweets station",
+    "Drinks station",
+    "Packaging station",
+    "Delivery",
+    "Cleaning"
+];
 export const ROLE_ORDER = ["owner_admin", "manager", "waiter_cashier", "kitchen_staff", "driver"];
 export const ROLE_DEFINITIONS = {
     owner_admin: {
@@ -187,6 +202,7 @@ export const ROLE_DEFINITIONS = {
         canReviewProcedures: true,
         canCompleteProcedures: true,
         canManageReservations: true,
+        canManageSchedule: true,
         operationalRole: "Owner/Admin"
     },
     manager: {
@@ -203,13 +219,14 @@ export const ROLE_DEFINITIONS = {
         canReviewProcedures: true,
         canCompleteProcedures: true,
         canManageReservations: true,
+        canManageSchedule: true,
         operationalRole: "Manager"
     },
     waiter_cashier: {
         label: "Waiter/Cashier",
         icon: "WC",
         homeView: "orders",
-        views: ["dashboard", "orders", "procedures", "reservations"],
+        views: ["dashboard", "orders", "procedures", "team", "reservations"],
         canCreateOrders: true,
         canRecordWaste: true,
         canCompleteProcedures: true,
@@ -220,7 +237,7 @@ export const ROLE_DEFINITIONS = {
         label: "Kitchen staff",
         icon: "KS",
         homeView: "kitchen",
-        views: ["dashboard", "kitchen", "procedures"],
+        views: ["dashboard", "kitchen", "procedures", "team"],
         canAdvanceTickets: true,
         canRecordWaste: true,
         canManageProcedures: true,
@@ -270,6 +287,7 @@ export const DATA_MODEL = [
     { name: "orders", fields: "channel, customer, payment status/method/reference, staff member, fulfillment, requested time, address, line items, assigned driver, delivery status/proof" },
     { name: "kitchen_tickets", fields: "order, product, station, status, priority, issue note, SLA times" },
     { name: "driver_deliveries", fields: "driver, order, pickup status, delivery status, ETA, location, notes, proof photo, cash collection" },
+    { name: "staff_shifts", fields: "staff, date, role/station, planned start/end, notification, clock-in/out, breaks, planned vs actual metrics" },
     { name: "table_qr_codes", fields: "token, table, area, active/disabled status, customer order URL" },
     { name: "reservations", fields: "guest, time, table, source, status" },
     { name: "procedures", fields: "title, department, language, steps, required tools/products, media, frequency, assigned role" },

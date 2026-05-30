@@ -888,6 +888,84 @@ Switch off signs and lock the restaurant.</textarea>
               </div>
             </section>
 
+            <section class="panel wide-panel time-clock-panel" id="timeClockPanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Time clock</p>
+                  <h2>My shifts</h2>
+                </div>
+              </div>
+              <div class="procedure-summary-grid" id="timeClockSummary"></div>
+              <div class="time-clock-list" id="myShiftList"></div>
+            </section>
+
+            <section class="panel wide-panel schedule-management-panel" id="schedulePanel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Staff scheduling</p>
+                  <h2>Weekly schedule</h2>
+                </div>
+                <div class="mini-actions">
+                  <button class="mini-btn" type="button" data-schedule-week="previous">Previous</button>
+                  <button class="mini-btn" type="button" data-schedule-week="today">This Week</button>
+                  <button class="mini-btn" type="button" data-schedule-week="next">Next</button>
+                </div>
+              </div>
+              <form id="shiftForm" class="schedule-form-grid">
+                <input name="shiftId" type="hidden">
+                <label>
+                  Staff
+                  <select name="staffId" id="shiftStaffSelect" required></select>
+                </label>
+                <label>
+                  Role
+                  <select name="role" id="shiftRoleSelect" required></select>
+                </label>
+                <label>
+                  Station
+                  <select name="station" id="shiftStationSelect" required></select>
+                </label>
+                <label>
+                  Date
+                  <input name="date" id="shiftDateInput" type="date" required>
+                </label>
+                <label>
+                  Start
+                  <input name="startTime" type="time" value="12:00" required>
+                </label>
+                <label>
+                  End
+                  <input name="endTime" type="time" value="20:00" required>
+                </label>
+                <label class="schedule-notes-field">
+                  Notes
+                  <input name="notes" type="text" placeholder="Station detail or handover note" autocomplete="off">
+                </label>
+                <div class="schedule-form-actions">
+                  <button class="primary-btn" type="submit" data-shift-submit-label>Create Shift</button>
+                  <button class="ghost-btn quiet-btn" type="button" data-cancel-shift-edit>Clear</button>
+                </div>
+              </form>
+              <div class="procedure-summary-grid" id="weeklyScheduleSummary"></div>
+              <div class="schedule-week-grid" id="weeklyScheduleGrid"></div>
+              <div class="attendance-report-grid">
+                <section>
+                  <div class="inline-panel-header">
+                    <p class="eyebrow">Attendance</p>
+                    <h3>Planned vs actual</h3>
+                  </div>
+                  <div class="attendance-report-list" id="attendanceReportList"></div>
+                </section>
+                <section>
+                  <div class="inline-panel-header">
+                    <p class="eyebrow">Payroll export</p>
+                    <h3>Weekly CSV</h3>
+                  </div>
+                  <textarea id="payrollExportPreview" class="payroll-export" rows="8" readonly></textarea>
+                </section>
+              </div>
+            </section>
+
             <section class="panel form-panel admin-only" id="staffAdminPanel">
               <div class="panel-header compact">
                 <div>
@@ -930,16 +1008,6 @@ Switch off signs and lock the restaurant.</textarea>
                 </div>
               </div>
               <div class="user-list" id="userList"></div>
-            </section>
-
-            <section class="panel" id="schedulePanel">
-              <div class="panel-header compact">
-                <div>
-                  <p class="eyebrow">Time management</p>
-                  <h2>Today schedule</h2>
-                </div>
-              </div>
-              <div class="staff-list" id="staffList"></div>
             </section>
 
             <section class="panel" id="driversPanel">

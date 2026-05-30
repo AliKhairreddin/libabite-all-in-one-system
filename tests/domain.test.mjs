@@ -22,6 +22,7 @@ import { getProductMarginProfile, productAvailabilityLabel } from "../dist/domai
 import { procedureAssignedToUser, procedureFrequencyWindowMs, procedureStatusClass } from "../dist/domain/procedures.js";
 import { convertActualUsageToStockUnits, convertRecipeLineToStockUnits, getRecipeUsageLabel, recipeLineAppliesToOrder } from "../dist/domain/recipes.js";
 import { getAvailableReservationTable, getReservationConflicts, getReservationIssues, getReservationValidation } from "../dist/domain/reservations.js";
+import { formatShiftHours, getShiftMetrics, getWeekDates, getWeekStartDate } from "../dist/domain/scheduling.js";
 import { getCurrentUser, roleCan, roleDefinition, visibleViewsForRole } from "../dist/domain/users.js";
 import { formatActualUsageLabel, formatSignedAmount, formatStockAmount } from "../dist/shared/formatters.js";
 import { slugify, uniqueRecordId } from "../dist/shared/ids.js";
@@ -186,6 +187,59 @@ test("reservation conflicts respect table, status, and turnover window", () => {
     "Overlaps 19:00 Nour"
   ]);
   assert.equal(getReservationValidation({ tableId: "table-3", guests: 4, time: "19:30" }, tables, reservations).ok, true);
+});
+
+test("staff shift metrics compare planned time with actual punches", () => {
+  const monday = getWeekStartDate("2026-05-30");
+  assert.equal(monday, "2026-05-25");
+  assert.deepEqual(getWeekDates(monday), [
+    "2026-05-25",
+    "2026-05-26",
+    "2026-05-27",
+    "2026-05-28",
+    "2026-05-29",
+    "2026-05-30",
+    "2026-05-31"
+  ]);
+
+  const lateShift = {
+    date: "2026-05-25",
+    startTime: "10:00",
+    endTime: "18:00",
+    role: "Kitchen",
+    clockInAtMs: new Date("2026-05-25T10:08:00").getTime(),
+    clockOutAtMs: new Date("2026-05-25T16:50:00").getTime(),
+    breakMinutes: 20
+  };
+  const lateMetrics = getShiftMetrics(lateShift, new Date("2026-05-25T19:00:00").getTime());
+  assert.equal(lateMetrics.plannedMinutes, 480);
+  assert.equal(lateMetrics.actualMinutes, 382);
+  assert.equal(lateMetrics.lateMinutes, 8);
+  assert.equal(lateMetrics.earlyOutMinutes, 70);
+  assert.equal(lateMetrics.attendanceStatus, "Left early");
+
+  const driverShift = {
+    date: "2026-05-26",
+    startTime: "10:00",
+    endTime: "18:00",
+    role: "Driver",
+    clockInAtMs: new Date("2026-05-26T09:55:00").getTime(),
+    clockOutAtMs: new Date("2026-05-26T18:45:00").getTime(),
+    breakMinutes: 20
+  };
+  const driverMetrics = getShiftMetrics(driverShift, new Date("2026-05-26T19:00:00").getTime());
+  assert.equal(driverMetrics.overtimeMinutes, 30);
+  assert.equal(driverMetrics.driverOnTimeStatus, "On time");
+  assert.equal(formatShiftHours(driverMetrics.actualMinutes), "8.5h");
+
+  const missedMetrics = getShiftMetrics({
+    date: "2026-05-27",
+    startTime: "12:00",
+    endTime: "14:00",
+    role: "Front"
+  }, new Date("2026-05-27T14:10:00").getTime());
+  assert.equal(missedMetrics.missed, true);
+  assert.equal(missedMetrics.attendanceStatus, "Missed");
 });
 
 test("inventory deduction planner prefers requested location then largest remaining stock", () => {

@@ -29,6 +29,15 @@ import { normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupSt
 import { normalizeOrderFulfillment, normalizeOrderType, normalizeWebsiteFulfillment, orderTypeDefinition } from "../domain/orders.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
 import { getAvailableReservationTable, getReservationConflicts, isReservationTime } from "../domain/reservations.js";
+import {
+  getWeekStartDate,
+  normalizeScheduleRole,
+  normalizeScheduleStation,
+  normalizeShiftDate,
+  normalizeShiftTime,
+  sortShiftsByDateTime,
+  toDateInputString
+} from "../domain/scheduling.js";
 import { getFreshSeedState, seedState } from "./seed.js";
 import { slugify } from "../shared/ids.js";
 
@@ -550,6 +559,75 @@ export function normalizeDrivers(drivers, users = []) {
     .filter(Boolean);
 }
 
+function getDefaultScheduleStation(role) {
+  if (role === "Driver") return "Delivery";
+  if (role === "Kitchen") return "Main kitchen";
+  if (role === "Cashier") return "Cashier";
+  if (role === "Grill") return "Grill station";
+  if (role === "Sweets") return "Sweets station";
+  if (role === "Packaging") return "Packaging station";
+  return "Restaurant floor";
+}
+
+function getDefaultScheduleRoleForUser(user) {
+  const operationalRole = ROLE_DEFINITIONS[user?.role]?.operationalRole || "Front";
+  return operationalRole === "Owner/Admin" ? "Manager" : operationalRole;
+}
+
+export function normalizeStaffShifts(shifts, users = []) {
+  const seenIds = new Set();
+  const userById = new Map(users.map((user) => [user.id, user]));
+  const today = toDateInputString();
+
+  const normalized = (Array.isArray(shifts) ? shifts : [])
+    .map((shift, index) => {
+      const staffId = String(shift.staffId || shift.userId || shift.id || "").trim();
+      const user = userById.get(staffId);
+      if (!user || user.status !== "Active") return null;
+
+      const id = slugify(shift.id || `shift-${staffId}-${shift.date || today}-${index + 1}`, `shift-${index + 1}`);
+      if (!id || seenIds.has(id)) return null;
+      seenIds.add(id);
+
+      const fallbackRole = getDefaultScheduleRoleForUser(user);
+      const role = normalizeScheduleRole(shift.role || shift.assignedRole, fallbackRole);
+      const date = normalizeShiftDate(shift.date || shift.shiftDate, today);
+      const startTime = normalizeShiftTime(shift.startTime || shift.startsAt || shift.start || "09:00");
+      const endTime = normalizeShiftTime(shift.endTime || shift.endsAt || shift.end || "17:00");
+      const clockInAtMs = normalizeOptionalTimestamp(shift.clockInAtMs);
+      const clockOutAtMs = clockInAtMs ? normalizeOptionalTimestamp(shift.clockOutAtMs) : "";
+      const breakStartedAtMs = clockInAtMs && !clockOutAtMs ? normalizeOptionalTimestamp(shift.breakStartedAtMs) : "";
+      const breakMinutes = Math.max(0, Math.round(Number(shift.breakMinutes) || 0));
+
+      return {
+        id,
+        staffId: user.id,
+        staffName: String(shift.staffName || shift.userName || user.name).replace(/\s+/g, " ").trim(),
+        role,
+        station: normalizeScheduleStation(shift.station || shift.assignedStation, getDefaultScheduleStation(role)),
+        date,
+        startTime,
+        endTime,
+        notifiedAtMs: normalizeOptionalTimestamp(shift.notifiedAtMs),
+        notifiedAt: String(shift.notifiedAt || "").trim(),
+        clockInAtMs,
+        clockInAt: String(shift.clockInAt || "").trim(),
+        clockOutAtMs,
+        clockOutAt: String(shift.clockOutAt || "").trim(),
+        breakStartedAtMs,
+        breakStartedAt: breakStartedAtMs ? String(shift.breakStartedAt || "").trim() : "",
+        breakMinutes,
+        status: String(shift.status || "Scheduled").trim() || "Scheduled",
+        notes: String(shift.notes || "").trim(),
+        createdAtMs: normalizeOptionalTimestamp(shift.createdAtMs),
+        updatedAtMs: normalizeOptionalTimestamp(shift.updatedAtMs)
+      };
+    })
+    .filter(Boolean);
+
+  return sortShiftsByDateTime(normalized);
+}
+
 export function normalizeProcedureLanguage(language) {
   const candidate = String(language || "").trim();
   return LANGUAGE_OPTIONS.some((option) => option.id === candidate) ? candidate : DEFAULT_RESTAURANT_SETTINGS.defaultLanguage;
@@ -903,6 +981,7 @@ export function normalizeState(candidate) {
     "procedures",
     "procedureCompletions",
     "staff",
+    "staffShifts",
     "drivers",
     "reservations",
     "productionLog",
@@ -921,6 +1000,8 @@ export function normalizeState(candidate) {
   next.restaurantSettings = normalizeRestaurantSettings(source.restaurantSettings);
   next.users = normalizeUsers(next.users);
   if (!next.users.some((user) => user.id === next.currentUserId)) next.currentUserId = "";
+  next.scheduleWeekStart = getWeekStartDate(normalizeShiftDate(source.scheduleWeekStart, toDateInputString()));
+  next.staffShifts = normalizeStaffShifts(next.staffShifts, next.users);
   next.drivers = normalizeDrivers(next.drivers, next.users);
   next.customers = normalizeCustomers(next.customers);
 

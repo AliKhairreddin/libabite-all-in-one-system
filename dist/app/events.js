@@ -1,7 +1,7 @@
 import { resetState, saveState, state } from "./state.js";
 export function bindAppEvents(handlers) {
     const document = window.document;
-    const { addCustomerCartItem, addDeliveryNote, addOrderDraftLine, addReservation, addSellableRecipeLine, adjustCustomerCartItem, advanceOrder, advanceTicket, addTicketIssueNote, applyInventoryAction, assignDeliveryOrderToDriver, assignQrCode, cancelOrder, can, clearOrderDraft, createOrder, createProcedure, createPurchasedProduct, createSellableProduct, createStaffUser, createTableQrCode, findCustomerBySearchValue, getCustomerOrderingSession, getSelectedLineModifiers, getSelectedPaymentMethodFromAction, loadCustomerIntoManualOrder, logWaste, login, logout, markDeliveryCashCollected, markOrderPaid, markOrderServed, markSupplierOrderOrdered, markTicketDelayed, openQrCustomerUrl, printOrderReceipt, promptAndRecordProcedureStatus, receiveSupplierOrder, recordProcedureCompletion, recordProduction, recordWaste, regenerateQrCode, removeCustomerCartItem, removeOrderDraftLine, removeSellableRecipeLine, render, renderInventoryActionForm, renderManualOrderControls, renderOrderBuilder, renderProcedureFormControls, renderProductionRecipeFields, renderProductsInSelects, renderReservationPlanner, renderSellableProductForm, renderSellableRecipeCostPreview, renderWasteForms, saveRestaurantSettings, sendOrderToKitchen, setProcedureStepProgress, setView, setWebsiteFulfillment, showOrderReceipt, showToast, startNewCustomerOrder, submitCustomerQrOrder, submitWebsiteOrder, tableById, togglePurchasedProduct, toggleQrCode, toggleSellableProduct, updateDeliveryStatus, updateIngredientPurchasePrice, updateProductionCostPreview, updateTicketStatus, uploadDeliveryProof } = handlers;
+    const { addCustomerCartItem, addDeliveryNote, addOrderDraftLine, addReservation, addSellableRecipeLine, adjustCustomerCartItem, advanceOrder, advanceTicket, addTicketIssueNote, applyInventoryAction, assignDeliveryOrderToDriver, assignQrCode, cancelOrder, cancelStaffShiftEdit, can, clearOrderDraft, clockInShift, clockOutShift, createOrder, createProcedure, createPurchasedProduct, createSellableProduct, createStaffShift, createStaffUser, createTableQrCode, findCustomerBySearchValue, getCustomerOrderingSession, getSelectedLineModifiers, getSelectedPaymentMethodFromAction, loadCustomerIntoManualOrder, logWaste, login, logout, markDeliveryCashCollected, markOrderPaid, markOrderServed, markSupplierOrderOrdered, markTicketDelayed, moveScheduleWeek, notifyStaffShift, openQrCustomerUrl, printOrderReceipt, promptAndRecordProcedureStatus, receiveSupplierOrder, recordProcedureCompletion, recordProduction, recordWaste, regenerateQrCode, removeCustomerCartItem, removeOrderDraftLine, removeSellableRecipeLine, render, renderInventoryActionForm, renderManualOrderControls, renderOrderBuilder, renderProcedureFormControls, renderProductionRecipeFields, renderProductsInSelects, renderReservationPlanner, renderSellableProductForm, renderSellableRecipeCostPreview, renderWasteForms, saveRestaurantSettings, sendOrderToKitchen, selectStaffShiftForEdit, setProcedureStepProgress, setView, setWebsiteFulfillment, showOrderReceipt, showToast, startNewCustomerOrder, startShiftBreak, submitCustomerQrOrder, submitWebsiteOrder, tableById, togglePurchasedProduct, toggleQrCode, toggleSellableProduct, updateDeliveryStatus, updateIngredientPurchasePrice, updateProductionCostPreview, updateTicketStatus, uploadDeliveryProof, endShiftBreak } = handlers;
     document.addEventListener("click", (event) => {
         const demoLogin = event.target.closest("[data-demo-login]");
         if (demoLogin) {
@@ -76,6 +76,30 @@ export function bindAppEvents(handlers) {
         const deliveryProof = event.target.closest("[data-upload-delivery-proof]");
         if (deliveryProof)
             uploadDeliveryProof(deliveryProof.dataset.uploadDeliveryProof);
+        const scheduleWeek = event.target.closest("[data-schedule-week]");
+        if (scheduleWeek)
+            moveScheduleWeek(scheduleWeek.dataset.scheduleWeek);
+        const editShift = event.target.closest("[data-edit-shift]");
+        if (editShift)
+            selectStaffShiftForEdit(editShift.dataset.editShift);
+        const cancelShiftEdit = event.target.closest("[data-cancel-shift-edit]");
+        if (cancelShiftEdit)
+            cancelStaffShiftEdit();
+        const notifyShift = event.target.closest("[data-notify-shift]");
+        if (notifyShift)
+            notifyStaffShift(notifyShift.dataset.notifyShift);
+        const clockIn = event.target.closest("[data-clock-in-shift]");
+        if (clockIn)
+            clockInShift(clockIn.dataset.clockInShift);
+        const clockOut = event.target.closest("[data-clock-out-shift]");
+        if (clockOut)
+            clockOutShift(clockOut.dataset.clockOutShift);
+        const startBreak = event.target.closest("[data-start-break-shift]");
+        if (startBreak)
+            startShiftBreak(startBreak.dataset.startBreakShift);
+        const endBreak = event.target.closest("[data-end-break-shift]");
+        if (endBreak)
+            endShiftBreak(endBreak.dataset.endBreakShift);
         const cancelButton = event.target.closest("[data-cancel-order]");
         if (cancelButton)
             cancelOrder(cancelButton.dataset.cancelOrder);
@@ -279,6 +303,10 @@ export function bindAppEvents(handlers) {
     document.querySelector("#staffUserForm").addEventListener("submit", (event) => {
         event.preventDefault();
         createStaffUser(new FormData(event.currentTarget));
+    });
+    document.querySelector("#shiftForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        createStaffShift(new FormData(event.currentTarget));
     });
     document.querySelector("#settingsForm").addEventListener("submit", (event) => {
         event.preventDefault();

@@ -16,12 +16,16 @@ export function bindAppEvents(handlers) {
     assignDeliveryOrderToDriver,
     assignQrCode,
     cancelOrder,
+    cancelStaffShiftEdit,
     can,
     clearOrderDraft,
+    clockInShift,
+    clockOutShift,
     createOrder,
     createProcedure,
     createPurchasedProduct,
     createSellableProduct,
+    createStaffShift,
     createStaffUser,
     createTableQrCode,
     findCustomerBySearchValue,
@@ -37,6 +41,8 @@ export function bindAppEvents(handlers) {
     markOrderServed,
     markSupplierOrderOrdered,
     markTicketDelayed,
+    moveScheduleWeek,
+    notifyStaffShift,
     openQrCustomerUrl,
     printOrderReceipt,
     promptAndRecordProcedureStatus,
@@ -61,12 +67,14 @@ export function bindAppEvents(handlers) {
     renderWasteForms,
     saveRestaurantSettings,
     sendOrderToKitchen,
+    selectStaffShiftForEdit,
     setProcedureStepProgress,
     setView,
     setWebsiteFulfillment,
     showOrderReceipt,
     showToast,
     startNewCustomerOrder,
+    startShiftBreak,
     submitCustomerQrOrder,
     submitWebsiteOrder,
     tableById,
@@ -77,7 +85,8 @@ export function bindAppEvents(handlers) {
     updateIngredientPurchasePrice,
     updateProductionCostPreview,
     updateTicketStatus,
-    uploadDeliveryProof
+    uploadDeliveryProof,
+    endShiftBreak
   } = handlers;
   document.addEventListener("click", (event: any) => {
     const demoLogin = event.target.closest("[data-demo-login]");
@@ -155,6 +164,30 @@ export function bindAppEvents(handlers) {
 
     const deliveryProof = event.target.closest("[data-upload-delivery-proof]");
     if (deliveryProof) uploadDeliveryProof(deliveryProof.dataset.uploadDeliveryProof);
+
+    const scheduleWeek = event.target.closest("[data-schedule-week]");
+    if (scheduleWeek) moveScheduleWeek(scheduleWeek.dataset.scheduleWeek);
+
+    const editShift = event.target.closest("[data-edit-shift]");
+    if (editShift) selectStaffShiftForEdit(editShift.dataset.editShift);
+
+    const cancelShiftEdit = event.target.closest("[data-cancel-shift-edit]");
+    if (cancelShiftEdit) cancelStaffShiftEdit();
+
+    const notifyShift = event.target.closest("[data-notify-shift]");
+    if (notifyShift) notifyStaffShift(notifyShift.dataset.notifyShift);
+
+    const clockIn = event.target.closest("[data-clock-in-shift]");
+    if (clockIn) clockInShift(clockIn.dataset.clockInShift);
+
+    const clockOut = event.target.closest("[data-clock-out-shift]");
+    if (clockOut) clockOutShift(clockOut.dataset.clockOutShift);
+
+    const startBreak = event.target.closest("[data-start-break-shift]");
+    if (startBreak) startShiftBreak(startBreak.dataset.startBreakShift);
+
+    const endBreak = event.target.closest("[data-end-break-shift]");
+    if (endBreak) endShiftBreak(endBreak.dataset.endBreakShift);
 
     const cancelButton = event.target.closest("[data-cancel-order]");
     if (cancelButton) cancelOrder(cancelButton.dataset.cancelOrder);
@@ -385,6 +418,11 @@ export function bindAppEvents(handlers) {
   document.querySelector("#staffUserForm").addEventListener("submit", (event: any) => {
     event.preventDefault();
     createStaffUser(new FormData(event.currentTarget));
+  });
+
+  document.querySelector("#shiftForm")?.addEventListener("submit", (event: any) => {
+    event.preventDefault();
+    createStaffShift(new FormData(event.currentTarget));
   });
   
   document.querySelector("#settingsForm").addEventListener("submit", (event: any) => {

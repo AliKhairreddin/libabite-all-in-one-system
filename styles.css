@@ -2491,6 +2491,155 @@ textarea {
   stroke-dasharray: 7 8;
 }
 
+.time-clock-panel,
+.schedule-management-panel {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.time-clock-list,
+.schedule-day-list,
+.attendance-report-list {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(118px, 1fr));
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.schedule-form-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.schedule-notes-field {
+  grid-column: span 3;
+}
+
+.schedule-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.schedule-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.schedule-day-column {
+  min-width: 170px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbf9;
+}
+
+.schedule-day-column > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.schedule-day-column > header span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.shift-card,
+.attendance-report-card {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.shift-card.is-missed {
+  border-color: #efaaa5;
+  background: #fff4f3;
+}
+
+.shift-card header,
+.attendance-report-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.shift-card p,
+.attendance-report-card p,
+.shift-note {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.shift-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shift-metrics-grid div {
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.shift-metrics-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.shift-metrics-grid strong {
+  display: block;
+  margin-top: 5px;
+}
+
+.attendance-report-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.payroll-export {
+  width: 100%;
+  min-height: 245px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .map-pin {
   position: absolute;
   z-index: 2;
@@ -2586,10 +2735,15 @@ textarea {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
+  .schedule-form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .kds-summary-grid,
   .kitchen-progress-list,
   .production-execution-grid,
-  .procedure-manager-grid {
+  .procedure-manager-grid,
+  .attendance-report-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2660,7 +2814,10 @@ textarea {
     .delivery-detail-grid,
     .delivery-proof-grid,
     .delivery-action-row,
-    .delivery-assignment-controls {
+    .delivery-assignment-controls,
+    .schedule-form-grid,
+    .shift-metrics-grid,
+    .attendance-report-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2669,7 +2826,9 @@ textarea {
   .delivery-order-card header,
   .delivery-assignment-card header,
   .manager-delivery-card header,
-  .driver-performance-card header {
+  .driver-performance-card header,
+  .shift-card header,
+  .attendance-report-card header {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -2724,6 +2883,15 @@ textarea {
 
   .mini-actions {
     justify-content: flex-start;
+  }
+
+  .schedule-notes-field {
+    grid-column: auto;
+  }
+
+  .schedule-form-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
