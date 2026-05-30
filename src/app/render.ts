@@ -2,6 +2,83 @@ import { state } from "./state.js";
 import { ROLE_ORDER } from "../shared/constants.js";
 import { escapeHtml } from "../shared/html.js";
 
+const NAV_ICONS = {
+  dashboard: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <rect x="3" y="3" width="7" height="8" rx="1.5"></rect>
+      <rect x="14" y="3" width="7" height="5" rx="1.5"></rect>
+      <rect x="14" y="12" width="7" height="9" rx="1.5"></rect>
+      <rect x="3" y="15" width="7" height="6" rx="1.5"></rect>
+    </svg>
+  `,
+  orders: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M7 3h10a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2-2-1.35V5a2 2 0 0 1 2-2Z"></path>
+      <path d="M9 8h6"></path>
+      <path d="M9 12h6"></path>
+      <path d="M9 16h4"></path>
+    </svg>
+  `,
+  kitchen: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M7 3v8"></path>
+      <path d="M4 3v5a3 3 0 0 0 6 0V3"></path>
+      <path d="M7 11v10"></path>
+      <path d="M17 3v18"></path>
+      <path d="M17 3a4 4 0 0 1 4 4v3h-4"></path>
+    </svg>
+  `,
+  inventory: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M12 3 4 7.2v9.6L12 21l8-4.2V7.2L12 3Z"></path>
+      <path d="m4.5 7.5 7.5 4 7.5-4"></path>
+      <path d="M12 11.5V21"></path>
+      <path d="m8.25 5.25 7.5 4"></path>
+    </svg>
+  `,
+  procedures: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M9 5h6"></path>
+      <path d="M9 3h6v4H9z"></path>
+      <path d="M7 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1"></path>
+      <path d="m8 14 2.4 2.4L16 11"></path>
+    </svg>
+  `,
+  team: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M16 21v-2a4 4 0 0 0-8 0v2"></path>
+      <circle cx="12" cy="8" r="3.5"></circle>
+      <path d="M20.5 21v-1.5a3.5 3.5 0 0 0-3-3.45"></path>
+      <path d="M17 4.5a3 3 0 0 1 0 6"></path>
+      <path d="M3.5 21v-1.5a3.5 3.5 0 0 1 3-3.45"></path>
+      <path d="M7 4.5a3 3 0 0 0 0 6"></path>
+    </svg>
+  `,
+  settings: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M4 7h9"></path>
+      <path d="M17 7h3"></path>
+      <circle cx="15" cy="7" r="2"></circle>
+      <path d="M4 17h3"></path>
+      <path d="M11 17h9"></path>
+      <circle cx="9" cy="17" r="2"></circle>
+    </svg>
+  `,
+  reservations: `
+    <svg viewBox="0 0 24 24" focusable="false">
+      <rect x="4" y="5" width="16" height="15" rx="2"></rect>
+      <path d="M8 3v4"></path>
+      <path d="M16 3v4"></path>
+      <path d="M4 10h16"></path>
+      <path d="M8 14h.01"></path>
+      <path d="M12 14h.01"></path>
+      <path d="M16 14h.01"></path>
+      <path d="M8 17h.01"></path>
+      <path d="M12 17h.01"></path>
+    </svg>
+  `
+};
+
 export function createAppRenderer(deps) {
   const document: any = window.document;
   const {
@@ -131,7 +208,7 @@ export function createAppRenderer(deps) {
     visibleViews().forEach((view) => {
       const button = createNode(`
         <button class="nav-item ${state.activeView === view.id ? "is-active" : ""}" type="button" data-view="${escapeHtml(view.id)}">
-          <span class="nav-icon" aria-hidden="true">${escapeHtml(view.icon)}</span>
+          <span class="nav-icon" aria-hidden="true">${NAV_ICONS[view.icon] || NAV_ICONS[view.id] || ""}</span>
           <span>${escapeHtml(view.label)}</span>
           ${counts[view.id] ? `<span class="nav-count">${counts[view.id]}</span>` : ""}
         </button>

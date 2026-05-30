@@ -397,8 +397,23 @@ button {
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 0.78rem;
-  font-weight: 800;
+  color: #f3c05f;
+}
+
+.nav-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.is-active .nav-icon {
+  background: #f3c05f;
+  color: #173d36;
 }
 
 .nav-count {

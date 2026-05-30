@@ -42,14 +42,14 @@ import { createDashboardUi } from "./ui/dashboard.js";
 import { createOrderBuilderUi } from "./ui/order-builder.js";
 import { createOrderCardsUi } from "./ui/order-cards.js";
 const views = [
-    { id: "dashboard", label: "Command", icon: "CM" },
-    { id: "orders", label: "Orders", icon: "OR" },
-    { id: "kitchen", label: "Kitchen", icon: "KT" },
-    { id: "inventory", label: "Inventory", icon: "IN" },
-    { id: "procedures", label: "Procedures", icon: "PR" },
-    { id: "team", label: "Team", icon: "TM" },
-    { id: "settings", label: "Settings", icon: "SE" },
-    { id: "reservations", label: "Bookings", icon: "BK" }
+    { id: "dashboard", label: "Command", icon: "dashboard" },
+    { id: "orders", label: "Orders", icon: "orders" },
+    { id: "kitchen", label: "Kitchen", icon: "kitchen" },
+    { id: "inventory", label: "Inventory", icon: "inventory" },
+    { id: "procedures", label: "Procedures", icon: "procedures" },
+    { id: "team", label: "Team", icon: "team" },
+    { id: "settings", label: "Settings", icon: "settings" },
+    { id: "reservations", label: "Bookings", icon: "reservations" }
 ];
 function money(value) {
     return formatMoney(value, state?.restaurantSettings?.currency || "EUR");
