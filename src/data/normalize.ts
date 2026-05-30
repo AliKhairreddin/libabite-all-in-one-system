@@ -1,0 +1,1173 @@
+import {
+  AVAILABILITY_OPTIONS,
+  DEFAULT_INVENTORY_LOCATIONS,
+  DEFAULT_MARGIN_MINIMUM,
+  DEFAULT_MARGIN_TARGET,
+  DEFAULT_PAID_PAYMENT_METHOD,
+  DEFAULT_PRODUCT_AVAILABILITY,
+  DEFAULT_RESTAURANT_SETTINGS,
+  INVENTORY_ACTIONS,
+  KITCHEN_STATION_ALIASES,
+  LANGUAGE_OPTIONS,
+  ORDER_STATUSES,
+  PHASE_11_SEED_INGREDIENT_IDS,
+  PHASE_11_SEED_PRODUCT_IDS,
+  PROCEDURE_ASSIGNED_ROLES,
+  PROCEDURE_COMPLETION_STATUSES,
+  PROCEDURE_FREQUENCIES,
+  PRODUCT_CATEGORIES,
+  QR_CODE_STATUSES,
+  RECIPE_APPLIES_OPTIONS,
+  ROLE_DEFINITIONS,
+  TICKET_STATUSES,
+  UNIT_TYPES,
+  VAT_OPTIONS,
+  WASTE_REASONS
+} from "../shared/constants.js";
+import { normalizeOptionalTimestamp, normalizeTimestamp, timeNow } from "../shared/dates.js";
+import { normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
+import { normalizeOrderFulfillment, normalizeOrderType, normalizeWebsiteFulfillment, orderTypeDefinition } from "../domain/orders.js";
+import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
+import { getAvailableReservationTable, getReservationConflicts, isReservationTime } from "../domain/reservations.js";
+import { getFreshSeedState, seedState } from "./seed.js";
+import { slugify } from "../shared/ids.js";
+
+type AnyRecord = Record<string, any>;
+
+export function normalizeKitchenStation(value) {
+  const cleaned = String(value || "").replace(/\s+/g, " ").trim();
+  const mapped = KITCHEN_STATION_ALIASES[cleaned.toLowerCase()];
+  return mapped || cleaned || "Main kitchen";
+}
+
+export function unitTypeDefinition(unitType) {
+  const legacyMap = {
+    g: "grams",
+    gram: "grams",
+    grams: "grams",
+    kg: "kilograms",
+    kilogram: "kilograms",
+    kilograms: "kilograms",
+    ml: "milliliters",
+    milliliter: "milliliters",
+    milliliters: "milliliters",
+    l: "liters",
+    liter: "liters",
+    liters: "liters",
+    pcs: "pieces",
+    piece: "pieces",
+    pieces: "pieces",
+    box: "boxes",
+    boxes: "boxes",
+    package: "packages",
+    packages: "packages"
+  };
+  const id = legacyMap[String(unitType || "").toLowerCase()] || "pieces";
+  return UNIT_TYPES.find((type) => type.id === id) || UNIT_TYPES.find((type) => type.id === "pieces");
+}
+
+export function normalizeProductAvailability(availability) {
+  const source = availability && typeof availability === "object" ? availability : {};
+  return AVAILABILITY_OPTIONS.reduce((nextAvailability, option) => {
+    nextAvailability[option.id] = source[option.id] === undefined
+      ? DEFAULT_PRODUCT_AVAILABILITY[option.id]
+      : Boolean(source[option.id]);
+    return nextAvailability;
+  }, {});
+}
+
+export function normalizeMarginPercent(value, fallback = 0) {
+  const percent = Number(value);
+  return Number.isFinite(percent) ? Math.min(100, Math.max(0, Number(percent.toFixed(1)))) : fallback;
+}
+
+export function normalizeRecipeWastePercent(value) {
+  return normalizeMarginPercent(value, 0);
+}
+
+export function normalizeRecipeAppliesTo(value) {
+  return RECIPE_APPLIES_OPTIONS.some((option) => option.id === value) ? value : "all";
+}
+
+export function normalizeRecipeLine(line, ingredientIds) {
+  if (!line || !ingredientIds.has(line.ingredientId)) return null;
+  const base = {
+    ingredientId: line.ingredientId,
+    wastePercent: normalizeRecipeWastePercent(line.wastePercent),
+    station: normalizeKitchenStation(line.station || line.preparationStation),
+    notes: String(line.notes || "").trim(),
+    appliesTo: normalizeRecipeAppliesTo(line.appliesTo || (line.onlyForTakeawayDelivery ? "takeawayDelivery" : "all"))
+  };
+  const grams = Number(line.grams);
+  const milliliters = Number(line.milliliters);
+  const units = Number(line.units);
+
+  if (Number.isFinite(grams) && grams > 0) return { ...base, grams };
+  if (Number.isFinite(milliliters) && milliliters > 0) return { ...base, milliliters };
+  if (Number.isFinite(units) && units > 0) return { ...base, units };
+  return null;
+}
+
+export function normalizeRecipeLines(recipe, ingredientIds) {
+  return Array.isArray(recipe)
+    ? recipe.map((line) => normalizeRecipeLine(line, ingredientIds)).filter(Boolean)
+    : [];
+}
+
+export function normalizeBatchOutput(output, ingredientIds) {
+  if (!output || typeof output !== "object") return null;
+  const ingredientId = String(output.ingredientId || output.productId || "").trim();
+  if (!ingredientIds.has(ingredientId)) return null;
+  const quantity = normalizeStockQuantity(output.quantity ?? output.outputQuantity);
+  if (quantity <= 0) return null;
+  return {
+    ingredientId,
+    quantity,
+    unitType: unitTypeDefinition(output.unitType || output.unit || "kilograms").id,
+    location: normalizeInventoryLocationName(output.location || output.toLocation, "Fridge")
+  };
+}
+
+export function normalizeStockQuantity(value) {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? Math.max(0, Number(quantity.toFixed(3))) : 0;
+}
+
+export function normalizeInventoryLocationName(value, fallback = "Dry storage") {
+  const cleaned = String(value || "").replace(/\s+/g, " ").trim();
+  return cleaned || fallback;
+}
+
+export function isDefaultInventoryLocation(location) {
+  return DEFAULT_INVENTORY_LOCATIONS.includes(location);
+}
+
+export function sortInventoryLocations(locations: any[]) {
+  const defaultOrder = new Map(DEFAULT_INVENTORY_LOCATIONS.map((location, index) => [location, index]));
+  return ([...new Set(locations.map((location) => normalizeInventoryLocationName(location, "")).filter(Boolean))] as string[])
+    .sort((first, second) => {
+      const firstIndex = defaultOrder.has(first) ? defaultOrder.get(first) : Number.MAX_SAFE_INTEGER;
+      const secondIndex = defaultOrder.has(second) ? defaultOrder.get(second) : Number.MAX_SAFE_INTEGER;
+      return (firstIndex ?? Number.MAX_SAFE_INTEGER) - (secondIndex ?? Number.MAX_SAFE_INTEGER) || first.localeCompare(second);
+    });
+}
+
+export function normalizeLocationStock(locationStock, fallbackLocation, fallbackStock) {
+  const rows: Array<[any, any]> = [];
+  if (Array.isArray(locationStock)) {
+    locationStock.forEach((row) => {
+      rows.push([row.location || row.name, row.quantity ?? row.stock]);
+    });
+  } else if (locationStock && typeof locationStock === "object") {
+    Object.entries(locationStock).forEach(([location, quantity]) => rows.push([location, quantity]));
+  }
+
+  const nextLocationStock: Record<string, number> = {};
+  rows.forEach(([location, quantity]) => {
+    const normalizedLocation = normalizeInventoryLocationName(location, "");
+    const normalizedQuantity = normalizeStockQuantity(quantity);
+    if (!normalizedLocation || normalizedQuantity <= 0) return;
+    nextLocationStock[normalizedLocation] = normalizeStockQuantity((nextLocationStock[normalizedLocation] || 0) + normalizedQuantity);
+  });
+
+  if (!Object.keys(nextLocationStock).length && normalizeStockQuantity(fallbackStock) > 0) {
+    nextLocationStock[normalizeInventoryLocationName(fallbackLocation)] = normalizeStockQuantity(fallbackStock);
+  }
+
+  return Object.fromEntries(sortInventoryLocations(Object.keys(nextLocationStock)).map((location) => [location, nextLocationStock[location]]));
+}
+
+export function getIngredientTotalStock(ingredient) {
+  return normalizeStockQuantity(Object.values(ingredient?.locationStock || {}).reduce((sum: number, quantity) => sum + (Number(quantity) || 0), 0));
+}
+
+export function getIngredientPrimaryLocation(ingredient) {
+  const entries = Object.entries(ingredient?.locationStock || {}).filter(([, quantity]) => Number(quantity) > 0) as Array<[string, number]>;
+  if (!entries.length) return normalizeInventoryLocationName(ingredient?.location, "Dry storage");
+  return entries.sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0][0];
+}
+
+export function syncIngredientStock(ingredient) {
+  const hasLocationStock = ingredient.locationStock && typeof ingredient.locationStock === "object";
+  ingredient.locationStock = normalizeLocationStock(ingredient.locationStock, ingredient.location, hasLocationStock ? 0 : ingredient.stock);
+  ingredient.stock = getIngredientTotalStock(ingredient);
+  ingredient.location = getIngredientPrimaryLocation(ingredient);
+  return ingredient.stock;
+}
+
+export function normalizeCustomInventoryLocations(locations, ingredients = []) {
+  const customLocations = Array.isArray(locations) ? locations : [];
+  ingredients.forEach((ingredient) => {
+    Object.keys(ingredient.locationStock || {}).forEach((location) => customLocations.push(location));
+  });
+  return sortInventoryLocations(customLocations).filter((location) => !isDefaultInventoryLocation(location));
+}
+
+export function normalizeInventoryHistory(history, ingredientIds) {
+  return (Array.isArray(history) ? history : [])
+    .map((entry, index) => {
+      const ingredientId = String(entry.ingredientId || "").trim();
+      if (!ingredientIds.has(ingredientId)) return null;
+      const action = INVENTORY_ACTIONS.some((item) => item.id === entry.type) ? entry.type : "correct";
+      return {
+        id: entry.id || `INV-${Date.now()}-${index + 1}`,
+        ingredientId,
+        ingredientName: String(entry.ingredientName || "").trim(),
+        type: action,
+        quantity: normalizeStockQuantity(entry.quantity),
+        fromLocation: normalizeInventoryLocationName(entry.fromLocation, ""),
+        toLocation: normalizeInventoryLocationName(entry.toLocation, ""),
+        resultingStock: normalizeStockQuantity(entry.resultingStock),
+        time: entry.time || timeNow(),
+        detail: String(entry.detail || "").trim()
+      };
+    })
+    .filter(Boolean)
+    .slice(-80);
+}
+
+export function normalizeWasteReason(reason) {
+  const candidate = String(reason || "").trim();
+  return WASTE_REASONS.some((item) => item.id === candidate) ? candidate : "Other";
+}
+
+export function getWasteUnitOptionsForIngredient(ingredient) {
+  const unitType = unitTypeDefinition(ingredient?.unitType || ingredient?.unit);
+  if (unitType.recipeMeasure === "grams") {
+    return UNIT_TYPES.filter((option) => option.id === "grams" || option.id === "kilograms");
+  }
+  if (unitType.recipeMeasure === "milliliters") {
+    return UNIT_TYPES.filter((option) => option.id === "milliliters" || option.id === "liters");
+  }
+  return UNIT_TYPES.filter((option) => option.id === unitType.id);
+}
+
+export function normalizeWasteUnitType(unitType, ingredient) {
+  const candidate = unitTypeDefinition(unitType).id;
+  const allowedUnits = getWasteUnitOptionsForIngredient(ingredient).map((option) => option.id);
+  return allowedUnits.includes(candidate) ? candidate : unitTypeDefinition(ingredient?.unitType || ingredient?.unit).id;
+}
+
+export function convertWasteQuantityToStockUnits(ingredient, quantity, unitTypeId) {
+  const amount = normalizeStockQuantity(quantity);
+  const stockUnitType = unitTypeDefinition(ingredient?.unitType || ingredient?.unit);
+  const wasteUnitType = unitTypeDefinition(unitTypeId);
+  const stockMeasure = stockUnitType.recipeMeasure;
+  const wasteMeasure = wasteUnitType.recipeMeasure;
+
+  if (stockMeasure === "grams" && wasteMeasure === "grams") {
+    const grams = wasteUnitType.id === "kilograms" ? amount * 1000 : amount;
+    return normalizeStockQuantity(stockUnitType.id === "kilograms" ? grams / 1000 : grams);
+  }
+
+  if (stockMeasure === "milliliters" && wasteMeasure === "milliliters") {
+    const milliliters = wasteUnitType.id === "liters" ? amount * 1000 : amount;
+    return normalizeStockQuantity(stockUnitType.id === "liters" ? milliliters / 1000 : milliliters);
+  }
+
+  return amount;
+}
+
+export function getWasteCost(ingredient, stockQuantity) {
+  return Math.max(0, Number(((Number(stockQuantity) || 0) * (Number(ingredient?.purchasePrice) || 0)).toFixed(2)));
+}
+
+export function normalizeWasteTimestamp(record) {
+  const timestamp = normalizeOptionalTimestamp(record?.occurredAtMs)
+    || normalizeOptionalTimestamp(record?.dateTimeMs)
+    || Date.parse(record?.occurredAt || record?.dateTime || "");
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : normalizeTimestamp(record?.timeMs, record?.time);
+}
+
+export function normalizeWasteRecords(records, ingredients, users) {
+  const ingredientByIdLookup = new Map<string, AnyRecord>(ingredients.map((ingredient) => [ingredient.id, ingredient as AnyRecord]));
+  const userByIdLookup = new Map<string, AnyRecord>(users.map((user) => [user.id, user as AnyRecord]));
+
+  return (Array.isArray(records) ? records : [])
+    .map((record, index) => {
+      const ingredientId = String(record.ingredientId || record.productId || "").trim();
+      const ingredient = ingredientByIdLookup.get(ingredientId);
+      if (!ingredient) return null;
+
+      const quantity = normalizeStockQuantity(record.quantity ?? record.displayQuantity ?? record.stockQuantity);
+      const unitType = normalizeWasteUnitType(record.unitType || record.unit, ingredient);
+      const stockQuantity = normalizeStockQuantity(record.stockQuantity ?? convertWasteQuantityToStockUnits(ingredient, quantity, unitType));
+      if (stockQuantity <= 0) return null;
+
+      const staffId = String(record.staffId || record.userId || "").trim();
+      const staff = userByIdLookup.get(staffId);
+      const occurredAtMs = normalizeWasteTimestamp(record);
+      const cost = Number(record.cost);
+
+      return {
+        id: record.id || `WST-${Date.now()}-${index + 1}`,
+        ingredientId,
+        ingredientName: String(record.ingredientName || record.productName || ingredient.name).trim(),
+        quantity,
+        unitType,
+        stockQuantity,
+        stockUnit: ingredient.unit,
+        reason: normalizeWasteReason(record.reason),
+        staffId: staff?.id || "",
+        staffName: String(record.staffName || record.staffMember || staff?.name || "Staff").trim(),
+        occurredAtMs,
+        notes: String(record.notes || "").trim(),
+        fromLocation: normalizeInventoryLocationName(record.fromLocation || record.location, ""),
+        cost: Number.isFinite(cost) ? Math.max(0, Number(cost.toFixed(2))) : getWasteCost(ingredient, stockQuantity)
+      };
+    })
+    .filter(Boolean)
+    .slice(-120);
+}
+
+export function normalizeIngredients(ingredients) {
+  const seenIds = new Set();
+  return ingredients
+    .map((ingredient, index) => {
+      const name = String(ingredient.name || ingredient.ingredientName || "").trim();
+      if (!name) return null;
+      const id = slugify(ingredient.id || name, `ingredient-${index + 1}`);
+      if (seenIds.has(id)) return null;
+      seenIds.add(id);
+      const unitType = unitTypeDefinition(ingredient.unitType || ingredient.unit);
+      const stock = normalizeStockQuantity(ingredient.stock ?? ingredient.currentStock);
+      const min = Math.max(0, Number(ingredient.min ?? ingredient.minimumStock) || 0);
+      const max = Math.max(min, Number(ingredient.max ?? ingredient.maximumStock) || Math.max(min, stock));
+      const locationStock = normalizeLocationStock(
+        ingredient.locationStock || ingredient.locations,
+        ingredient.location || ingredient.storageLocation,
+        stock
+      );
+
+      const normalizedIngredient = {
+        id,
+        name,
+        supplier: String(ingredient.supplier || "Default supplier").trim(),
+        purchasePrice: Math.max(0, Number(ingredient.purchasePrice) || 0),
+        unitType: unitType.id,
+        unit: unitType.shortLabel,
+        stock,
+        min,
+        max,
+        location: normalizeInventoryLocationName(ingredient.location || ingredient.storageLocation, "Dry storage"),
+        locationStock,
+        expiryDate: String(ingredient.expiryDate || "").trim(),
+        barcode: String(ingredient.barcode || ingredient.qrCode || "").trim(),
+        active: ingredient.active === undefined ? ingredient.status !== "Inactive" : Boolean(ingredient.active)
+      };
+      syncIngredientStock(normalizedIngredient);
+      return normalizedIngredient;
+    })
+    .filter(Boolean);
+}
+
+export function normalizeProducts(products, ingredientIds) {
+  const seenIds = new Set();
+  return products
+    .map((product, index) => {
+      const name = String(product.name || product.productName || "").trim();
+      if (!name) return null;
+      const id = slugify(product.id || name, `product-${index + 1}`);
+      if (seenIds.has(id)) return null;
+      seenIds.add(id);
+      const category = PRODUCT_CATEGORIES.includes(product.category)
+        ? product.category
+        : PRODUCT_CATEGORIES.includes(product.station)
+          ? product.station
+          : "Other";
+      const station = normalizeKitchenStation(product.station || product.kitchenStation || "Main kitchen");
+      const vatSetting = VAT_OPTIONS.some((option) => option.id === product.vatSetting) ? product.vatSetting : "standard";
+      const targetMargin = normalizeMarginPercent(product.targetMargin, DEFAULT_MARGIN_TARGET);
+      const minMargin = Math.min(targetMargin, normalizeMarginPercent(product.minMargin ?? product.minimumMargin, DEFAULT_MARGIN_MINIMUM));
+
+      return {
+        id,
+        name,
+        code: String(product.code || product.sku || product.SKU || "").trim() || id.toUpperCase(),
+        category,
+        station,
+        price: Math.max(0, Number(product.price ?? product.sellingPrice) || 0),
+        vatSetting,
+        active: product.active === undefined ? product.status !== "Inactive" : Boolean(product.active),
+        availability: normalizeProductAvailability(product.availability),
+        targetMargin,
+        minMargin,
+        recipe: normalizeRecipeLines(product.recipe, ingredientIds)
+          .map((line) => ({ ...line, station: normalizeKitchenStation(line.station || station) })),
+        batchOutput: normalizeBatchOutput(product.batchOutput || product.output, ingredientIds),
+        lastProductionCost: Math.max(0, Number(product.lastProductionCost) || 0),
+        lastProductionPlannedCost: Math.max(0, Number(product.lastProductionPlannedCost) || 0),
+        lastProductionMargin: product.lastProductionMargin === null || product.lastProductionMargin === undefined || product.lastProductionMargin === ""
+          ? null
+          : Number.isFinite(Number(product.lastProductionMargin)) ? Number(product.lastProductionMargin) : null,
+        lastProductionCostDelta: Number.isFinite(Number(product.lastProductionCostDelta)) ? Number(product.lastProductionCostDelta) : 0,
+        lastProductionAt: String(product.lastProductionAt || "").trim(),
+        lastProductionAtMs: normalizeOptionalTimestamp(product.lastProductionAtMs)
+      };
+    })
+    .filter(Boolean);
+}
+
+export function normalizeProductionBatchLines(lines, ingredientIds) {
+  return (Array.isArray(lines) ? lines : [])
+    .map((line) => {
+      const ingredientId = String(line.ingredientId || "").trim();
+      if (!ingredientIds.has(ingredientId)) return null;
+      const measure = line.measure && typeof line.measure === "object"
+        ? {
+          key: ["grams", "milliliters", "units"].includes(line.measure.key) ? line.measure.key : "units",
+          label: String(line.measure.label || "pieces"),
+          shortLabel: String(line.measure.shortLabel || "pcs")
+        }
+        : { key: "units", label: "pieces", shortLabel: "pcs" };
+      return {
+        ingredientId,
+        ingredientName: String(line.ingredientName || "").trim(),
+        measure,
+        plannedUsage: normalizeStockQuantity(line.plannedUsage),
+        actualUsage: normalizeStockQuantity(line.actualUsage),
+        plannedStockQuantity: normalizeStockQuantity(line.plannedStockQuantity),
+        actualStockQuantity: normalizeStockQuantity(line.actualStockQuantity),
+        plannedCost: Math.max(0, Number(line.plannedCost) || 0),
+        actualCost: Math.max(0, Number(line.actualCost) || 0)
+      };
+    })
+    .filter(Boolean);
+}
+
+export function normalizeProductionBatches(records, productIds, ingredientIds, users) {
+  const userByIdLookup = new Map<string, AnyRecord>(users.map((user) => [user.id, user as AnyRecord]));
+  return (Array.isArray(records) ? records : [])
+    .map((record, index) => {
+      const productId = String(record.productId || "").trim();
+      if (!productIds.has(productId)) return null;
+      const outputIngredientId = String(record.outputIngredientId || "").trim();
+      const completedById = String(record.completedById || record.userId || "").trim();
+      const completedBy = userByIdLookup.get(completedById);
+      const completedAt = record.completedAt || record.time || timeNow();
+      return {
+        id: record.id || `BAT-${Date.now()}-${index + 1}`,
+        productId,
+        productName: String(record.productName || "").trim(),
+        completedById: completedBy?.id || completedById,
+        completedByName: String(record.completedByName || record.staffName || completedBy?.name || "Staff").trim(),
+        completedAt,
+        completedAtMs: normalizeOptionalTimestamp(record.completedAtMs) || normalizeTimestamp(record.timeMs, completedAt),
+        plannedCost: Math.max(0, Number(record.plannedCost) || 0),
+        actualCost: Math.max(0, Number(record.actualCost) || 0),
+        costDelta: Number.isFinite(Number(record.costDelta)) ? Number(record.costDelta) : 0,
+        plannedMargin: record.plannedMargin === null || record.plannedMargin === undefined || record.plannedMargin === ""
+          ? null
+          : Number.isFinite(Number(record.plannedMargin)) ? Number(record.plannedMargin) : null,
+        actualMargin: record.actualMargin === null || record.actualMargin === undefined || record.actualMargin === ""
+          ? null
+          : Number.isFinite(Number(record.actualMargin)) ? Number(record.actualMargin) : null,
+        marginDelta: record.marginDelta === null || record.marginDelta === undefined || record.marginDelta === ""
+          ? null
+          : Number.isFinite(Number(record.marginDelta)) ? Number(record.marginDelta) : null,
+        outputIngredientId: ingredientIds.has(outputIngredientId) ? outputIngredientId : "",
+        outputIngredientName: String(record.outputIngredientName || "").trim(),
+        outputQuantity: normalizeStockQuantity(record.outputQuantity),
+        outputUnitType: unitTypeDefinition(record.outputUnitType || record.unitType).id,
+        outputStockQuantity: normalizeStockQuantity(record.outputStockQuantity),
+        outputUnitCost: Math.max(0, Number(record.outputUnitCost) || 0),
+        outputLocation: normalizeInventoryLocationName(record.outputLocation, ""),
+        lines: normalizeProductionBatchLines(record.lines, ingredientIds)
+      };
+    })
+    .filter(Boolean)
+    .slice(-80);
+}
+
+export function normalizeRestaurantSettings(settings) {
+  const source = settings && typeof settings === "object" ? settings : {};
+  const supportedLanguageIds = new Set(LANGUAGE_OPTIONS.map((language) => language.id));
+  const supportedLanguages = Array.isArray(source.supportedLanguages)
+    ? source.supportedLanguages.filter((language) => supportedLanguageIds.has(language))
+    : DEFAULT_RESTAURANT_SETTINGS.supportedLanguages;
+  const defaultLanguage = supportedLanguageIds.has(source.defaultLanguage)
+    ? source.defaultLanguage
+    : DEFAULT_RESTAURANT_SETTINGS.defaultLanguage;
+
+  if (!supportedLanguages.includes(defaultLanguage)) supportedLanguages.unshift(defaultLanguage);
+
+  return {
+    restaurantName: source.restaurantName || DEFAULT_RESTAURANT_SETTINGS.restaurantName,
+    location: source.location || DEFAULT_RESTAURANT_SETTINGS.location,
+    currency: source.currency === "EUR" ? "EUR" : DEFAULT_RESTAURANT_SETTINGS.currency,
+    currencyLabel: DEFAULT_RESTAURANT_SETTINGS.currencyLabel,
+    opensAt: isReservationTime(source.opensAt) ? source.opensAt : DEFAULT_RESTAURANT_SETTINGS.opensAt,
+    closesAt: isReservationTime(source.closesAt) ? source.closesAt : DEFAULT_RESTAURANT_SETTINGS.closesAt,
+    defaultLanguage,
+    supportedLanguages: supportedLanguages.length ? supportedLanguages : [...DEFAULT_RESTAURANT_SETTINGS.supportedLanguages]
+  };
+}
+
+export function normalizeUsers(users) {
+  const seenEmails = new Set();
+  return users
+    .map((user, index) => {
+      const email = String(user.email || "").trim().toLowerCase();
+      const role = ROLE_DEFINITIONS[user.role] ? user.role : "waiter_cashier";
+      if (!email || seenEmails.has(email)) return null;
+      seenEmails.add(email);
+      return {
+        id: user.id || `${slugify(email.split("@")[0], "user")}-${index + 1}`,
+        name: user.name || email,
+        email,
+        role,
+        password: String(user.password || "demo123"),
+        status: user.status === "Inactive" ? "Inactive" : "Active"
+      };
+    })
+    .filter(Boolean);
+}
+
+export function normalizeDrivers(drivers, users = []) {
+  const seenIds = new Set();
+  const driverUserNames = new Map(
+    users
+      .filter((user) => user.role === "driver")
+      .map((user) => [user.id, user.name])
+  );
+
+  return (Array.isArray(drivers) ? drivers : [])
+    .map((driver, index) => {
+      const fallbackName = driverUserNames.get(driver.id) || `Driver ${index + 1}`;
+      const name = String(driver.name || fallbackName).replace(/\s+/g, " ").trim();
+      const id = slugify(driver.id || name, `driver-${index + 1}`);
+      if (!id || seenIds.has(id)) return null;
+      seenIds.add(id);
+      return {
+        id,
+        name: name || fallbackName,
+        status: normalizeDriverStatus(driver.status),
+        eta: String(driver.eta || "-").trim() || "-",
+        orderId: driver.orderId || null,
+        location: String(driver.location || "Restaurant").replace(/\s+/g, " ").trim() || "Restaurant"
+      };
+    })
+    .filter(Boolean);
+}
+
+export function normalizeProcedureLanguage(language) {
+  const candidate = String(language || "").trim();
+  return LANGUAGE_OPTIONS.some((option) => option.id === candidate) ? candidate : DEFAULT_RESTAURANT_SETTINGS.defaultLanguage;
+}
+
+export function normalizeProcedureFrequency(frequency) {
+  const candidate = String(frequency || "").trim();
+  return PROCEDURE_FREQUENCIES.includes(candidate) ? candidate : "Daily";
+}
+
+export function normalizeProcedureAssignedRole(role, fallbackDepartment = "") {
+  const candidate = String(role || "").trim();
+  if (PROCEDURE_ASSIGNED_ROLES.includes(candidate)) return candidate;
+
+  const department = String(fallbackDepartment || "").toLowerCase();
+  if (department.includes("cashier")) return "Cashier";
+  if (department.includes("driver") || department.includes("delivery")) return "Driver";
+  if (department.includes("kitchen") || department.includes("food") || department.includes("clean")) return "Kitchen";
+  if (department.includes("manager") || department.includes("management")) return "Manager";
+  if (department.includes("front")) return "Front";
+  return "All staff";
+}
+
+export function normalizeProcedureDepartment(department) {
+  const candidate = String(department || "").trim();
+  return candidate || "Management";
+}
+
+export function normalizeListInput(value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value || "")
+      .split(/\n|,/)
+      .map((item) => item.trim());
+  return [...new Set(values.map((item) => String(item || "").trim()).filter(Boolean))];
+}
+
+export function normalizeProcedureSteps(steps, fallbackText = "") {
+  const normalizedSteps = normalizeListInput(Array.isArray(steps) ? steps : String(steps || "").split(/\n/));
+  if (normalizedSteps.length) return normalizedSteps;
+  const fallback = String(fallbackText || "").trim();
+  return fallback ? [fallback] : [];
+}
+
+export function normalizeProcedureMedia(media) {
+  return normalizeListInput(media).filter((url) => /^https?:\/\//i.test(url));
+}
+
+export function normalizeProcedureRecord(procedure, index = 0) {
+  const title = String(procedure.title || procedure.name || procedure.text || "").trim() || `Procedure ${index + 1}`;
+  const department = normalizeProcedureDepartment(procedure.department || procedure.owner);
+  return {
+    id: slugify(procedure.id || title, `procedure-${index + 1}`),
+    title,
+    department,
+    language: normalizeProcedureLanguage(procedure.language),
+    steps: normalizeProcedureSteps(procedure.steps, procedure.text),
+    requiredTools: normalizeListInput(procedure.requiredTools || procedure.tools),
+    requiredProducts: normalizeListInput(procedure.requiredProducts || procedure.products),
+    media: normalizeProcedureMedia(procedure.media || procedure.mediaUrls || procedure.attachments),
+    frequency: normalizeProcedureFrequency(procedure.frequency),
+    assignedRole: normalizeProcedureAssignedRole(procedure.assignedRole || procedure.owner, department),
+    active: procedure.active === undefined ? true : Boolean(procedure.active),
+    createdById: String(procedure.createdById || "").trim(),
+    createdByName: String(procedure.createdByName || "").trim(),
+    createdAtMs: normalizeOptionalTimestamp(procedure.createdAtMs) || Date.now()
+  };
+}
+
+export function normalizeProcedures(procedures) {
+  const seenIds = new Set();
+  return (Array.isArray(procedures) ? procedures : [])
+    .map((procedure, index) => normalizeProcedureRecord(procedure, index))
+    .filter((procedure) => {
+      if (!procedure.title || seenIds.has(procedure.id)) return false;
+      seenIds.add(procedure.id);
+      return true;
+    });
+}
+
+export function isLegacyProcedureList(procedures) {
+  return Array.isArray(procedures)
+    && procedures.length > 0
+    && procedures.every((procedure) => procedure && procedure.text && !procedure.title);
+}
+
+export function mergeDefaultProcedures(procedures) {
+  const byId = new Map(procedures.map((procedure) => [procedure.id, procedure]));
+  normalizeProcedures(seedState.procedures).forEach((procedure) => {
+    if (!byId.has(procedure.id)) byId.set(procedure.id, procedure);
+  });
+  return [...byId.values()];
+}
+
+export function normalizeProcedureCompletions(records, procedureIds, users) {
+  const userById = new Map<string, AnyRecord>(users.map((user) => [user.id, user as AnyRecord]));
+  return (Array.isArray(records) ? records : [])
+    .map((record, index) => {
+      const procedureId = String(record.procedureId || "").trim();
+      if (!procedureIds.has(procedureId)) return null;
+      const status = PROCEDURE_COMPLETION_STATUSES.includes(record.status) ? record.status : "Done";
+      const completedById = String(record.completedById || record.userId || "").trim();
+      const completedBy = userById.get(completedById);
+      const completedAtMs = normalizeOptionalTimestamp(record.completedAtMs)
+        || normalizeOptionalTimestamp(record.timeMs)
+        || Date.parse(record.completedAt || record.time || "")
+        || Date.now();
+      return {
+        id: record.id || `PROC-CMP-${Date.now()}-${index + 1}`,
+        procedureId,
+        status,
+        completedById: completedBy?.id || completedById,
+        completedByName: String(record.completedByName || record.staffName || completedBy?.name || "Staff").trim(),
+        assignedRole: normalizeProcedureAssignedRole(record.assignedRole, completedBy ? (ROLE_DEFINITIONS[completedBy.role] || ROLE_DEFINITIONS.waiter_cashier).operationalRole : ""),
+        completedAtMs,
+        completedAt: record.completedAt || timeNow(),
+        checkedSteps: Array.isArray(record.checkedSteps)
+          ? record.checkedSteps.map((step) => Math.max(0, Math.floor(Number(step) || 0)))
+          : [],
+        notes: String(record.notes || record.issue || record.reason || "").trim()
+      };
+    })
+    .filter(Boolean)
+    .slice(-180);
+}
+
+export function normalizeProcedureProgress(progress, procedureIds, users) {
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) return {};
+  const userIds = new Set(users.map((user) => user.id));
+  return Object.entries(progress).reduce((nextProgress, [key, value]) => {
+    const [userId, procedureId] = String(key).split(":");
+    if (!userIds.has(userId) || !procedureIds.has(procedureId)) return nextProgress;
+    const steps = Array.isArray(value)
+      ? [...new Set(value.map((step) => Math.max(0, Math.floor(Number(step) || 0))))]
+      : [];
+    if (steps.length) nextProgress[key] = steps;
+    return nextProgress;
+  }, {});
+}
+
+export function normalizeOrderStatus(status, paymentStatus = "") {
+  const legacyMap = {
+    Queued: "Sent to kitchen",
+    Done: "Served"
+  };
+  const candidate = legacyMap[status] || status;
+  if (ORDER_STATUSES.includes(candidate)) return candidate;
+  if (paymentStatus === "Paid") return "Paid";
+  return "New";
+}
+
+export function normalizePaymentStatus(status) {
+  return ["Paid", "Unpaid", "Pay later"].includes(status) ? status : "Unpaid";
+}
+
+export function normalizeDeliveryNotes(notes) {
+  const source = Array.isArray(notes)
+    ? notes
+    : String(notes || "").trim()
+      ? [{ text: String(notes).trim() }]
+      : [];
+  return source
+    .map((note, index) => {
+      const text = String(note.text || note.note || note.message || "").replace(/\s+/g, " ").trim();
+      if (!text) return null;
+      const at = note.at || note.createdAt || timeNow();
+      return {
+        id: note.id || `DLV-NOTE-${Date.now()}-${index + 1}`,
+        text,
+        authorId: String(note.authorId || note.userId || "").trim(),
+        authorName: String(note.authorName || note.userName || note.staffName || "Driver").trim(),
+        at,
+        atMs: normalizeOptionalTimestamp(note.atMs) || normalizeOptionalTimestamp(note.createdAtMs) || normalizeTimestamp(note.timeMs, at)
+      };
+    })
+    .filter(Boolean)
+    .slice(-12);
+}
+
+export function normalizeLineModifiers(modifiers) {
+  const source = Array.isArray(modifiers)
+    ? modifiers
+    : String(modifiers || "")
+      .split(",")
+      .map((modifier) => modifier.trim());
+  return [...new Set(source.map((modifier) => String(modifier || "").trim()).filter(Boolean))];
+}
+
+export function normalizeOrderLineItem(item, productIds) {
+  const productId = item.productId;
+  const quantity = Math.floor(Number(item.quantity) || 0);
+  if (!productIds.has(productId) || quantity < 1) return null;
+  return {
+    productId,
+    quantity,
+    note: String(item.note || item.notes || "").trim(),
+    modifiers: normalizeLineModifiers(item.modifiers)
+  };
+}
+
+export function normalizeCustomerPhone(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+export function customerPhoneKey(value) {
+  return normalizeCustomerPhone(value).replace(/[^\d+]/g, "");
+}
+
+export function normalizeAddressHistory(addresses) {
+  const source = Array.isArray(addresses)
+    ? addresses
+    : String(addresses || "")
+      .split("\n")
+      .map((address) => address.trim());
+  return [...new Set(source.map((address) => String(address || "").replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 8);
+}
+
+export function normalizeCustomerRecord(customer, index, seenIds = new Set()) {
+  const name = String(customer.name || customer.customerName || customer.customer || "").replace(/\s+/g, " ").trim();
+  const phone = normalizeCustomerPhone(customer.phone || customer.customerPhone || customer.phoneNumber);
+  const fallbackId = name || phone || `customer-${index + 1}`;
+  let id = slugify(customer.id || fallbackId, `customer-${index + 1}`);
+  let suffix = 2;
+  while (seenIds.has(id)) {
+    id = `${slugify(customer.id || fallbackId, `customer-${index + 1}`)}-${suffix}`;
+    suffix += 1;
+  }
+  seenIds.add(id);
+
+  return {
+    id,
+    name: name || phone || `Customer ${index + 1}`,
+    phone,
+    email: String(customer.email || customer.customerEmail || "").trim(),
+    addresses: normalizeAddressHistory(customer.addresses || customer.addressHistory || customer.deliveryAddress || customer.address),
+    notes: String(customer.notes || customer.customerNotes || "").trim(),
+    createdAt: customer.createdAt || timeNow(),
+    updatedAt: customer.updatedAt || customer.createdAt || timeNow()
+  };
+}
+
+export function normalizeCustomers(customers) {
+  const seenIds = new Set();
+  const byPhone = new Map();
+  const normalized = (Array.isArray(customers) ? customers : [])
+    .map((customer, index) => normalizeCustomerRecord(customer, index, seenIds))
+    .filter((customer) => customer.name || customer.phone);
+
+  normalized.forEach((customer) => {
+    const phoneKey = customerPhoneKey(customer.phone);
+    if (!phoneKey || !byPhone.has(phoneKey)) {
+      if (phoneKey) byPhone.set(phoneKey, customer);
+      return;
+    }
+
+    const existing = byPhone.get(phoneKey);
+    existing.name = existing.name || customer.name;
+    existing.email = existing.email || customer.email;
+    existing.addresses = normalizeAddressHistory([...existing.addresses, ...customer.addresses]);
+    existing.notes = existing.notes || customer.notes;
+    existing.updatedAt = customer.updatedAt || existing.updatedAt;
+    (customer as AnyRecord).mergedInto = existing.id;
+  });
+
+  return normalized.filter((customer) => !(customer as AnyRecord).mergedInto);
+}
+
+export function normalizeQrCodeStatus(status) {
+  return QR_CODE_STATUSES.includes(status) ? status : "Active";
+}
+
+export function createQrToken(tableId, existingTokens = new Set()) {
+  const base = slugify(tableId || "table", "table");
+  let token = `libabite-${base}`;
+  let suffix = 2;
+  while (existingTokens.has(token)) {
+    token = `libabite-${base}-${suffix}`;
+    suffix += 1;
+  }
+  existingTokens.add(token);
+  return token;
+}
+
+export function createDefaultTableQrCodes(tables) {
+  const existingTokens = new Set();
+  return tables.map((table, index) => ({
+    id: `qr-${table.id || index + 1}`,
+    tableId: table.id,
+    area: table.zone || "Dining room",
+    token: createQrToken(table.id, existingTokens),
+    status: "Active",
+    createdAt: timeNow(),
+    regeneratedAt: ""
+  }));
+}
+
+export function normalizeTableQrCodes(codes, tables) {
+  const tableIds = new Set(tables.map((table) => table.id));
+  const existingTokens = new Set();
+  const normalized = (Array.isArray(codes) ? codes : [])
+    .map((code, index) => {
+      const tableId = String(code.tableId || "").trim();
+      if (!tableIds.has(tableId)) return null;
+      const rawToken = String(code.token || "").trim();
+      const token = rawToken && !existingTokens.has(rawToken)
+        ? rawToken
+        : createQrToken(tableId, existingTokens);
+      existingTokens.add(token);
+      return {
+        id: code.id || `qr-${tableId}-${index + 1}`,
+        tableId,
+        area: String(code.area || tables.find((table) => table.id === tableId)?.zone || "Dining room").trim(),
+        token,
+        status: normalizeQrCodeStatus(code.status),
+        createdAt: code.createdAt || timeNow(),
+        regeneratedAt: code.regeneratedAt || ""
+      };
+    })
+    .filter(Boolean);
+
+  tables.forEach((table) => {
+    if (normalized.some((code) => code.tableId === table.id)) return;
+    normalized.push({
+      id: `qr-${table.id}`,
+      tableId: table.id,
+      area: table.zone || "Dining room",
+      token: createQrToken(table.id, existingTokens),
+      status: "Active",
+      createdAt: timeNow(),
+      regeneratedAt: ""
+    });
+  });
+
+  return normalized;
+}
+
+export function normalizeState(candidate) {
+  const source = candidate ? structuredClone(candidate) : {};
+  const next = { ...getFreshSeedState(), ...source };
+  const collectionKeys = [
+    "products",
+    "ingredients",
+    "orders",
+    "tickets",
+    "tables",
+    "tableQrCodes",
+    "customerCart",
+    "websiteCart",
+    "customers",
+    "supplierOrders",
+    "procedures",
+    "procedureCompletions",
+    "staff",
+    "drivers",
+    "reservations",
+    "productionLog",
+    "productionBatches",
+    "users",
+    "customInventoryLocations",
+    "inventoryHistory",
+    "wasteRecords",
+    "productRecipeDraft"
+  ];
+
+  collectionKeys.forEach((key) => {
+    if (!Array.isArray(next[key])) next[key] = structuredClone(seedState[key]);
+  });
+
+  next.restaurantSettings = normalizeRestaurantSettings(source.restaurantSettings);
+  next.users = normalizeUsers(next.users);
+  if (!next.users.some((user) => user.id === next.currentUserId)) next.currentUserId = "";
+  next.drivers = normalizeDrivers(next.drivers, next.users);
+  next.customers = normalizeCustomers(next.customers);
+
+  const rawProcedures = Array.isArray(source.procedures) ? source.procedures : seedState.procedures;
+  next.procedures = mergeDefaultProcedures(normalizeProcedures(isLegacyProcedureList(rawProcedures) ? seedState.procedures : rawProcedures));
+  const procedureIds = new Set(next.procedures.map((procedure) => procedure.id));
+  next.procedureCompletions = normalizeProcedureCompletions(next.procedureCompletions, procedureIds, next.users);
+  next.procedureProgress = normalizeProcedureProgress(source.procedureProgress, procedureIds, next.users);
+
+  next.ingredients = normalizeIngredients(next.ingredients);
+  const existingIngredientIds = new Set(next.ingredients.map((ingredient) => ingredient.id));
+  normalizeIngredients(seedState.ingredients)
+    .filter((ingredient) => PHASE_11_SEED_INGREDIENT_IDS.includes(ingredient.id) && !existingIngredientIds.has(ingredient.id))
+    .forEach((ingredient) => {
+      next.ingredients.push(ingredient);
+      existingIngredientIds.add(ingredient.id);
+    });
+  const ingredientIds = new Set(next.ingredients.map((ingredient) => ingredient.id));
+  next.customInventoryLocations = normalizeCustomInventoryLocations(next.customInventoryLocations, next.ingredients);
+  next.inventoryHistory = normalizeInventoryHistory(next.inventoryHistory, ingredientIds);
+  next.wasteRecords = normalizeWasteRecords(next.wasteRecords, next.ingredients, next.users);
+  const existingProductIds = new Set((Array.isArray(next.products) ? next.products : []).map((product) => slugify(product.id || product.name || "", "")));
+  seedState.products
+    .filter((product) => PHASE_11_SEED_PRODUCT_IDS.includes(product.id) && !existingProductIds.has(product.id))
+    .forEach((product) => next.products.push(structuredClone(product)));
+  next.products = normalizeProducts(next.products, ingredientIds);
+  const productIds = new Set(next.products.map((product) => product.id));
+  next.productionBatches = normalizeProductionBatches(next.productionBatches, productIds, ingredientIds, next.users);
+  next.orderDraft = Array.isArray(candidate?.orderDraft)
+    ? candidate.orderDraft
+      .map((item) => normalizeOrderLineItem(item, productIds))
+      .filter(Boolean)
+    : [];
+  next.receiptOrderId = String(candidate?.receiptOrderId || "");
+  next.productRecipeDraft = normalizeRecipeLines(candidate?.productRecipeDraft, ingredientIds);
+
+  next.tables = next.tables
+    .map((table, index) => ({
+      id: table.id || `table-${index + 1}`,
+      name: table.name || `Table ${index + 1}`,
+      capacity: Math.max(1, Math.floor(Number(table.capacity) || 2)),
+      zone: table.zone || "Dining room"
+    }))
+    .filter((table) => table.id);
+  if (!next.tables.length) next.tables = structuredClone(seedState.tables);
+  next.tableQrCodes = normalizeTableQrCodes(next.tableQrCodes, next.tables);
+  next.customerCart = Array.isArray(candidate?.customerCart)
+    ? candidate.customerCart
+      .map((item) => normalizeOrderLineItem(item, productIds))
+      .filter(Boolean)
+    : [];
+  next.websiteCart = Array.isArray(candidate?.websiteCart)
+    ? candidate.websiteCart
+      .map((item) => normalizeOrderLineItem(item, productIds))
+      .filter(Boolean)
+    : [];
+  next.websiteFulfillment = normalizeWebsiteFulfillment(candidate?.websiteFulfillment);
+
+  const tableIds = new Set(next.tables.map((table) => table.id));
+  const normalizedReservations = [];
+  next.reservations.forEach((reservation, index) => {
+    const id = reservation.id || `RES-${Date.now()}-${index + 1}`;
+    const guests = Math.max(1, Math.floor(Number(reservation.guests) || 1));
+    const time = isReservationTime(reservation.time) ? reservation.time : "19:00";
+    const requestedTable = tableIds.has(reservation.tableId)
+      ? next.tables.find((table) => table.id === reservation.tableId)
+      : null;
+    const assignedTable = requestedTable
+      && requestedTable.capacity >= guests
+      && !getReservationConflicts({ id, tableId: requestedTable.id, time }, normalizedReservations).length
+      ? requestedTable
+      : getAvailableReservationTable({ id, guests, time }, next.tables, normalizedReservations);
+
+    normalizedReservations.push({
+      id,
+      name: reservation.name || "Guest",
+      guests,
+      time,
+      tableId: assignedTable?.id || requestedTable?.id || next.tables[0]?.id || "",
+      source: reservation.source || "Website",
+      status: reservation.status || "Confirmed"
+    });
+  });
+  next.reservations = normalizedReservations;
+
+  next.supplierOrders = Array.isArray(candidate?.supplierOrders)
+    ? candidate.supplierOrders
+      .map((order) => ({
+        id: order.id || `SUP-${Date.now()}`,
+        supplier: order.supplier,
+        status: order.status === "Ordered" ? "Ordered" : order.status === "Received" ? "Received" : "Draft",
+        createdAt: order.createdAt || timeNow(),
+        orderedAt: order.orderedAt || "",
+        receivedAt: order.receivedAt || "",
+        items: Array.isArray(order.items)
+          ? order.items
+            .map((item) => ({ ingredientId: item.ingredientId, quantity: Number(item.quantity) }))
+            .filter((item) => ingredientIds.has(item.ingredientId) && item.quantity > 0)
+          : []
+      }))
+      .filter((order) => order.supplier && order.items.length)
+    : [];
+
+  next.orders = next.orders
+    .map((order) => {
+      const channel = normalizeOrderType(order.orderType || order.channel);
+      const typeDefinition = orderTypeDefinition(channel);
+      const rawPaymentStatus = normalizePaymentStatus(order.status === "Paid" ? "Paid" : order.paymentStatus);
+      let paymentMethod = normalizePaymentMethod(order.paymentMethod || order.paymentMethodName || order.payment || rawPaymentStatus, rawPaymentStatus);
+      if (rawPaymentStatus === "Paid" && !isPaidPaymentMethod(paymentMethod)) paymentMethod = DEFAULT_PAID_PAYMENT_METHOD;
+      const paymentStatus = getPaymentStatusForMethod(paymentMethod, rawPaymentStatus);
+      const createdAt = order.createdAt || timeNow();
+      const items = Array.isArray(order.items)
+        ? order.items.map((item) => normalizeOrderLineItem(item, productIds)).filter(Boolean)
+        : [];
+      const requestedTableId = String(order.tableId || "").trim();
+      const tableId = tableIds.has(requestedTableId) ? requestedTableId : "";
+      const staffIdCandidate = String(order.staffId || order.createdByUserId || order.userId || "").trim();
+      const staffUser = next.users.find((user) => user.id === staffIdCandidate);
+      const staffId = staffUser?.id || "";
+      const staffName = String(order.staffName || order.staffMember || order.createdByName || staffUser?.name || "").trim();
+      const paidByIdCandidate = String(order.paidByUserId || order.paidById || "").trim();
+      const paidByUser = next.users.find((user) => user.id === paidByIdCandidate) || staffUser;
+      const customerIdCandidate = String(order.customerId || "").trim();
+      const customerRecord = next.customers.find((customer) => customer.id === customerIdCandidate);
+      const fulfillment = normalizeOrderFulfillment(channel, order.fulfillment || typeDefinition.fulfillment);
+      const assignedDriverId = String(order.assignedDriver || order.driverId || "").trim();
+      const deliveryStatus = fulfillment === "Delivery"
+        ? normalizeDriverDeliveryStatus(order.deliveryStatus || order.driverStatus) || (assignedDriverId ? "Assigned" : "")
+        : "";
+      const deliveryAssignedAtMs = deliveryStatus
+        ? normalizeOptionalTimestamp(order.deliveryAssignedAtMs)
+          || normalizeOptionalTimestamp(order.assignedAtMs)
+          || normalizeTimestamp(order.sentAtMs, order.sentAt || createdAt)
+        : "";
+      const deliveryStatusUpdatedAtMs = deliveryStatus
+        ? normalizeOptionalTimestamp(order.deliveryStatusUpdatedAtMs)
+          || normalizeOptionalTimestamp(order.deliveryUpdatedAtMs)
+          || deliveryAssignedAtMs
+        : "";
+
+      return {
+        ...order,
+        orderType: channel,
+        channel,
+        tableId,
+        customerId: customerRecord?.id || "",
+        customer: String(order.customer || (tableId ? next.tables.find((table) => table.id === tableId)?.name : "") || "Walk-in").trim(),
+        paymentStatus,
+        paymentMethod,
+        fulfillment,
+        status: normalizeOrderStatus(order.status, paymentStatus),
+        createdAt,
+        createdAtMs: normalizeTimestamp(order.createdAtMs, createdAt),
+        sentAt: order.sentAt || (order.status && order.status !== "New" ? createdAt : ""),
+        paidAt: paymentStatus === "Paid" ? order.paidAt || createdAt : "",
+        paidAtMs: paymentStatus === "Paid" ? normalizeTimestamp(order.paidAtMs, order.paidAt || createdAt) : "",
+        staffId,
+        staffName,
+        paidByUserId: paymentStatus === "Paid" ? paidByUser?.id || "" : "",
+        paidByName: paymentStatus === "Paid" ? String(order.paidByName || paidByUser?.name || staffName || "").trim() : "",
+        inventoryDeducted: order.inventoryDeducted === undefined ? order.status && order.status !== "New" : Boolean(order.inventoryDeducted),
+        requestedTime: String(order.requestedTime || "").trim(),
+        customerName: String(order.customerName || "").trim(),
+        customerPhone: String(order.customerPhone || "").trim(),
+        customerEmail: String(order.customerEmail || "").trim(),
+        deliveryAddress: String(order.deliveryAddress || order.address || "").trim(),
+        paymentReference: String(order.paymentReference || "").trim(),
+        paymentProcessor: String(order.paymentProcessor || "").trim(),
+        customerNotes: String(order.customerNotes || "").trim(),
+        assignedDriver: fulfillment === "Delivery" ? assignedDriverId : "",
+        pickupStatus: normalizePickupStatus(order.pickupStatus, deliveryStatus),
+        deliveryStatus,
+        deliveryAssignedAtMs,
+        deliveryStatusUpdatedAtMs,
+        deliveredAt: String(order.deliveredAt || "").trim(),
+        deliveredAtMs: normalizeOptionalTimestamp(order.deliveredAtMs),
+        failedAt: String(order.failedAt || "").trim(),
+        failedAtMs: normalizeOptionalTimestamp(order.failedAtMs),
+        returnedAt: String(order.returnedAt || "").trim(),
+        returnedAtMs: normalizeOptionalTimestamp(order.returnedAtMs),
+        deliveryWasLate: Boolean(order.deliveryWasLate),
+        deliveryNotes: normalizeDeliveryNotes(order.deliveryNotes || order.deliveryNote),
+        deliveryProofPhotoName: String(order.deliveryProofPhotoName || order.proofPhotoName || "").trim(),
+        deliveryProofAtMs: normalizeOptionalTimestamp(order.deliveryProofAtMs),
+        deliveryProofByName: String(order.deliveryProofByName || "").trim(),
+        cashCollected: Boolean(order.cashCollected),
+        cashCollectedAt: String(order.cashCollectedAt || "").trim(),
+        cashCollectedAtMs: normalizeOptionalTimestamp(order.cashCollectedAtMs),
+        cashCollectedByName: String(order.cashCollectedByName || "").trim(),
+        notes: String(order.notes || "").trim(),
+        items
+      };
+    })
+    .filter((order) => order.id && order.items.length);
+
+  if (!next.orders.some((order) => order.id === next.receiptOrderId)) next.receiptOrderId = "";
+  next.customerLastOrderId = String(candidate?.customerLastOrderId || "");
+  if (next.customerLastOrderId && !next.orders.some((order) => order.id === next.customerLastOrderId)) next.customerLastOrderId = "";
+  next.websiteLastOrderId = String(candidate?.websiteLastOrderId || "");
+  if (next.websiteLastOrderId && !next.orders.some((order) => order.id === next.websiteLastOrderId)) next.websiteLastOrderId = "";
+
+  const orderIds = new Set(next.orders.map((order) => order.id));
+  next.tickets = next.tickets
+    .map((ticket, index) => {
+      const product = next.products.find((item) => item.id === ticket.productId);
+      const order = next.orders.find((item) => item.id === ticket.orderId);
+      const status = TICKET_STATUSES.includes(ticket.status) ? ticket.status : "Queued";
+      const createdAt = ticket.createdAt || order?.createdAt || timeNow();
+      const createdAtMs = normalizeTimestamp(ticket.createdAtMs, createdAt);
+      const acceptedAtMs = normalizeOptionalTimestamp(ticket.acceptedAtMs)
+        || (["Accepted", "Preparing", "Delayed", "Ready", "Done"].includes(status) ? createdAtMs : "");
+      const startedAtMs = normalizeOptionalTimestamp(ticket.startedAtMs)
+        || (["Preparing", "Delayed", "Ready", "Done"].includes(status) ? acceptedAtMs || createdAtMs : "");
+      const delayedAtMs = normalizeOptionalTimestamp(ticket.delayedAtMs)
+        || (status === "Delayed" ? Date.now() : "");
+      const readyAtMs = normalizeOptionalTimestamp(ticket.readyAtMs)
+        || ((status === "Ready" || status === "Done") ? Date.now() : "");
+      const completedAtMs = normalizeOptionalTimestamp(ticket.completedAtMs)
+        || (status === "Done" ? readyAtMs || Date.now() : "");
+
+      return {
+        id: ticket.id || `TCK-${order?.number || Date.now()}-${index + 1}`,
+        orderId: ticket.orderId,
+        productId: ticket.productId,
+        quantity: Math.max(1, Math.floor(Number(ticket.quantity) || 1)),
+        station: normalizeKitchenStation(ticket.station || product?.station || "Main kitchen"),
+        status,
+        createdAt,
+        createdAtMs,
+        acceptedAtMs,
+        startedAtMs,
+        delayedAtMs,
+        readyAtMs,
+        completedAtMs,
+        notes: ticket.notes || "",
+        issueNote: String(ticket.issueNote || ticket.delayReason || "").trim()
+      };
+    })
+    .filter((ticket) => orderIds.has(ticket.orderId) && productIds.has(ticket.productId));
+
+  const highestOrderNumber = next.orders.reduce((highest, order) => Math.max(highest, Number(order.number) || 0), 0);
+  if (!Number.isFinite(next.nextOrderNumber) || next.nextOrderNumber <= highestOrderNumber) {
+    next.nextOrderNumber = highestOrderNumber + 1;
+  }
+
+  reconcileDeliveryAssignments(next);
+
+  return next;
+}

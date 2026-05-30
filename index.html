@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <section class="customer-qr-screen" id="customerQrScreen" aria-label="QR table ordering" hidden></section>
+    <section class="customer-qr-screen" id="customerQrScreen" aria-label="Customer ordering" hidden></section>
 
     <section class="login-screen" id="loginScreen" aria-label="Login">
       <div class="login-card">
@@ -34,6 +34,7 @@
           <button class="primary-btn" type="submit">Log In</button>
         </form>
         <div class="demo-logins" id="demoLogins" aria-label="Demo accounts"></div>
+        <a class="primary-btn public-order-link" href="?order=website">Order Online</a>
       </div>
     </section>
 
@@ -196,11 +197,57 @@
                     </select>
                   </label>
                 </div>
-                <input name="fulfillment" id="orderFulfillment" type="hidden" value="Kitchen">
-                <label>
+                <label id="manualFulfillmentLabel" hidden>
+                  Phone/message type
+                  <select name="fulfillment" id="orderFulfillment"></select>
+                </label>
+                <label id="orderCustomerLabel">
                   Customer/contact
                   <input name="customer" type="text" placeholder="Optional for dine-in" autocomplete="off">
                 </label>
+                <section class="manual-order-panel" id="manualOrderPanel" hidden>
+                  <div class="form-row">
+                    <label>
+                      Search customer
+                      <input name="customerSearch" id="customerSearch" type="search" list="customerSearchOptions" placeholder="Name, phone, or address" autocomplete="off">
+                      <datalist id="customerSearchOptions"></datalist>
+                    </label>
+                    <label>
+                      Existing customer
+                      <select name="customerId" id="customerSelect"></select>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Customer name
+                      <input name="customerName" id="manualCustomerName" type="text" autocomplete="name">
+                    </label>
+                    <label>
+                      Phone number
+                      <input name="customerPhone" id="manualCustomerPhone" type="tel" autocomplete="tel">
+                    </label>
+                  </div>
+                  <input name="customerEmail" id="manualCustomerEmail" type="hidden">
+                  <label id="manualAddressLabel">
+                    <span>Address history</span>
+                    <textarea name="deliveryAddress" id="manualDeliveryAddress" rows="2" autocomplete="street-address" placeholder="Optional saved address"></textarea>
+                  </label>
+                  <div class="form-row">
+                    <label>
+                      Pickup/delivery time
+                      <input name="requestedTime" id="manualRequestedTime" type="time">
+                    </label>
+                    <label id="manualDriverLabel" hidden>
+                      Driver
+                      <select name="assignedDriver" id="manualDriverSelect"></select>
+                    </label>
+                  </div>
+                  <label>
+                    Customer notes
+                    <textarea name="customerNotes" id="manualCustomerNotes" rows="2" placeholder="Saved preferences, allergy reminders, delivery notes"></textarea>
+                  </label>
+                  <div class="customer-history-panel" id="customerHistoryPanel" aria-live="polite"></div>
+                </section>
                 <label>
                   Product
                   <select name="productId" id="productSelect"></select>
@@ -790,6 +837,57 @@ Switch off signs and lock the restaurant.</textarea>
 
         <section class="view" id="view-team" data-title="Staff & Drivers">
           <div class="team-layout">
+            <section class="panel wide-panel driver-app-panel" id="driverAppPanel" hidden>
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Driver mobile app</p>
+                  <h2>My assigned orders</h2>
+                </div>
+              </div>
+              <div class="procedure-summary-grid driver-status-strip" id="driverStatusStrip"></div>
+              <div class="driver-order-list" id="driverOrderList"></div>
+            </section>
+
+            <section class="panel wide-panel delivery-management-panel" id="deliveryManagementPanel" hidden>
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Manager tracking</p>
+                  <h2>Delivery management</h2>
+                </div>
+              </div>
+              <div class="procedure-summary-grid" id="deliveryManagerSummary"></div>
+              <div class="delivery-management-grid">
+                <section>
+                  <div class="inline-panel-header">
+                    <p class="eyebrow">Assign orders</p>
+                    <h3>Driver assignment</h3>
+                  </div>
+                  <div class="delivery-assignment-list" id="deliveryAssignmentList"></div>
+                </section>
+                <section>
+                  <div class="inline-panel-header">
+                    <p class="eyebrow">Live route</p>
+                    <h3>Active deliveries</h3>
+                  </div>
+                  <div class="manager-delivery-list" id="managerDeliveryList"></div>
+                </section>
+                <section>
+                  <div class="inline-panel-header">
+                    <p class="eyebrow">Proof and outcomes</p>
+                    <h3>Completed deliveries</h3>
+                  </div>
+                  <div class="manager-delivery-list" id="completedDeliveryList"></div>
+                </section>
+                <section>
+                  <div class="inline-panel-header">
+                    <p class="eyebrow">Driver performance</p>
+                    <h3>Shift metrics</h3>
+                  </div>
+                  <div class="driver-performance-list" id="driverPerformanceList"></div>
+                </section>
+              </div>
+            </section>
+
             <section class="panel form-panel admin-only" id="staffAdminPanel">
               <div class="panel-header compact">
                 <div>

@@ -33,6 +33,10 @@ It includes:
 - Phase 12 QR dine-in ordering with per-table QR codes, a customer menu/cart flow, kitchen ticket creation, table-aware staff order visibility, and recipe inventory deduction
 - admin QR management for creating, disabling, regenerating, and assigning QR codes to tables/areas
 - QR payment choices for online payment or order-now-pay-later at the counter/table
+- Phase 13 public website ordering at `?order=website` with takeaway/delivery selection, cart checkout, pickup/delivery time, customer contact/address capture, online payment reference, backend order creation, kitchen routing, inventory deduction, receipt creation, and delivery driver assignment
+- Phase 14 manual phone/message orders with existing customer search, new customer capture, phone/address history, takeaway/delivery choice, notes, payment method, kitchen routing, inventory deduction, and delivery driver assignment
+- Phase 15 driver delivery app with assigned orders, customer contact/address, item details, pickup and delivery statuses, notes, proof photo filename capture, and cash collection
+- manager delivery tracking with driver assignment, current location, active/late/completed deliveries, ETA, proof status, and driver performance
 - staff scheduling and driver status
 - reservations
 
@@ -56,6 +60,25 @@ Phase 12 demo flow:
 - Customer sees Table 1, adds QR-available menu items to cart, chooses online payment or pay later, and places the order
 - The order is sent to kitchen tickets as a QR table order, staff see the table on Orders/Kitchen screens, and recipe inventory is deducted
 - Owner/Admin can manage table QR codes in Settings
+
+Phase 13 demo flow:
+
+- Open the public ordering URL, for example `http://127.0.0.1:4173/?order=website`
+- Customer chooses Takeaway or Delivery, adds website-available menu items, enters time/contact details, and pays online
+- The website order is marked Paid with an online payment reference, appears in Orders, creates a receipt, routes items to kitchen screens, deducts recipe inventory, and assigns an available driver for delivery
+
+Phase 14 demo flow:
+
+- In Orders, choose `Phone/message order`, search a saved customer or enter a new name and phone number
+- Choose Takeaway or Delivery, add products, notes, payment method, requested time, and a driver for delivery if needed
+- Send to Kitchen; the order appears like a website order, kitchen tickets are created, inventory is deducted, and customer history updates
+
+Phase 15 demo flow:
+
+- Manager/Owner opens Team to assign or reassign active delivery orders and monitor active, late, completed, and driver performance sections
+- Driver logs in with `driver@libabite.nl`, opens Team, and sees only their assigned delivery orders with customer details, address, phone, order lines, notes, payment state, ETA, and status actions
+- Driver can move the delivery through Assigned, At restaurant, Picked up, On the way, Delivered, Failed delivery, or Returned
+- Driver can add a delivery note, optionally upload a photo proof filename, and mark cash collected for unpaid delivery orders
 
 Demo logins:
 

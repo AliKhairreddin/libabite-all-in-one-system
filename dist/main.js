@@ -1,3 +1,3 @@
-import { initApp } from "./core.js";
+import { initApp } from "./app/init.js";
 initApp();
 //# sourceMappingURL=main.js.map

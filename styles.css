@@ -67,6 +67,12 @@ button {
   color: var(--muted);
 }
 
+.customer-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .customer-table-badge {
   min-height: 46px;
   padding: 7px 12px;
@@ -151,6 +157,10 @@ button {
 .customer-confirmation p {
   margin-top: 4px;
   color: var(--muted);
+}
+
+.customer-confirmation-code {
+  font-weight: 800;
 }
 
 .customer-menu-panel h1 {
@@ -263,10 +273,51 @@ button {
   font-size: 0.86rem;
 }
 
+.customer-service-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #edf2ef;
+}
+
+.customer-service-toggle button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.customer-service-toggle button.is-selected {
+  background: #ffffff;
+  color: var(--brand);
+  box-shadow: 0 1px 4px rgba(29, 36, 38, 0.08);
+}
+
+.customer-checkout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.customer-delivery-address,
+.customer-payment-card {
+  padding-top: 2px;
+}
+
 .customer-cart-total {
   padding-top: 12px;
   border-top: 1px solid var(--line);
   font-size: 1.12rem;
+}
+
+.public-order-link {
+  text-decoration: none;
 }
 
 .app-shell {
@@ -1181,6 +1232,68 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfdfc;
+}
+
+.manual-order-panel {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.manual-order-panel[hidden] {
+  display: none;
+}
+
+.customer-history-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.customer-history-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.customer-history-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.customer-history-head p,
+.customer-history-grid p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.customer-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.customer-history-grid section {
+  min-height: 68px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.customer-history-grid span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .availability-card.warning {
@@ -2190,6 +2303,160 @@ textarea {
   border-left: 4px solid var(--brand-2);
 }
 
+.driver-app-panel,
+.delivery-management-panel {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.driver-order-list,
+.delivery-assignment-list,
+.manager-delivery-list,
+.driver-performance-list {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-management-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.delivery-management-grid h3 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+}
+
+.delivery-order-card,
+.delivery-assignment-card,
+.manager-delivery-card,
+.driver-performance-card {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.delivery-order-card.is-late,
+.manager-delivery-card.is-late {
+  border-color: #efaaa5;
+  background: #fff4f3;
+}
+
+.delivery-order-card header,
+.delivery-assignment-card header,
+.manager-delivery-card header,
+.driver-performance-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.delivery-kicker,
+.delivery-detail-grid span,
+.delivery-notes > span,
+.delivery-note-row span,
+.delivery-proof-grid span,
+.delivery-performance-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.delivery-order-card p,
+.delivery-assignment-card p,
+.manager-delivery-card p,
+.driver-performance-card p,
+.delivery-note-row p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.delivery-detail-grid,
+.delivery-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.delivery-detail-grid div,
+.delivery-proof-grid div {
+  min-height: 64px;
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.delivery-detail-grid strong,
+.delivery-proof-grid strong {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.delivery-notes {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.delivery-note-row {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.delivery-note-row:first-of-type {
+  border-top: 0;
+}
+
+.delivery-actions {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.delivery-action-row,
+.delivery-assignment-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.delivery-action-row input {
+  min-height: 36px;
+  padding: 7px 9px;
+}
+
+.delivery-performance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 10px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.delivery-performance-grid strong {
+  color: var(--ink);
+  text-align: right;
+}
+
 .driver-map {
   position: relative;
   height: 220px;
@@ -2385,14 +2652,31 @@ textarea {
     .production-ingredient-line,
     .ticket-board,
     .customer-product-grid,
+    .customer-checkout-grid,
+    .customer-history-grid,
     .qr-admin-grid,
-    .qr-admin-body {
+    .qr-admin-body,
+    .delivery-management-grid,
+    .delivery-detail-grid,
+    .delivery-proof-grid,
+    .delivery-action-row,
+    .delivery-assignment-controls {
     grid-template-columns: 1fr;
   }
 
   .customer-topbar,
-  .customer-confirmation {
+  .customer-confirmation,
+  .delivery-order-card header,
+  .delivery-assignment-card header,
+  .manager-delivery-card header,
+  .driver-performance-card header {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .customer-topbar-actions {
+    width: 100%;
+    align-items: stretch;
     flex-direction: column;
   }
 
