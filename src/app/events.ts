@@ -12,12 +12,14 @@ export function bindAppEvents(handlers) {
     advanceOrder,
     advanceTicket,
     addTicketIssueNote,
+    approveSupplierOrder,
     applyInventoryAction,
     assignDeliveryOrderToDriver,
     assignQrCode,
     cancelOrder,
     cancelStaffShiftEdit,
     can,
+    clearSupplierForm,
     clearOrderDraft,
     clockInShift,
     clockOutShift,
@@ -66,8 +68,11 @@ export function bindAppEvents(handlers) {
     renderSellableRecipeCostPreview,
     renderWasteForms,
     saveRestaurantSettings,
+    saveSupplierRecord,
     sendOrderToKitchen,
+    sendSupplierOrder,
     selectStaffShiftForEdit,
+    selectSupplierForEdit,
     setProcedureStepProgress,
     setView,
     setWebsiteFulfillment,
@@ -131,6 +136,18 @@ export function bindAppEvents(handlers) {
   
     const nextOrder = event.target.closest("[data-next-order]");
     if (nextOrder) advanceOrder(nextOrder.dataset.nextOrder);
+
+    const editSupplier = event.target.closest("[data-edit-supplier]");
+    if (editSupplier) selectSupplierForEdit(editSupplier.dataset.editSupplier);
+
+    const clearSupplier = event.target.closest("[data-clear-supplier-form]");
+    if (clearSupplier) clearSupplierForm();
+
+    const supplierApprove = event.target.closest("[data-supplier-approve]");
+    if (supplierApprove) approveSupplierOrder(supplierApprove.dataset.supplierApprove);
+
+    const supplierSend = event.target.closest("[data-supplier-send]");
+    if (supplierSend) sendSupplierOrder(supplierSend.dataset.supplierSend);
   
     const supplierOrdered = event.target.closest("[data-supplier-ordered]");
     if (supplierOrdered) markSupplierOrderOrdered(supplierOrdered.dataset.supplierOrdered);
@@ -384,6 +401,11 @@ export function bindAppEvents(handlers) {
     applyInventoryAction(new FormData(event.currentTarget));
   });
   document.querySelector("#inventoryActionForm").addEventListener("change", renderInventoryActionForm);
+
+  document.querySelector("#supplierForm")?.addEventListener("submit", (event: any) => {
+    event.preventDefault();
+    saveSupplierRecord(new FormData(event.currentTarget));
+  });
 
   document.querySelectorAll("[data-waste-form]").forEach((form) => {
     form.addEventListener("submit", (event: any) => {

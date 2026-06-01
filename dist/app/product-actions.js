@@ -158,8 +158,28 @@ export function createProductActionsRuntime(deps) {
             barcode,
             active
         });
+        const newIngredient = state.ingredients[state.ingredients.length - 1];
+        const supplierRecord = state.suppliers.find((item) => item.name.toLowerCase() === supplier.toLowerCase());
+        if (supplierRecord) {
+            supplierRecord.productsSupplied = [...new Set([...(supplierRecord.productsSupplied || []), newIngredient.id])];
+        }
+        else {
+            state.suppliers.push({
+                id: uniqueRecordId(supplier, [state.suppliers]),
+                name: supplier,
+                contactPerson: "",
+                email: "",
+                phone: "",
+                apiDetails: "",
+                deliveryDays: 0,
+                minimumOrderAmount: 0,
+                productsSupplied: [newIngredient.id],
+                integrationMethod: "manual",
+                autoSendAfterApproval: false
+            });
+        }
         pushInventoryHistory({
-            ingredient: state.ingredients[state.ingredients.length - 1],
+            ingredient: newIngredient,
             type: "add",
             quantity: stock,
             toLocation: location,

@@ -1,7 +1,7 @@
 import { resetState, saveState, state } from "./state.js";
 export function bindAppEvents(handlers) {
     const document = window.document;
-    const { addCustomerCartItem, addDeliveryNote, addOrderDraftLine, addReservation, addSellableRecipeLine, adjustCustomerCartItem, advanceOrder, advanceTicket, addTicketIssueNote, applyInventoryAction, assignDeliveryOrderToDriver, assignQrCode, cancelOrder, cancelStaffShiftEdit, can, clearOrderDraft, clockInShift, clockOutShift, createOrder, createProcedure, createPurchasedProduct, createSellableProduct, createStaffShift, createStaffUser, createTableQrCode, findCustomerBySearchValue, getCustomerOrderingSession, getSelectedLineModifiers, getSelectedPaymentMethodFromAction, loadCustomerIntoManualOrder, logWaste, login, logout, markDeliveryCashCollected, markOrderPaid, markOrderServed, markSupplierOrderOrdered, markTicketDelayed, moveScheduleWeek, notifyStaffShift, openQrCustomerUrl, printOrderReceipt, promptAndRecordProcedureStatus, receiveSupplierOrder, recordProcedureCompletion, recordProduction, recordWaste, regenerateQrCode, removeCustomerCartItem, removeOrderDraftLine, removeSellableRecipeLine, render, renderInventoryActionForm, renderManualOrderControls, renderOrderBuilder, renderProcedureFormControls, renderProductionRecipeFields, renderProductsInSelects, renderReservationPlanner, renderSellableProductForm, renderSellableRecipeCostPreview, renderWasteForms, saveRestaurantSettings, sendOrderToKitchen, selectStaffShiftForEdit, setProcedureStepProgress, setView, setWebsiteFulfillment, showOrderReceipt, showToast, startNewCustomerOrder, startShiftBreak, submitCustomerQrOrder, submitWebsiteOrder, tableById, togglePurchasedProduct, toggleQrCode, toggleSellableProduct, updateDeliveryStatus, updateIngredientPurchasePrice, updateProductionCostPreview, updateTicketStatus, uploadDeliveryProof, endShiftBreak } = handlers;
+    const { addCustomerCartItem, addDeliveryNote, addOrderDraftLine, addReservation, addSellableRecipeLine, adjustCustomerCartItem, advanceOrder, advanceTicket, addTicketIssueNote, approveSupplierOrder, applyInventoryAction, assignDeliveryOrderToDriver, assignQrCode, cancelOrder, cancelStaffShiftEdit, can, clearSupplierForm, clearOrderDraft, clockInShift, clockOutShift, createOrder, createProcedure, createPurchasedProduct, createSellableProduct, createStaffShift, createStaffUser, createTableQrCode, findCustomerBySearchValue, getCustomerOrderingSession, getSelectedLineModifiers, getSelectedPaymentMethodFromAction, loadCustomerIntoManualOrder, logWaste, login, logout, markDeliveryCashCollected, markOrderPaid, markOrderServed, markSupplierOrderOrdered, markTicketDelayed, moveScheduleWeek, notifyStaffShift, openQrCustomerUrl, printOrderReceipt, promptAndRecordProcedureStatus, receiveSupplierOrder, recordProcedureCompletion, recordProduction, recordWaste, regenerateQrCode, removeCustomerCartItem, removeOrderDraftLine, removeSellableRecipeLine, render, renderInventoryActionForm, renderManualOrderControls, renderOrderBuilder, renderProcedureFormControls, renderProductionRecipeFields, renderProductsInSelects, renderReservationPlanner, renderSellableProductForm, renderSellableRecipeCostPreview, renderWasteForms, saveRestaurantSettings, saveSupplierRecord, sendOrderToKitchen, sendSupplierOrder, selectStaffShiftForEdit, selectSupplierForEdit, setProcedureStepProgress, setView, setWebsiteFulfillment, showOrderReceipt, showToast, startNewCustomerOrder, startShiftBreak, submitCustomerQrOrder, submitWebsiteOrder, tableById, togglePurchasedProduct, toggleQrCode, toggleSellableProduct, updateDeliveryStatus, updateIngredientPurchasePrice, updateProductionCostPreview, updateTicketStatus, uploadDeliveryProof, endShiftBreak } = handlers;
     document.addEventListener("click", (event) => {
         const demoLogin = event.target.closest("[data-demo-login]");
         if (demoLogin) {
@@ -43,6 +43,18 @@ export function bindAppEvents(handlers) {
         const nextOrder = event.target.closest("[data-next-order]");
         if (nextOrder)
             advanceOrder(nextOrder.dataset.nextOrder);
+        const editSupplier = event.target.closest("[data-edit-supplier]");
+        if (editSupplier)
+            selectSupplierForEdit(editSupplier.dataset.editSupplier);
+        const clearSupplier = event.target.closest("[data-clear-supplier-form]");
+        if (clearSupplier)
+            clearSupplierForm();
+        const supplierApprove = event.target.closest("[data-supplier-approve]");
+        if (supplierApprove)
+            approveSupplierOrder(supplierApprove.dataset.supplierApprove);
+        const supplierSend = event.target.closest("[data-supplier-send]");
+        if (supplierSend)
+            sendSupplierOrder(supplierSend.dataset.supplierSend);
         const supplierOrdered = event.target.closest("[data-supplier-ordered]");
         if (supplierOrdered)
             markSupplierOrderOrdered(supplierOrdered.dataset.supplierOrdered);
@@ -274,6 +286,10 @@ export function bindAppEvents(handlers) {
         applyInventoryAction(new FormData(event.currentTarget));
     });
     document.querySelector("#inventoryActionForm").addEventListener("change", renderInventoryActionForm);
+    document.querySelector("#supplierForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveSupplierRecord(new FormData(event.currentTarget));
+    });
     document.querySelectorAll("[data-waste-form]").forEach((form) => {
         form.addEventListener("submit", (event) => {
             event.preventDefault();

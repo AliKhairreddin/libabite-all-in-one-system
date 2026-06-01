@@ -111,10 +111,10 @@ export function createOrderCardsUi(deps) {
     const reorderQuantity = getSupplierOrderQuantity(ingredient);
     const cls = ingredient.stock <= ingredient.min ? "danger" : "";
     const activeSupplierOrder = getActiveSupplierOrder(ingredient.supplier);
-    const isAwaitingReceipt = activeSupplierOrder?.status === "Ordered"
+    const isAwaitingReceipt = ["Approved", "Sent", "Ordered"].includes(activeSupplierOrder?.status)
       && activeSupplierOrder.items.some((item) => item.ingredientId === ingredient.id);
     const supplierText = isAwaitingReceipt
-      ? `Ordered from ${ingredient.supplier}; waiting to receive ${formatStockAmount(reorderQuantity, ingredient.unit)}.`
+      ? `${activeSupplierOrder.status} purchase order from ${ingredient.supplier}; waiting to receive ${formatStockAmount(reorderQuantity, ingredient.unit)}.`
       : `Suggested reorder ${formatStockAmount(reorderQuantity, ingredient.unit)} from ${ingredient.supplier}.`;
     return `
       <article class="alert-card ${cls}">

@@ -9,6 +9,7 @@ import {
   KITCHEN_STATIONS,
   PRODUCT_CATEGORIES,
   RECIPE_APPLIES_OPTIONS,
+  SUPPLIER_INTEGRATION_METHODS,
   TAKEAWAY_DELIVERY_RECIPE_CONTEXT,
   UNIT_TYPES,
   VAT_OPTIONS,
@@ -49,6 +50,8 @@ export function createInventoryUi(deps) {
     getRecipeMeasureOptionsForIngredient,
     getRecipeUsageLabel,
     getSupplierOrderDrafts,
+    getSupplierMinimumOrderGap,
+    getSupplierOrderPayload,
     getSupplierOrderQuantity,
     getSupplierOrderTotal,
     getWasteCost,
@@ -69,6 +72,8 @@ export function createInventoryUi(deps) {
     productById,
     productHasConditionalRecipeLines,
     roundMoneyValue,
+    supplierById,
+    supplierForIngredient,
     unitTypeDefinition,
     wasteUnitLabel
   } = deps;
@@ -268,6 +273,105 @@ export function createInventoryUi(deps) {
     form.querySelectorAll("input, select, button").forEach((element) => {
       element.disabled = !can("canManageProducts");
     });
+  }
+
+  function supplierIntegrationOptionsHtml(selectedMethod = "manual") {
+    const selected = SUPPLIER_INTEGRATION_METHODS.some((method) => method.id === selectedMethod) ? selectedMethod : "manual";
+    return SUPPLIER_INTEGRATION_METHODS
+      .map((method) => `<option value="${escapeHtml(method.id)}" ${method.id === selected ? "selected" : ""}>${escapeHtml(method.label)}</option>`)
+      .join("");
+  }
+
+  function supplierProductsLabel(supplier) {
+    const productNames = (supplier.productsSupplied || [])
+      .map((ingredientId) => ingredientById(ingredientId)?.name)
+      .filter(Boolean);
+    return productNames.length ? productNames.join(", ") : "No products linked";
+  }
+
+  function supplierCard(supplier) {
+    const integrationLabel = SUPPLIER_INTEGRATION_METHODS.find((method) => method.id === supplier.integrationMethod)?.label || "Manual order";
+    const contactParts = [
+      supplier.contactPerson,
+      supplier.email,
+      supplier.phone
+    ].filter(Boolean);
+    return `
+      <article class="supplier-card">
+        <header>
+          <div>
+            <strong>${escapeHtml(supplier.name)}</strong>
+            <p>${escapeHtml(contactParts.join(" | ") || "No contact details")}</p>
+          </div>
+          <span class="pill info">${escapeHtml(integrationLabel)}</span>
+        </header>
+        <div class="supplier-detail-grid">
+          <span>Delivery</span><strong>${supplier.deliveryDays ? `${supplier.deliveryDays} days` : "Not set"}</strong>
+          <span>Minimum order</span><strong>${escapeHtml(money(supplier.minimumOrderAmount || 0))}</strong>
+          <span>Products</span><strong>${escapeHtml(supplierProductsLabel(supplier))}</strong>
+          <span>Auto-send</span><strong>${supplier.autoSendAfterApproval ? "After approval" : "Manual send"}</strong>
+        </div>
+        ${supplier.apiDetails ? `<p class="line-detail">${escapeHtml(supplier.apiDetails)}</p>` : ""}
+        <div class="mini-actions">
+          <button class="mini-btn" type="button" data-edit-supplier="${escapeHtml(supplier.id)}">Edit</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderSupplierManagement() {
+    document.querySelectorAll(".supplier-management-panel").forEach((panel) => {
+      panel.hidden = !can("canManageInventory");
+    });
+
+    const form = document.querySelector("#supplierForm");
+    const methodSelect = document.querySelector("#supplierIntegrationMethod");
+    const productChecks = document.querySelector("#supplierProductChecks");
+    const supplierList = document.querySelector("#supplierList");
+    if (!form || !methodSelect || !productChecks || !supplierList) return;
+
+    const editable = can("canManageInventory");
+    const selectedSupplier = supplierById(state.supplierFormSupplierId);
+    const previousProductIds = [...productChecks.querySelectorAll("input[name='productsSupplied']:checked")].map((input) => input.value);
+    const selectedProductIds = new Set(selectedSupplier ? selectedSupplier.productsSupplied || [] : previousProductIds);
+
+    if (selectedSupplier) {
+      form.elements.supplierId.value = selectedSupplier.id;
+      form.elements.name.value = selectedSupplier.name;
+      form.elements.contactPerson.value = selectedSupplier.contactPerson || "";
+      form.elements.email.value = selectedSupplier.email || "";
+      form.elements.phone.value = selectedSupplier.phone || "";
+      form.elements.deliveryDays.value = selectedSupplier.deliveryDays || 0;
+      form.elements.minimumOrderAmount.value = selectedSupplier.minimumOrderAmount || 0;
+      form.elements.apiDetails.value = selectedSupplier.apiDetails || "";
+      form.elements.autoSendAfterApproval.checked = Boolean(selectedSupplier.autoSendAfterApproval);
+    } else if (!form.elements.supplierId.value) {
+      form.elements.name.value = form.elements.name.value || "";
+      form.elements.contactPerson.value = form.elements.contactPerson.value || "";
+      form.elements.email.value = form.elements.email.value || "";
+      form.elements.phone.value = form.elements.phone.value || "";
+      form.elements.deliveryDays.value = form.elements.deliveryDays.value || 2;
+      form.elements.minimumOrderAmount.value = form.elements.minimumOrderAmount.value || 0;
+      form.elements.apiDetails.value = form.elements.apiDetails.value || "";
+    }
+
+    methodSelect.innerHTML = supplierIntegrationOptionsHtml(selectedSupplier?.integrationMethod || methodSelect.value || "manual");
+    productChecks.innerHTML = state.ingredients.length
+      ? state.ingredients.map((ingredient) => `
+        <label class="check-row">
+          <input name="productsSupplied" type="checkbox" value="${escapeHtml(ingredient.id)}" ${selectedProductIds.has(ingredient.id) ? "checked" : ""}>
+          <span>${escapeHtml(ingredient.name)}</span>
+        </label>
+      `).join("")
+      : `<p class="draft-empty">Create purchased products before linking suppliers.</p>`;
+
+    form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+      element.disabled = !editable;
+    });
+
+    supplierList.innerHTML = state.suppliers.length
+      ? state.suppliers.map(supplierCard).join("")
+      : emptyState("No suppliers saved yet.");
   }
   
   function getLocationSummaryText(ingredient) {
@@ -513,39 +617,75 @@ export function createInventoryUi(deps) {
   }
   
   function supplierOrderCard(order) {
-    const statusClass = order.status === "Ordered" ? "info" : "warning";
+    const supplier = supplierById(order.supplierId) || state.suppliers.find((item) => item.name === order.supplier);
+    const statusClass = order.status === "Received" ? "ok" : order.status === "Draft" ? "warning" : "info";
     const itemCount = order.items.length;
     const total = getSupplierOrderTotal(order);
+    const minimumGap = getSupplierMinimumOrderGap(order);
+    const payload = getSupplierOrderPayload(order);
+    const isAwaitingReceipt = order.status === "Sent" || order.status === "Ordered";
+    const showPayload = order.status === "Approved" || isAwaitingReceipt;
     return `
-      <article class="supplier-card ${order.status === "Ordered" ? "is-ordered" : ""}">
+      <article class="supplier-card ${isAwaitingReceipt ? "is-ordered" : ""}">
         <header>
           <div>
             <strong>${escapeHtml(order.supplier)}</strong>
-            <p>${itemCount} ${itemCount === 1 ? "line" : "lines"} · ${escapeHtml(money(total))} estimated</p>
+            <p>${itemCount} ${itemCount === 1 ? "line" : "lines"} | ${escapeHtml(money(total))} estimated${supplier?.deliveryDays ? ` | ${supplier.deliveryDays} delivery days` : ""}</p>
           </div>
           <span class="pill ${statusClass}">${escapeHtml(order.status)}</span>
         </header>
+        ${minimumGap > 0 ? `<p class="supplier-minimum warning">Below supplier minimum by ${escapeHtml(money(minimumGap))}.</p>` : ""}
         <div class="supplier-lines">
           ${order.items.map((item) => {
             const ingredient = ingredientById(item.ingredientId);
             if (!ingredient) return "";
+            const quantityValue = Number(item.quantity || item.suggestedQuantity || 0).toFixed(3).replace(/\.?0+$/, "");
+            const receivedValue = Number(item.receivedQuantity === "" || item.receivedQuantity === undefined ? item.quantity : item.receivedQuantity).toFixed(3).replace(/\.?0+$/, "");
             return `
               <div class="supplier-line">
                 <div>
                   <strong>${escapeHtml(ingredient.name)}</strong>
-                  <p>${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))} on hand · ${escapeHtml(getLocationSummaryText(ingredient))}</p>
+                  <p>${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))} on hand | min ${escapeHtml(formatStockAmount(ingredient.min, ingredient.unit))} | suggested ${escapeHtml(formatStockAmount(item.suggestedQuantity || item.quantity, ingredient.unit))}</p>
+                  <p>${escapeHtml(getLocationSummaryText(ingredient))}</p>
                 </div>
-                <span>${escapeHtml(formatStockAmount(item.quantity, ingredient.unit))}</span>
+                ${order.status === "Draft" ? `
+                  <label class="supplier-quantity-field">
+                    <span>Order</span>
+                    <input data-supplier-order-quantity="${escapeHtml(`${order.id}::${ingredient.id}`)}" type="number" min="0.001" step="0.001" value="${escapeHtml(quantityValue)}" aria-label="Order quantity for ${escapeHtml(ingredient.name)}">
+                    <small>${escapeHtml(ingredient.unit)}</small>
+                  </label>
+                ` : isAwaitingReceipt ? `
+                  <label class="supplier-quantity-field">
+                    <span>Received</span>
+                    <input data-supplier-received-quantity="${escapeHtml(`${order.id}::${ingredient.id}`)}" type="number" min="0" step="0.001" value="${escapeHtml(receivedValue)}" aria-label="Received quantity for ${escapeHtml(ingredient.name)}">
+                    <small>${escapeHtml(ingredient.unit)}</small>
+                  </label>
+                ` : `<span>${escapeHtml(formatStockAmount(item.quantity, ingredient.unit))}</span>`}
               </div>
             `;
           }).join("")}
         </div>
+        ${showPayload ? `
+          <div class="supplier-export">
+            <div class="supplier-export-header">
+              <strong>${escapeHtml(payload.label)}</strong>
+              <span>${escapeHtml(payload.target || "Manual handoff")}</span>
+            </div>
+            <textarea readonly rows="6" aria-label="Supplier order ${escapeHtml(payload.label)} payload">${escapeHtml(payload.body)}</textarea>
+          </div>
+        ` : ""}
         <div class="supplier-total">
-          <span>${escapeHtml(order.status === "Ordered" ? `Ordered ${order.orderedAt}` : "Ready to send")}</span>
+          <span>${escapeHtml(order.status === "Received"
+            ? `Received ${order.receivedAt}`
+            : isAwaitingReceipt
+              ? `Sent ${order.sentAt || order.orderedAt}`
+              : order.status === "Approved"
+                ? "Approved and ready to send"
+                : "Draft generated from low stock")}</span>
           <div class="mini-actions">
-            ${order.status === "Ordered"
-              ? `<button class="mini-btn" type="button" data-supplier-received="${escapeHtml(order.supplier)}">Received</button>`
-              : `<button class="mini-btn" type="button" data-supplier-ordered="${escapeHtml(order.supplier)}">Ordered</button>`}
+            ${order.status === "Draft" ? `<button class="mini-btn" type="button" data-supplier-approve="${escapeHtml(order.id)}">Approve</button>` : ""}
+            ${order.status === "Approved" ? `<button class="mini-btn" type="button" data-supplier-send="${escapeHtml(order.id)}">Send order</button>` : ""}
+            ${isAwaitingReceipt ? `<button class="mini-btn" type="button" data-supplier-received="${escapeHtml(order.id)}">Receive</button>` : ""}
           </div>
         </div>
       </article>
@@ -553,6 +693,7 @@ export function createInventoryUi(deps) {
   }
   
   function renderInventory() {
+    renderSupplierManagement();
     renderInventoryActionForm();
     const inventoryAlerts = [
       ...getLowStockIngredients().map(alertCard),
@@ -573,6 +714,7 @@ export function createInventoryUi(deps) {
       const statusClass = status === "inactive" ? "warning" : status === "danger" ? "danger" : status === "over" || status === "warning" ? "warning" : "ok";
       const expiryText = ingredient.expiryDate || "No expiry";
       const barcodeText = ingredient.barcode || "No code";
+      const supplier = supplierForIngredient(ingredient);
       return `
         <tr class="inventory-row ${status}">
           <td>
@@ -587,7 +729,10 @@ export function createInventoryUi(deps) {
           </td>
           <td>${ingredient.min} / ${ingredient.max} ${escapeHtml(ingredient.unit)}</td>
           <td>${locationStockHtml(ingredient)}</td>
-          <td>${escapeHtml(ingredient.supplier)}</td>
+          <td>
+            <strong>${escapeHtml(supplier?.name || ingredient.supplier)}</strong>
+            <span class="table-subtext">${escapeHtml(supplier?.deliveryDays ? `${supplier.deliveryDays} delivery days` : supplier?.contactPerson || "Supplier")}</span>
+          </td>
           <td>
             ${can("canManageProducts") ? `
               <div class="price-editor">
@@ -680,6 +825,7 @@ export function createInventoryUi(deps) {
     renderPurchasedProductForm,
     renderSellableProductForm,
     renderSellableRecipeCostPreview,
+    renderSupplierManagement,
     renderWasteForms,
     renderWasteReport,
     renderWasteTracking

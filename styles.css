@@ -2136,6 +2136,43 @@ textarea {
   gap: 12px;
 }
 
+.supplier-management-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.supplier-form {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.standalone-check {
+  min-height: 42px;
+  align-self: end;
+  padding: 10px 0;
+}
+
+.supplier-detail-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 12px;
+  font-size: 0.84rem;
+}
+
+.supplier-detail-grid span {
+  color: var(--muted);
+}
+
+.supplier-detail-grid strong {
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 .supplier-card.is-ordered {
   border-color: #b7c9df;
   background: #f5f9fd;
@@ -2164,6 +2201,67 @@ textarea {
 
 .supplier-line p {
   margin-top: 3px;
+}
+
+.supplier-quantity-field {
+  min-width: 112px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 6px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.supplier-quantity-field span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.supplier-quantity-field input {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.supplier-quantity-field small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.supplier-minimum {
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #fff3d7;
+  color: #855f10 !important;
+  font-weight: 800;
+}
+
+.supplier-export {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.supplier-export-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.supplier-export-header strong {
+  color: var(--ink);
+}
+
+.supplier-export textarea {
+  min-height: 132px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .supplier-total {
@@ -2832,6 +2930,7 @@ textarea {
     .delivery-assignment-controls,
     .schedule-form-grid,
     .shift-metrics-grid,
+    .supplier-management-grid,
     .attendance-report-grid {
     grid-template-columns: 1fr;
   }

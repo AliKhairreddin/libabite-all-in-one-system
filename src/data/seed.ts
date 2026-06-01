@@ -80,6 +80,7 @@ export const seedState = {
   websiteCart: [],
   websiteLastOrderId: "",
   websiteFulfillment: WEBSITE_DEFAULT_FULFILLMENT,
+  supplierFormSupplierId: "",
   customers: [
     {
       id: "customer-nour-family",
@@ -100,6 +101,99 @@ export const seedState = {
       notes: "Usually asks for extra garlic sauce.",
       createdAt: "10:20",
       updatedAt: "10:20"
+    }
+  ],
+  suppliers: [
+    {
+      id: "halal-butcher-limburg",
+      name: "Halal Butcher Limburg",
+      contactPerson: "Omar Bakri",
+      email: "orders@halalbutcher-limburg.example",
+      phone: "+31 6 2211 4400",
+      apiDetails: "",
+      deliveryDays: 2,
+      minimumOrderAmount: 150,
+      productsSupplied: ["kefta", "minced-beef", "burger-patty"],
+      integrationMethod: "email",
+      autoSendAfterApproval: false
+    },
+    {
+      id: "libabite-prep-kitchen",
+      name: "Libabite Prep Kitchen",
+      contactPerson: "Amina Kitchen",
+      email: "prep@libabite.nl",
+      phone: "+31 6 4433 2100",
+      apiDetails: "",
+      deliveryDays: 1,
+      minimumOrderAmount: 0,
+      productsSupplied: ["onion-herb-mix", "cold-mezza-portion"],
+      integrationMethod: "manual",
+      autoSendAfterApproval: true
+    },
+    {
+      id: "spice-market-nl",
+      name: "Spice Market NL",
+      contactPerson: "Rania Spice",
+      email: "sales@spicemarket.example",
+      phone: "+31 6 5544 1188",
+      apiDetails: "POST https://supplier.example/api/orders with shared token",
+      deliveryDays: 3,
+      minimumOrderAmount: 75,
+      productsSupplied: ["kefta-spice-blend"],
+      integrationMethod: "api",
+      autoSendAfterApproval: false
+    },
+    {
+      id: "roermond-bakery",
+      name: "Roermond Bakery",
+      contactPerson: "Jeroen Bakery",
+      email: "orders@roermondbakery.example",
+      phone: "+31 6 7711 0900",
+      apiDetails: "",
+      deliveryDays: 1,
+      minimumOrderAmount: 50,
+      productsSupplied: ["burger-bun"],
+      integrationMethod: "whatsapp",
+      autoSendAfterApproval: false
+    },
+    {
+      id: "libabite-sweets",
+      name: "Libabite Sweets",
+      contactPerson: "Lina Sweets",
+      email: "sweets@libabite.nl",
+      phone: "+31 6 9988 3300",
+      apiDetails: "",
+      deliveryDays: 1,
+      minimumOrderAmount: 0,
+      productsSupplied: ["dessert-portion"],
+      integrationMethod: "pdf",
+      autoSendAfterApproval: false
+    },
+    {
+      id: "beverage-partner-limburg",
+      name: "Beverage Partner Limburg",
+      contactPerson: "Niels Beverage",
+      email: "orders@beveragepartner.example",
+      phone: "+31 6 1122 6688",
+      apiDetails: "",
+      deliveryDays: 2,
+      minimumOrderAmount: 90,
+      productsSupplied: ["lemonade-base"],
+      integrationMethod: "csv",
+      autoSendAfterApproval: false
+    },
+    {
+      id: "eco-packaging-nl",
+      name: "Eco Packaging NL",
+      contactPerson: "Sanne Packaging",
+      email: "orders@ecopackaging.example",
+      phone: "+31 6 4000 1200",
+      apiDetails: "",
+      deliveryDays: 4,
+      minimumOrderAmount: 100,
+      productsSupplied: ["packaging-box"],
+      integrationMethod: "email",
+      autoSendAfterApproval: false
     }
   ],
   supplierOrders: [],

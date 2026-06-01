@@ -332,6 +332,73 @@
 
         <section class="view" id="view-inventory" data-title="Products & Inventory">
           <div class="inventory-layout">
+            <section class="panel wide-panel supplier-management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Supplier management</p>
+                  <h2>Supplier connections</h2>
+                </div>
+              </div>
+              <div class="supplier-management-grid">
+                <form id="supplierForm" class="stacked-form supplier-form">
+                  <input name="supplierId" type="hidden">
+                  <div class="form-row">
+                    <label>
+                      Supplier name
+                      <input name="name" type="text" autocomplete="organization" required>
+                    </label>
+                    <label>
+                      Contact person
+                      <input name="contactPerson" type="text" autocomplete="name">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Email
+                      <input name="email" type="email" autocomplete="email">
+                    </label>
+                    <label>
+                      Phone
+                      <input name="phone" type="tel" autocomplete="tel">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Integration method
+                      <select name="integrationMethod" id="supplierIntegrationMethod"></select>
+                    </label>
+                    <label>
+                      Delivery days
+                      <input name="deliveryDays" type="number" min="0" step="1" value="2">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Minimum order amount
+                      <input name="minimumOrderAmount" type="number" min="0" step="0.01" value="0">
+                    </label>
+                    <label class="check-row standalone-check">
+                      <input name="autoSendAfterApproval" type="checkbox">
+                      <span>Auto-send after approval</span>
+                    </label>
+                  </div>
+                  <label>
+                    API details
+                    <textarea name="apiDetails" rows="3" placeholder="Optional endpoint, token note, or ordering instructions"></textarea>
+                  </label>
+                  <fieldset class="check-fieldset">
+                    <legend>Products supplied</legend>
+                    <div class="language-checks" id="supplierProductChecks"></div>
+                  </fieldset>
+                  <div class="form-row align-end">
+                    <button class="ghost-btn" type="button" data-clear-supplier-form>Clear</button>
+                    <button class="primary-btn" type="submit">Save Supplier</button>
+                  </div>
+                </form>
+                <div class="supplier-list" id="supplierList"></div>
+              </div>
+            </section>
+
             <section class="panel form-panel admin-product-only">
               <div class="panel-header compact">
                 <div>

@@ -1,10 +1,12 @@
-import { DEFAULT_RECIPE_ORDER_CONTEXT, INVENTORY_ACTIONS } from "../shared/constants.js";
+import { DEFAULT_RECIPE_ORDER_CONTEXT, INVENTORY_ACTIONS, SUPPLIER_INTEGRATION_METHODS } from "../shared/constants.js";
 import { convertWasteQuantityToStockUnits, getIngredientTotalStock, getWasteCost, isDefaultInventoryLocation, normalizeInventoryLocationName, normalizeStockQuantity, normalizeWasteReason, normalizeWasteUnitType, sortInventoryLocations, syncIngredientStock } from "../data/normalize.js";
 import { planStockDeduction } from "../domain/inventory.js";
 import { normalizeOptionalTimestamp, timeNow } from "../shared/dates.js";
+import { uniqueRecordId } from "../shared/ids.js";
 import { saveState, state } from "./state.js";
 export function createInventoryActionsRuntime(deps) {
-    const { can, currentUser, formatActualUsageLabel, formatDateTimeLocalInput, formatSignedAmount, formatStockAmount, formatWasteQuantity, getActiveSupplierOrder, getIngredientLocationRows, getIngredientPrimaryLocation, getIngredientStatus, getProductionExecutionDraft, getProductionReadiness, getStockRequirementsForItems, getSupplierKey, getSupplierOrderDrafts, getSupplierOrderQuantity, ingredientById, money, productById, render, renderProductionRecipeFields, showToast, updateProductionCostPreview } = deps;
+    const document = window.document;
+    const { can, currentUser, formatActualUsageLabel, formatDateTimeLocalInput, formatSignedAmount, formatStockAmount, formatWasteQuantity, getActiveSupplierOrder, getIngredientLocationRows, getIngredientPrimaryLocation, getIngredientStatus, getProductionExecutionDraft, getProductionReadiness, getStockRequirementsForItems, getSupplierKey, getSupplierOrderDrafts, getSupplierOrderQuantity, ingredientById, money, productById, render, renderProductionRecipeFields, showToast, supplierById, supplierForIngredient, updateProductionCostPreview } = deps;
     function getSelectedInventoryLocation(formData, selectName, customName = "") {
         const customLocation = customName ? normalizeInventoryLocationName(formData.get(customName), "") : "";
         return customLocation || normalizeInventoryLocationName(formData.get(selectName), "");
@@ -306,71 +308,246 @@ export function createInventoryActionsRuntime(deps) {
         });
         return changes;
     }
-    function markSupplierOrderOrdered(supplier) {
-        if (!can("canManageInventory")) {
-            showToast("This role cannot manage supplier orders.");
+    function normalizeSupplierIntegrationMethod(method) {
+        const candidate = String(method || "").trim();
+        return SUPPLIER_INTEGRATION_METHODS.some((item) => item.id === candidate) ? candidate : "manual";
+    }
+    function supplierIntegrationLabel(method) {
+        return SUPPLIER_INTEGRATION_METHODS.find((item) => item.id === method)?.label || "Manual order";
+    }
+    function selectSupplierForEdit(supplierId) {
+        if (!can("canManageInventory"))
+            return;
+        const supplier = supplierById(supplierId);
+        if (!supplier) {
+            showToast("Supplier not found.");
             return;
         }
-        const draft = getSupplierOrderDrafts().find((order) => order.supplier === supplier);
-        if (!draft || !draft.items.length) {
-            showToast("No supplier draft is ready for that supplier.");
-            return;
-        }
-        const activeOrder = getActiveSupplierOrder(supplier);
-        const orderedOrder = {
-            id: activeOrder?.id || `SUP-${getSupplierKey(supplier)}-${Date.now()}`,
-            supplier,
-            status: "Ordered",
-            createdAt: activeOrder?.createdAt || draft.createdAt || timeNow(),
-            orderedAt: timeNow(),
-            receivedAt: "",
-            items: draft.items.map((item) => ({ ...item }))
-        };
-        if (activeOrder) {
-            Object.assign(activeOrder, orderedOrder);
-        }
-        else {
-            state.supplierOrders.push(orderedOrder);
+        state.supplierFormSupplierId = supplier.id;
+        saveState();
+        render();
+    }
+    function clearSupplierForm() {
+        state.supplierFormSupplierId = "";
+        const form = document.querySelector("#supplierForm");
+        if (form) {
+            form.reset();
+            form.elements.supplierId.value = "";
         }
         saveState();
         render();
-        showToast(`${supplier} supplier order marked ordered.`);
     }
-    function receiveSupplierOrder(supplier) {
+    function saveSupplierRecord(formData) {
         if (!can("canManageInventory")) {
-            showToast("This role cannot receive supplier orders.");
+            showToast("This role cannot manage suppliers.");
             return;
         }
-        const order = getActiveSupplierOrder(supplier);
-        if (!order || order.status !== "Ordered") {
-            showToast("Mark the supplier order as ordered before receiving it.");
+        const supplierId = String(formData.get("supplierId") || state.supplierFormSupplierId || "").trim();
+        const name = String(formData.get("name") || "").replace(/\s+/g, " ").trim();
+        const productsSupplied = [...new Set(formData.getAll("productsSupplied")
+                .map((value) => String(value || "").trim())
+                .filter((ingredientId) => ingredientById(ingredientId)))];
+        const integrationMethod = normalizeSupplierIntegrationMethod(formData.get("integrationMethod"));
+        const minimumOrderAmount = Math.max(0, Number(formData.get("minimumOrderAmount")) || 0);
+        const deliveryDays = Math.max(0, Math.floor(Number(formData.get("deliveryDays")) || 0));
+        if (!name) {
+            showToast("Add a supplier name.");
+            return;
+        }
+        const existing = supplierById(supplierId) || state.suppliers.find((supplier) => supplier.name.toLowerCase() === name.toLowerCase());
+        const oldName = existing?.name || "";
+        const nextSupplier = {
+            id: existing?.id || uniqueRecordId(name, [state.suppliers]),
+            name,
+            contactPerson: String(formData.get("contactPerson") || "").replace(/\s+/g, " ").trim(),
+            email: String(formData.get("email") || "").trim(),
+            phone: String(formData.get("phone") || "").trim(),
+            apiDetails: String(formData.get("apiDetails") || "").trim(),
+            deliveryDays,
+            minimumOrderAmount,
+            productsSupplied,
+            integrationMethod,
+            autoSendAfterApproval: formData.get("autoSendAfterApproval") === "on"
+        };
+        if (existing) {
+            Object.assign(existing, nextSupplier);
+            if (oldName && oldName !== name) {
+                state.ingredients
+                    .filter((ingredient) => ingredient.supplier === oldName)
+                    .forEach((ingredient) => {
+                    ingredient.supplier = name;
+                });
+            }
+        }
+        else {
+            state.suppliers.push(nextSupplier);
+        }
+        productsSupplied.forEach((ingredientId) => {
+            const ingredient = ingredientById(ingredientId);
+            if (ingredient)
+                ingredient.supplier = name;
+        });
+        state.supplierFormSupplierId = "";
+        saveState();
+        render();
+        showToast(`${name} supplier saved.`);
+    }
+    function getSupplierOrderQuantityInput(orderId, ingredientId, fallback) {
+        const key = `${orderId}::${ingredientId}`;
+        const input = [...document.querySelectorAll("[data-supplier-order-quantity]")]
+            .find((element) => element.dataset.supplierOrderQuantity === key);
+        return normalizeStockQuantity(input?.value ?? fallback);
+    }
+    function getSupplierReceivedQuantityInput(orderId, ingredientId, fallback) {
+        const key = `${orderId}::${ingredientId}`;
+        const input = [...document.querySelectorAll("[data-supplier-received-quantity]")]
+            .find((element) => element.dataset.supplierReceivedQuantity === key);
+        return normalizeStockQuantity(input?.value ?? fallback);
+    }
+    function findSupplierOrderByIdOrSupplier(value) {
+        return state.supplierOrders.find((order) => order.id === value && order.status !== "Received")
+            || getActiveSupplierOrder(value);
+    }
+    function markSupplierOrderSent(order) {
+        const supplier = supplierById(order.supplierId) || state.suppliers.find((item) => item.name === order.supplier);
+        const sentAt = timeNow();
+        const method = normalizeSupplierIntegrationMethod(order.integrationMethod || supplier?.integrationMethod);
+        order.status = "Sent";
+        order.sentAt = sentAt;
+        order.orderedAt = sentAt;
+        order.integrationMethod = method;
+        order.integrationReference = `${method.toUpperCase()}-${Date.now()}`;
+        state.productionLog.push({
+            id: `LOG-${Date.now()}`,
+            time: sentAt,
+            text: `Purchase order ${order.id} sent to ${order.supplier} using ${supplierIntegrationLabel(method)}.`
+        });
+    }
+    function approveSupplierOrder(orderId) {
+        if (!can("canManageInventory")) {
+            showToast("This role cannot approve purchase orders.");
+            return;
+        }
+        const draft = getSupplierOrderDrafts().find((order) => order.id === orderId);
+        if (!draft || !draft.items.length) {
+            showToast("No purchase order draft is ready.");
+            return;
+        }
+        const supplier = supplierById(draft.supplierId) || state.suppliers.find((item) => item.name === draft.supplier);
+        const activeOrder = state.supplierOrders.find((order) => order.id === draft.id && order.status !== "Received");
+        const approvedAt = timeNow();
+        const approvedOrder = {
+            id: activeOrder?.id || `PO-${getSupplierKey(draft.supplier)}-${Date.now()}`,
+            supplierId: supplier?.id || draft.supplierId || getSupplierKey(draft.supplier),
+            supplier: draft.supplier,
+            status: "Approved",
+            createdAt: activeOrder?.createdAt || draft.createdAt || approvedAt,
+            approvedAt,
+            sentAt: "",
+            orderedAt: "",
+            receivedAt: "",
+            integrationMethod: normalizeSupplierIntegrationMethod(draft.integrationMethod || supplier?.integrationMethod),
+            integrationReference: "",
+            items: draft.items
+                .map((item) => {
+                const quantity = getSupplierOrderQuantityInput(draft.id, item.ingredientId, item.quantity);
+                return {
+                    ingredientId: item.ingredientId,
+                    quantity,
+                    suggestedQuantity: normalizeStockQuantity(item.suggestedQuantity || item.quantity),
+                    receivedQuantity: ""
+                };
+            })
+                .filter((item) => item.quantity > 0)
+        };
+        if (!approvedOrder.items.length) {
+            showToast("Enter at least one order quantity above zero.");
+            return;
+        }
+        if (activeOrder) {
+            Object.assign(activeOrder, approvedOrder);
+        }
+        else {
+            state.supplierOrders.push(approvedOrder);
+        }
+        const order = activeOrder || approvedOrder;
+        if (supplier?.autoSendAfterApproval)
+            markSupplierOrderSent(order);
+        saveState();
+        render();
+        showToast(`${approvedOrder.supplier} purchase order ${order.status === "Sent" ? "approved and sent" : "approved"}.`);
+    }
+    function sendSupplierOrder(orderId) {
+        if (!can("canManageInventory")) {
+            showToast("This role cannot send purchase orders.");
+            return;
+        }
+        const order = findSupplierOrderByIdOrSupplier(orderId);
+        if (!order || order.status !== "Approved") {
+            showToast("Approve the purchase order before sending it.");
+            return;
+        }
+        markSupplierOrderSent(order);
+        saveState();
+        render();
+        showToast(`${order.supplier} purchase order sent using ${supplierIntegrationLabel(order.integrationMethod)}.`);
+    }
+    function markSupplierOrderOrdered(supplier) {
+        const order = getSupplierOrderDrafts().find((item) => item.id === supplier || item.supplier === supplier || item.supplierId === supplier);
+        if (!order) {
+            showToast("No supplier order is ready.");
+            return;
+        }
+        if (order.status === "Draft") {
+            approveSupplierOrder(order.id);
+            return;
+        }
+        if (order.status === "Approved")
+            sendSupplierOrder(order.id);
+    }
+    function receiveSupplierOrder(orderId) {
+        if (!can("canManageInventory")) {
+            showToast("This role cannot receive purchase orders.");
+            return;
+        }
+        const order = findSupplierOrderByIdOrSupplier(orderId);
+        if (!order || (order.status !== "Sent" && order.status !== "Ordered")) {
+            showToast("Send the purchase order before receiving it.");
             return;
         }
         const receivedLines = order.items.map((item) => {
             const ingredient = ingredientById(item.ingredientId);
             if (!ingredient)
                 return null;
+            const receivedQuantity = getSupplierReceivedQuantityInput(order.id, item.ingredientId, item.quantity);
+            item.receivedQuantity = receivedQuantity;
+            if (receivedQuantity <= 0)
+                return null;
             const location = getIngredientPrimaryLocation(ingredient);
-            addStockToLocation(ingredient, location, item.quantity);
+            addStockToLocation(ingredient, location, receivedQuantity);
             pushInventoryHistory({
                 ingredient,
                 type: "add",
-                quantity: item.quantity,
+                quantity: receivedQuantity,
                 toLocation: location,
-                detail: `Supplier delivery received from ${supplier}.`
+                detail: `Purchase order ${order.id} received from ${order.supplier}.`
             });
-            return `${formatStockAmount(item.quantity, ingredient.unit)} ${ingredient.name}`;
+            return `${formatStockAmount(receivedQuantity, ingredient.unit)} ${ingredient.name}`;
         }).filter(Boolean);
+        if (!receivedLines.length) {
+            showToast("Enter at least one received quantity above zero.");
+            return;
+        }
         order.status = "Received";
         order.receivedAt = timeNow();
         state.productionLog.push({
             id: `LOG-${Date.now()}`,
             time: timeNow(),
-            text: `Supplier delivery received from ${supplier}: ${receivedLines.join(", ")} added to stock.`
+            text: `Purchase order ${order.id} received from ${order.supplier}: ${receivedLines.join(", ")} added to stock.`
         });
         saveState();
         render();
-        showToast(`${supplier} delivery received and inventory updated.`);
+        showToast(`${order.supplier} delivery received and inventory updated.`);
     }
     function logWaste() {
         if (!can("canRecordWaste")) {
@@ -500,7 +677,9 @@ export function createInventoryActionsRuntime(deps) {
         showToast("Batch result saved; inventory and actual cost updated.");
     }
     return {
+        approveSupplierOrder,
         applyInventoryAction,
+        clearSupplierForm,
         deductInventoryForItems,
         getSelectedInventoryLocation,
         logWaste,
@@ -509,7 +688,10 @@ export function createInventoryActionsRuntime(deps) {
         receiveSupplierOrder,
         recordProduction,
         recordWaste,
-        rememberInventoryLocation
+        rememberInventoryLocation,
+        saveSupplierRecord,
+        selectSupplierForEdit,
+        sendSupplierOrder
     };
 }
 //# sourceMappingURL=inventory-actions.js.map

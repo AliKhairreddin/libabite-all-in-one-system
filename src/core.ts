@@ -97,6 +97,15 @@ import {
   getStockRequirementsForItems as getStockRequirementsForItemsFromInventory,
   getStockShortages as getStockShortagesFromInventory
 } from "./domain/inventory.js";
+import {
+  buildSupplierOrderDrafts,
+  buildSupplierOrderPayload as buildSupplierOrderPayloadFromDomain,
+  getSupplierForIngredient as getSupplierForIngredientFromDomain,
+  getSupplierKey as getSupplierKeyFromDomain,
+  getSupplierMinimumOrderGap as getSupplierMinimumOrderGapFromDomain,
+  getSupplierOrderQuantity as getSupplierOrderQuantityFromDomain,
+  getSupplierOrderTotal as getSupplierOrderTotalFromDomain
+} from "./domain/suppliers.js";
 import { getOrderProgressSummary as summarizeOrderProgress } from "./domain/kitchen.js";
 import {
   calculateItemsTotal,
@@ -566,63 +575,56 @@ function getOverStockIngredients() {
   return state.ingredients.filter((ingredient) => ingredient.active && ingredient.max > 0 && ingredient.stock > ingredient.max);
 }
 
+function supplierById(id) {
+  return state.suppliers.find((supplier) => supplier.id === id);
+}
+
+function supplierForIngredient(ingredient) {
+  return getSupplierForIngredientFromDomain(ingredient, state.suppliers);
+}
+
 function getSupplierKey(supplier) {
-  return String(supplier || "supplier").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "supplier";
+  return getSupplierKeyFromDomain(supplier);
 }
 
 function getSupplierOrderQuantity(ingredient) {
-  return Math.max(0, Number((ingredient.max - ingredient.stock).toFixed(3)));
+  return getSupplierOrderQuantityFromDomain(ingredient);
 }
 
-function getActiveSupplierOrder(supplier) {
-  return state.supplierOrders.find((order) => order.supplier === supplier && order.status !== "Received");
+function getActiveSupplierOrder(supplierOrId) {
+  const supplierKey = getSupplierKey(supplierOrId);
+  return state.supplierOrders.find((order) => {
+    if (order.status === "Received") return false;
+    return order.supplierId === supplierOrId
+      || order.supplier === supplierOrId
+      || order.supplierId === supplierKey
+      || getSupplierKey(order.supplier) === supplierKey;
+  });
 }
 
 function getSupplierOrderTotal(order) {
-  return order.items.reduce((sum, item) => {
-    const ingredient = ingredientById(item.ingredientId);
-    return sum + (ingredient ? ingredient.purchasePrice * item.quantity : 0);
-  }, 0);
+  return getSupplierOrderTotalFromDomain(order, ingredientById);
+}
+
+function getSupplierMinimumOrderGap(order) {
+  const supplier = supplierById(order?.supplierId) || state.suppliers.find((item) => item.name === order?.supplier);
+  return getSupplierMinimumOrderGapFromDomain(order, supplier, ingredientById);
+}
+
+function getSupplierOrderPayload(order) {
+  const supplier = supplierById(order?.supplierId) || state.suppliers.find((item) => item.name === order?.supplier);
+  return buildSupplierOrderPayloadFromDomain(order, supplier, ingredientById, {
+    restaurantName: state.restaurantSettings.restaurantName
+  });
 }
 
 function getSupplierOrderDrafts() {
-  const activeOrders = state.supplierOrders
-    .filter((order) => order.status !== "Received")
-    .map((order) => ({
-      ...order,
-      items: order.items.filter((item) => ingredientById(item.ingredientId))
-    }))
-    .filter((order) => order.items.length);
-  const bySupplier = new Map<string, any>(activeOrders.map((order) => [order.supplier, order]));
-
-  getLowStockIngredients().forEach((ingredient) => {
-    const existing = bySupplier.get(ingredient.supplier);
-    if (existing?.status === "Ordered") return;
-
-    const item = {
-      ingredientId: ingredient.id,
-      quantity: getSupplierOrderQuantity(ingredient)
-    };
-
-    if (existing) {
-      const nextItems = existing.items.filter((line) => line.ingredientId !== ingredient.id);
-      nextItems.push(item);
-      existing.items = nextItems;
-      return;
-    }
-
-    bySupplier.set(ingredient.supplier, {
-      id: `SUP-${getSupplierKey(ingredient.supplier)}`,
-      supplier: ingredient.supplier,
-      status: "Draft",
-      createdAt: timeNow(),
-      orderedAt: "",
-      receivedAt: "",
-      items: [item]
-    });
+  return buildSupplierOrderDrafts({
+    ingredients: state.ingredients,
+    suppliers: state.suppliers,
+    activeOrders: state.supplierOrders,
+    now: timeNow()
   });
-
-  return [...bySupplier.values()].sort((a, b) => a.supplier.localeCompare(b.supplier));
 }
 
 function getStationNames() {
@@ -858,7 +860,9 @@ const {
 });
 
 const {
+  approveSupplierOrder,
   applyInventoryAction,
+  clearSupplierForm,
   deductInventoryForItems,
   getSelectedInventoryLocation,
   logWaste,
@@ -867,7 +871,10 @@ const {
   receiveSupplierOrder,
   recordProduction,
   recordWaste,
-  rememberInventoryLocation
+  rememberInventoryLocation,
+  saveSupplierRecord,
+  selectSupplierForEdit,
+  sendSupplierOrder
 } = createInventoryActionsRuntime({
   can,
   currentUser,
@@ -892,6 +899,8 @@ const {
   render: () => render(),
   renderProductionRecipeFields: (options) => renderProductionRecipeFields(options),
   showToast,
+  supplierById,
+  supplierForIngredient,
   updateProductionCostPreview: () => updateProductionCostPreview()
 });
 
@@ -1197,6 +1206,8 @@ const {
   getRecipeMeasureOptionsForIngredient,
   getRecipeUsageLabel,
   getSupplierOrderDrafts,
+  getSupplierMinimumOrderGap,
+  getSupplierOrderPayload,
   getSupplierOrderQuantity,
   getSupplierOrderTotal,
   getWasteCost,
@@ -1217,6 +1228,8 @@ const {
   productById,
   productHasConditionalRecipeLines,
   roundMoneyValue,
+  supplierById,
+  supplierForIngredient,
   unitTypeDefinition,
   wasteUnitLabel
 });
@@ -1491,11 +1504,13 @@ export function createAppRuntime() {
       advanceOrder,
       advanceTicket,
       addTicketIssueNote,
+      approveSupplierOrder,
       applyInventoryAction,
       assignDeliveryOrderToDriver,
       assignQrCode,
       cancelOrder,
       can,
+      clearSupplierForm,
       clearOrderDraft,
       clockInShift,
       clockOutShift,
@@ -1544,8 +1559,11 @@ export function createAppRuntime() {
       renderSellableRecipeCostPreview,
       renderWasteForms,
       saveRestaurantSettings,
+      saveSupplierRecord,
       sendOrderToKitchen,
+      sendSupplierOrder,
       selectStaffShiftForEdit,
+      selectSupplierForEdit,
       setProcedureStepProgress,
       setView,
       setWebsiteFulfillment,

@@ -19,6 +19,8 @@ import {
   QR_CODE_STATUSES,
   RECIPE_APPLIES_OPTIONS,
   ROLE_DEFINITIONS,
+  SUPPLIER_INTEGRATION_METHODS,
+  SUPPLIER_ORDER_STATUSES,
   TICKET_STATUSES,
   UNIT_TYPES,
   VAT_OPTIONS,
@@ -40,6 +42,7 @@ import {
 } from "../domain/scheduling.js";
 import { getFreshSeedState, seedState } from "./seed.js";
 import { slugify } from "../shared/ids.js";
+import { getSupplierKey } from "../domain/suppliers.js";
 
 type AnyRecord = Record<string, any>;
 
@@ -368,6 +371,116 @@ export function normalizeIngredients(ingredients) {
       return normalizedIngredient;
     })
     .filter(Boolean);
+}
+
+export function normalizeSupplierIntegrationMethod(method) {
+  const candidate = String(method || "").trim();
+  return SUPPLIER_INTEGRATION_METHODS.some((item) => item.id === candidate) ? candidate : "manual";
+}
+
+export function normalizeSupplierOrderStatus(status) {
+  const candidate = String(status || "").trim();
+  return SUPPLIER_ORDER_STATUSES.includes(candidate) ? candidate : "Draft";
+}
+
+export function normalizeSuppliers(suppliers, ingredients = []) {
+  const ingredientIds = new Set(ingredients.map((ingredient) => ingredient.id));
+  const byId = new Map();
+  const byName = new Map();
+
+  function upsertSupplier(source, index = 0) {
+    const name = String(source?.name || source?.supplierName || source || "").replace(/\s+/g, " ").trim();
+    if (!name) return null;
+    const id = slugify(source?.id || name, `supplier-${index + 1}`);
+    const existing = byId.get(id) || byName.get(name.toLowerCase());
+    const productIds = new Set([
+      ...(existing?.productsSupplied || []),
+      ...(Array.isArray(source?.productsSupplied) ? source.productsSupplied : []),
+      ...(Array.isArray(source?.productIds) ? source.productIds : [])
+    ].map((value) => String(value || "").trim()).filter((value) => ingredientIds.has(value)));
+
+    const nextSupplier = {
+      id: existing?.id || id,
+      name,
+      contactPerson: String(source?.contactPerson || source?.contact || existing?.contactPerson || "").replace(/\s+/g, " ").trim(),
+      email: String(source?.email || existing?.email || "").trim(),
+      phone: String(source?.phone || existing?.phone || "").trim(),
+      apiDetails: String(source?.apiDetails || source?.api || existing?.apiDetails || "").trim(),
+      deliveryDays: Math.max(0, Math.floor(Number(source?.deliveryDays ?? existing?.deliveryDays) || 0)),
+      minimumOrderAmount: Math.max(0, Number(source?.minimumOrderAmount ?? source?.minOrderAmount ?? existing?.minimumOrderAmount) || 0),
+      productsSupplied: [...productIds],
+      integrationMethod: normalizeSupplierIntegrationMethod(source?.integrationMethod || source?.method || existing?.integrationMethod),
+      autoSendAfterApproval: Boolean(source?.autoSendAfterApproval ?? existing?.autoSendAfterApproval)
+    };
+
+    byId.set(nextSupplier.id, nextSupplier);
+    byName.set(nextSupplier.name.toLowerCase(), nextSupplier);
+    return nextSupplier;
+  }
+
+  (Array.isArray(suppliers) ? suppliers : []).forEach(upsertSupplier);
+
+  ingredients.forEach((ingredient, index) => {
+    const supplierName = String(ingredient.supplier || "Default supplier").replace(/\s+/g, " ").trim() || "Default supplier";
+    const supplier = upsertSupplier({ id: getSupplierKey(supplierName), name: supplierName }, index);
+    if (supplier && !supplier.productsSupplied.includes(ingredient.id)) supplier.productsSupplied.push(ingredient.id);
+  });
+
+  return [...byId.values()]
+    .map((supplier) => ({
+      ...supplier,
+      productsSupplied: [...new Set(supplier.productsSupplied)].filter((id) => ingredientIds.has(id))
+    }))
+    .sort((first, second) => first.name.localeCompare(second.name));
+}
+
+export function normalizeSupplierOrders(orders, ingredientIds, suppliers = []) {
+  const supplierIds = new Set(suppliers.map((supplier) => supplier.id));
+  const supplierByName = new Map(suppliers.map((supplier) => [supplier.name.toLowerCase(), supplier]));
+
+  return (Array.isArray(orders) ? orders : [])
+    .map((order, index) => {
+      const supplierName = String(order.supplier || order.supplierName || "").replace(/\s+/g, " ").trim();
+      const supplier = suppliers.find((item) => item.id === order.supplierId)
+        || supplierByName.get(supplierName.toLowerCase())
+        || null;
+      const resolvedSupplier = supplier || (supplierName ? { id: getSupplierKey(supplierName), name: supplierName } : null);
+      if (!resolvedSupplier) return null;
+
+      const status = normalizeSupplierOrderStatus(order.status);
+      return {
+        id: order.id || `SUP-${Date.now()}-${index + 1}`,
+        supplierId: supplierIds.has(resolvedSupplier.id) ? resolvedSupplier.id : getSupplierKey(resolvedSupplier.name),
+        supplier: resolvedSupplier.name,
+        status,
+        createdAt: order.createdAt || timeNow(),
+        approvedAt: status === "Draft" ? "" : order.approvedAt || order.orderedAt || "",
+        sentAt: (status === "Sent" || status === "Ordered" || status === "Received") ? order.sentAt || order.orderedAt || "" : "",
+        orderedAt: order.orderedAt || order.sentAt || "",
+        receivedAt: status === "Received" ? order.receivedAt || timeNow() : "",
+        integrationMethod: normalizeSupplierIntegrationMethod(order.integrationMethod || supplier?.integrationMethod),
+        integrationReference: String(order.integrationReference || "").trim(),
+        items: Array.isArray(order.items)
+          ? order.items
+            .map((item) => {
+              const ingredientId = String(item.ingredientId || "").trim();
+              const quantity = normalizeStockQuantity(item.quantity);
+              const receivedQuantity = item.receivedQuantity === undefined || item.receivedQuantity === ""
+                ? ""
+                : normalizeStockQuantity(item.receivedQuantity);
+              return {
+                ingredientId,
+                quantity,
+                suggestedQuantity: normalizeStockQuantity(item.suggestedQuantity ?? item.quantity),
+                receivedQuantity
+              };
+            })
+            .filter((item) => ingredientIds.has(item.ingredientId) && item.quantity > 0)
+          : []
+      };
+    })
+    .filter((order) => order.supplier && order.items.length)
+    .slice(-80);
 }
 
 export function normalizeProducts(products, ingredientIds) {
@@ -977,6 +1090,7 @@ export function normalizeState(candidate) {
     "customerCart",
     "websiteCart",
     "customers",
+    "suppliers",
     "supplierOrders",
     "procedures",
     "procedureCompletions",
@@ -1020,6 +1134,8 @@ export function normalizeState(candidate) {
       existingIngredientIds.add(ingredient.id);
     });
   const ingredientIds = new Set(next.ingredients.map((ingredient) => ingredient.id));
+  next.suppliers = normalizeSuppliers(next.suppliers, next.ingredients);
+  if (!next.suppliers.some((supplier) => supplier.id === next.supplierFormSupplierId)) next.supplierFormSupplierId = "";
   next.customInventoryLocations = normalizeCustomInventoryLocations(next.customInventoryLocations, next.ingredients);
   next.inventoryHistory = normalizeInventoryHistory(next.inventoryHistory, ingredientIds);
   next.wasteRecords = normalizeWasteRecords(next.wasteRecords, next.ingredients, next.users);
@@ -1087,23 +1203,7 @@ export function normalizeState(candidate) {
   });
   next.reservations = normalizedReservations;
 
-  next.supplierOrders = Array.isArray(candidate?.supplierOrders)
-    ? candidate.supplierOrders
-      .map((order) => ({
-        id: order.id || `SUP-${Date.now()}`,
-        supplier: order.supplier,
-        status: order.status === "Ordered" ? "Ordered" : order.status === "Received" ? "Received" : "Draft",
-        createdAt: order.createdAt || timeNow(),
-        orderedAt: order.orderedAt || "",
-        receivedAt: order.receivedAt || "",
-        items: Array.isArray(order.items)
-          ? order.items
-            .map((item) => ({ ingredientId: item.ingredientId, quantity: Number(item.quantity) }))
-            .filter((item) => ingredientIds.has(item.ingredientId) && item.quantity > 0)
-          : []
-      }))
-      .filter((order) => order.supplier && order.items.length)
-    : [];
+  next.supplierOrders = normalizeSupplierOrders(candidate?.supplierOrders, ingredientIds, next.suppliers);
 
   next.orders = next.orders
     .map((order) => {

@@ -23,6 +23,14 @@ import { procedureAssignedToUser, procedureFrequencyWindowMs, procedureStatusCla
 import { convertActualUsageToStockUnits, convertRecipeLineToStockUnits, getRecipeUsageLabel, recipeLineAppliesToOrder } from "../dist/domain/recipes.js";
 import { getAvailableReservationTable, getReservationConflicts, getReservationIssues, getReservationValidation } from "../dist/domain/reservations.js";
 import { formatShiftHours, getShiftMetrics, getWeekDates, getWeekStartDate } from "../dist/domain/scheduling.js";
+import {
+  buildSupplierOrderDrafts,
+  buildSupplierOrderPayload,
+  getLowStockReorderSuggestions,
+  getSupplierMinimumOrderGap,
+  getSupplierOrderQuantity,
+  groupReorderSuggestionsBySupplier
+} from "../dist/domain/suppliers.js";
 import { getCurrentUser, roleCan, roleDefinition, visibleViewsForRole } from "../dist/domain/users.js";
 import { formatActualUsageLabel, formatSignedAmount, formatStockAmount } from "../dist/shared/formatters.js";
 import { slugify, uniqueRecordId } from "../dist/shared/ids.js";
@@ -279,6 +287,39 @@ test("inventory availability accounts for reserved basket stock", () => {
   assert.equal(getStockRequirementsForItems([{ productId: "kefta", quantity: 2 }], deps, {}).get("beef"), 4);
   assert.equal(getProductAvailability(products.get("kefta"), [{ productId: "kefta", quantity: 1 }], deps, {}).maxQuantity, 1);
   assert.equal(getStockShortages([{ productId: "kefta", quantity: 3 }], deps, {})[0].shortage, 1);
+});
+
+test("supplier reorder drafts group low-stock products and preserve sent orders", () => {
+  const ingredients = [
+    { id: "beef", name: "Beef", supplier: "Butcher", stock: 2, min: 5, max: 20, purchasePrice: 8, unit: "kg", active: true },
+    { id: "bun", name: "Bun", supplier: "Bakery", stock: 8, min: 10, max: 40, purchasePrice: 0.5, unit: "pcs", active: true },
+    { id: "sauce", name: "Sauce", supplier: "Butcher", stock: 12, min: 5, max: 30, purchasePrice: 2, unit: "l", active: true }
+  ];
+  const suppliers = [
+    { id: "butcher", name: "Butcher", productsSupplied: ["beef", "sauce"], minimumOrderAmount: 200, integrationMethod: "email" },
+    { id: "bakery", name: "Bakery", productsSupplied: ["bun"], minimumOrderAmount: 20, integrationMethod: "csv" }
+  ];
+  const suggestions = getLowStockReorderSuggestions(ingredients, suppliers);
+  const grouped = groupReorderSuggestionsBySupplier(suggestions);
+
+  assert.equal(getSupplierOrderQuantity(ingredients[0]), 18);
+  assert.deepEqual(grouped.map((group) => group.supplier), ["Bakery", "Butcher"]);
+  assert.equal(grouped.find((group) => group.supplier === "Butcher").estimatedTotal, 144);
+
+  const drafts = buildSupplierOrderDrafts({
+    ingredients,
+    suppliers,
+    activeOrders: [{ id: "PO-bakery", supplierId: "bakery", supplier: "Bakery", status: "Sent", items: [{ ingredientId: "bun", quantity: 32 }] }],
+    now: "09:00"
+  });
+
+  assert.deepEqual(drafts.map((order) => [order.supplier, order.status]), [["Bakery", "Sent"], ["Butcher", "Draft"]]);
+  assert.equal(drafts.find((order) => order.supplier === "Butcher").items[0].quantity, 18);
+  assert.equal(getSupplierMinimumOrderGap(drafts.find((order) => order.supplier === "Butcher"), suppliers[0], (id) => ingredients.find((item) => item.id === id)), 56);
+
+  const payload = buildSupplierOrderPayload(drafts.find((order) => order.supplier === "Butcher"), suppliers[0], (id) => ingredients.find((item) => item.id === id), { restaurantName: "Libabite" });
+  assert.equal(payload.method, "email");
+  assert.match(payload.body, /Beef: 18 kg/);
 });
 
 test("recipe helpers handle route-specific lines and stock-unit conversion", () => {

@@ -122,6 +122,15 @@ export const INVENTORY_ACTIONS = [
     { id: "waste", label: "Mark wasted" },
     { id: "correct", label: "Correct manually" }
 ];
+export const SUPPLIER_INTEGRATION_METHODS = [
+    { id: "email", label: "Email order" },
+    { id: "pdf", label: "PDF order" },
+    { id: "csv", label: "CSV export" },
+    { id: "api", label: "API integration" },
+    { id: "whatsapp", label: "WhatsApp/message template" },
+    { id: "manual", label: "Manual order" }
+];
+export const SUPPLIER_ORDER_STATUSES = ["Draft", "Approved", "Sent", "Ordered", "Received"];
 export const WASTE_REASONS = [
     { id: "Spoiled", label: "Spoiled" },
     { id: "Dropped", label: "Dropped" },
@@ -279,6 +288,8 @@ export const DATA_MODEL = [
     { name: "restaurant_settings", fields: "name, location, currency, hours, languages" },
     { name: "sellable_products", fields: "name, code/SKU, category, kitchen station, price, VAT, status, availability, margin settings, recipe links" },
     { name: "purchased_products", fields: "ingredient, supplier, purchase price, unit type, min/max, total stock, stock by location, expiry, barcode, status" },
+    { name: "suppliers", fields: "name, contact person, email, phone, integration/API details, delivery days, minimum order amount, products supplied" },
+    { name: "purchase_orders", fields: "supplier, status, suggested quantity, approved quantity, sent method, received quantity, inventory update log" },
     { name: "inventory_locations", fields: "default restaurant locations, custom locations, per-location quantities" },
     { name: "inventory_actions", fields: "add, remove, transfer, waste, manual correction, stock history" },
     { name: "waste_records", fields: "product, quantity, unit, reason, staff member, date/time, notes, cost" },
