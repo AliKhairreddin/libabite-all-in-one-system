@@ -1,30 +1,30 @@
 :root {
   color-scheme: light;
-  --background: #f7f8f5;
-  --foreground: #1f241f;
+  --background: #f8faf7;
+  --foreground: #171c18;
   --card: #ffffff;
-  --card-foreground: #1f241f;
+  --card-foreground: #171c18;
   --popover: #ffffff;
-  --popover-foreground: #1f241f;
-  --primary: #1f4d3a;
-  --primary-foreground: #fbfdf9;
-  --secondary: #eef1ea;
-  --secondary-foreground: #273128;
-  --muted-surface: #eef1ea;
-  --muted-foreground: #667064;
-  --accent-surface: #f2eee7;
-  --accent-foreground: #5d3b21;
+  --popover-foreground: #171c18;
+  --primary: #0f5f46;
+  --primary-foreground: #f7fff9;
+  --secondary: #f0f3ee;
+  --secondary-foreground: #252b26;
+  --muted-surface: #f1f4ef;
+  --muted-foreground: #687268;
+  --accent-surface: #eef6f5;
+  --accent-foreground: #164d57;
   --destructive: #b42318;
   --destructive-foreground: #fffafa;
-  --success: #25724d;
-  --warning: #a66315;
-  --info-tone: #3c6878;
-  --border: #dde3d8;
-  --input: #d8dfd4;
-  --ring: #3f7f61;
+  --success: #1c7a4d;
+  --warning: #b86b16;
+  --info-tone: #336b7b;
+  --border: #dfe5dc;
+  --input: #d8e0d5;
+  --ring: #2f8066;
   --radius: 8px;
-  --shadow: 0 1px 2px rgba(31, 36, 31, 0.05), 0 12px 26px rgba(31, 36, 31, 0.06);
-  --shadow-sm: 0 1px 2px rgba(31, 36, 31, 0.06);
+  --shadow: 0 1px 2px rgba(20, 24, 21, 0.05), 0 14px 32px rgba(20, 24, 21, 0.07);
+  --shadow-sm: 0 1px 2px rgba(20, 24, 21, 0.06);
 
   --ink: var(--foreground);
   --muted: var(--muted-foreground);
@@ -3889,6 +3889,392 @@ textarea:hover {
 .empty-state {
   border-color: #cad3c6;
   background: rgba(255, 255, 255, 0.48);
+}
+
+/* shadcn-style overhaul layer for the restored app */
+body {
+  background: var(--background);
+}
+
+.app-shell {
+  background: var(--background);
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.sidebar {
+  padding: 18px 14px;
+  background: var(--card);
+  color: var(--foreground);
+  border-right: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.sidebar .brand {
+  padding: 0 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-mark {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.brand span,
+.sidebar .brand span {
+  color: var(--muted-foreground);
+}
+
+.nav-list {
+  gap: 4px;
+}
+
+.nav-item {
+  min-height: 40px;
+  padding: 8px 10px;
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-weight: 700;
+}
+
+.nav-item:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.nav-item.is-active {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-icon {
+  width: 26px;
+  height: 26px;
+  background: var(--secondary);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.is-active .nav-icon {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+.nav-count {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+}
+
+.workspace {
+  padding: 22px;
+}
+
+.topbar {
+  min-height: auto;
+  margin-bottom: 18px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.topbar h1 {
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
+  font-weight: 740;
+  letter-spacing: 0;
+}
+
+.topbar-scan-form,
+.user-menu,
+.login-card,
+.customer-error-card,
+.customer-confirmation,
+.customer-menu-panel,
+.customer-cart-panel,
+.form-panel,
+.panel,
+.driver-app-panel,
+.delivery-management-panel,
+.time-clock-panel,
+.schedule-management-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel {
+  padding: 16px;
+}
+
+.panel.wide-panel,
+.dashboard-grid .wide-panel {
+  padding: 16px;
+}
+
+.panel-header {
+  margin-bottom: 14px;
+}
+
+.primary-btn,
+.ghost-btn,
+.icon-btn,
+.mini-btn,
+.quiet-btn,
+.customer-add-btn,
+.danger-action {
+  min-height: 38px;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.875rem;
+  font-weight: 650;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.primary-btn:focus-visible,
+.ghost-btn:focus-visible,
+.icon-btn:focus-visible,
+.mini-btn:focus-visible,
+.quiet-btn:focus-visible,
+.customer-add-btn:focus-visible,
+.danger-action:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 0;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px rgba(47, 128, 102, 0.18);
+}
+
+.primary-btn,
+.customer-add-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.primary-btn:hover,
+.customer-add-btn:hover {
+  background: #0b4f3a;
+}
+
+.ghost-btn,
+.mini-btn,
+.quiet-btn {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.ghost-btn:hover,
+.mini-btn:hover,
+.quiet-btn:hover {
+  background: var(--secondary);
+}
+
+.icon-btn {
+  background: var(--card);
+  color: var(--muted-foreground);
+  border-color: var(--border);
+}
+
+.icon-btn:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.danger-action {
+  border-color: #efc6c0;
+  background: #fff7f5;
+  color: var(--destructive);
+}
+
+input,
+select,
+textarea {
+  min-height: 40px;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 0;
+}
+
+.metric,
+.management-signal-card,
+.dashboard-data-row,
+.report-card,
+.phase-loop-card,
+.phase-loop-metric,
+.production-guide,
+.production-ingredient-line,
+.production-usage-row,
+.cost-preview,
+.waste-summary-card,
+.procedure-summary-card,
+.check-row,
+.modifier-chip,
+.availability-card,
+.manual-order-panel,
+.order-draft,
+.customer-history-card,
+.customer-history-grid section,
+.table-capacity-card,
+.reservation-link-card,
+.reservation-ops-card,
+.order-card,
+.ticket-card,
+.station-card,
+.alert-card,
+.recipe-card,
+.supplier-card,
+.procedure-card,
+.procedure-step,
+.procedure-detail-grid div,
+.delivery-order-card,
+.delivery-assignment-card,
+.manager-delivery-card,
+.driver-performance-card,
+.delivery-detail-grid div,
+.delivery-proof-grid div,
+.order-progress-card,
+.kds-summary-card,
+.shift-card,
+.attendance-report-card,
+.shift-metrics-grid div,
+.user-card,
+.schema-card,
+.log-card,
+.qr-admin-card,
+.qr-code-box,
+.staff-scan-form,
+.scan-result-card,
+.scan-result-grid,
+.customer-table-badge,
+.customer-product-card,
+.customer-payment-card {
+  border-radius: var(--radius);
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.metric {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.metric span,
+.management-signal-card span,
+.management-signal-card small,
+.dashboard-subtitle,
+.report-card header span,
+.report-card header small,
+.mini-report-table th,
+.waste-summary-card span,
+.waste-summary-card small,
+.procedure-summary-card span,
+.procedure-summary-card small,
+.scan-result-grid span,
+.kds-summary-card span,
+.ticket-kicker,
+.ticket-notes span,
+.ticket-issue span,
+.procedure-kicker,
+.delivery-kicker,
+.delivery-detail-grid span,
+.delivery-notes > span,
+.delivery-note-row span,
+.delivery-proof-grid span,
+.delivery-performance-grid span,
+.shift-metrics-grid span,
+.eyebrow {
+  color: var(--muted-foreground);
+  letter-spacing: 0.02em;
+}
+
+.segmented,
+.tabs,
+.customer-service-toggle {
+  padding: 3px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.segmented button,
+.tabs button,
+.customer-service-toggle button {
+  border-radius: calc(var(--radius) - 3px);
+  font-weight: 650;
+}
+
+.segmented button.is-selected,
+.tabs button.is-selected,
+.customer-service-toggle button.is-selected {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.pill,
+.scan-type-pill,
+.tab-count {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.inventory-table-wrap,
+.mini-report-table-wrap {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.data-table th,
+.mini-report-table th {
+  background: var(--secondary);
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.data-table td,
+.data-table th,
+.mini-report-table td,
+.mini-report-table th {
+  border-bottom-color: var(--border);
+}
+
+.login-screen {
+  background: var(--background);
+}
+
+.login-card {
+  width: min(100%, 420px);
+}
+
+.demo-login {
+  background: var(--card);
 }
 
 @media (max-width: 1240px) {

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": false,
+    "noEmitOnError": false,
+    "skipLibCheck": true,
+    "sourceMap": true
+  },
+  "include": ["src/data/**/*.ts", "src/domain/**/*.ts", "src/shared/**/*.ts"]
+}

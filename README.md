@@ -1,142 +1,73 @@
 # Libabite All-in-One System
 
-A static prototype for a connected restaurant operations system.
+A connected restaurant operations system for Libabite. The full app is still
+present: login, orders, kitchen, inventory, procedures, team, settings,
+bookings, QR ordering, website ordering, external delivery imports, scanning,
+and the underlying domain logic.
 
-Open `index.html` in a browser to run the demo. The TypeScript source lives in
-`src/`, and the browser loads the compiled files from `dist/`.
+The UI is being overhauled with a shadcn-style design system while preserving
+the useful parts of the existing app experience.
 
-It includes:
+## Working Preference
 
-- login with seeded role-based users
-- Owner/Admin staff user creation
-- role-scoped dashboard navigation
-- restaurant settings for Libabite in Roermond, Netherlands
-- Phase 5 first complete product loop using one seeded product: Kefta Plate linked to Kefta inventory
-- sellable product and purchased product management with active/inactive status, kitchen stations, VAT settings, channel availability, purchase costs, and recipe links
-- Phase 6 dine-in POS/order entry with table selection, line notes, modifiers, New/Sent/Preparing/Ready/Served/Paid/Cancelled statuses, payment marking, and receipt preview/print
-- order type support for dine-in, takeaway, delivery, phone/message, QR table, website, and external delivery app orders
-- Phase 7 kitchen display screens for Burger, Cold mezza, Sweets, Drinks, Grill, and Packaging stations
-- per-product station routing so mixed orders only show each station its own items
-- kitchen ticket actions for accept, preparing, ready, delayed, issue note, and complete task
-- manager kitchen progress view across the full order
-- kitchen ticket priority, SLA aging, warnings, and escalation
-- Phase 8 receipt and payment tracking with cash, card, online, external delivery app, and unpaid/pay later methods
-- receipt details for restaurant, order number, date/time, table/order type, item quantities/prices, VAT, total, payment method, and staff member
-- inventory deduction from recipe usage
-- Phase 9 waste tracking for staff/admin with product, quantity, unit, reason, staff member, date/time, notes, inventory deduction, and waste cost reporting
-- low-stock supplier order drafts
-- Phase 10 procedures/SOP management with admin-created procedures, multilingual fields, required tools/products, optional media links, assigned roles, frequency, step checklists, and completion tracking
-- staff procedure actions for Done, Problem, and Skip with reason
-- manager procedure view for completed procedures, missed/due procedures, staff member, completion time, and notes/issues
-- Phase 11 guided recipe execution with required ingredients, preparation steps, actual quantities used, actual cost preview, margin impact, and saved batch results
-- prepared batch support that deducts raw ingredients, adds finished/prepared stock to inventory, and updates the prepared product unit cost
-- Phase 12 QR dine-in ordering with per-table QR codes, a customer menu/cart flow, kitchen ticket creation, table-aware staff order visibility, and recipe inventory deduction
-- admin QR management for creating, disabling, regenerating, and assigning QR codes to tables/areas
-- QR payment choices for online payment or order-now-pay-later at the counter/table
-- Phase 13 public website ordering at `?order=website` with takeaway/delivery selection, cart checkout, pickup/delivery time, customer contact/address capture, online payment reference, backend order creation, kitchen routing, inventory deduction, receipt creation, and delivery driver assignment
-- Phase 14 manual phone/message orders with existing customer search, new customer capture, phone/address history, takeaway/delivery choice, notes, payment method, kitchen routing, inventory deduction, and delivery driver assignment
-- Phase 15 driver delivery app with assigned orders, customer contact/address, item details, pickup and delivery statuses, notes, proof photo filename capture, and cash collection
-- manager delivery tracking with driver assignment, current location, active/late/completed deliveries, ETA, proof status, and driver performance
-- staff scheduling and driver status
-- Phase 19 internal reservation system with public website booking, pending manager approval, table assignment, arrived/no-show tracking, blocked unavailable times, capacity rules, notes/contact capture, and channel/source labels for Website, Google link, Facebook/Instagram, phone, walk-in, and staff entry
-- Phase 18 external delivery app integrations for Uber Eats, Thuisbezorgd, and other local delivery platforms
-- external product mappings from platform names/codes to internal products, recipes, and kitchen stations, including `Sandwich Kefta` / `99301` to `Kefta Sandwich`
-- external menu payload preparation, fallback order import by manual entry/email/CSV/staff entry, external commission tracking, internal kitchen routing, inventory deduction, and platform status push logging
-- Phase 20 staff scanning with a global scan field, inventory scan panel, product barcode/QR resolution, table/storage/staff/recipe scan recognition, and scanned-product stock actions
+When requesting new features, additions, redesigns, or other changes, the user
+does not expect old behavior, layout, structure, or implementation details to be
+preserved by default. It is okay to rethink or replace existing pieces when that
+better serves the new direction.
 
-Phase 5 demo flow:
+## Stack
 
-- Purchased product: Kefta, 30kg starting stock, 5kg minimum, stored in Fridge
-- Sellable product: Kefta Plate, recipe uses 200g Kefta per plate
-- Staff order: 10 Kefta Plates deducts 2kg from Kefta inventory
-- Waste example: 0.25kg wasted Kefta deducts from stock and records waste cost at the Kefta purchase price
-- Expected stock proof: 30kg to 28kg, with kitchen ticket, low-stock alert logic, and margin tracking visible
-
-Phase 11 demo flow:
-
-- Recipe execution defaults to a 10kg Kefta Mix Batch
-- Staff can enter actual raw quantities, such as 8600g minced beef instead of the planned 8500g
-- Saving the batch deducts raw stock, adds 10kg Kefta to prepared inventory, updates Kefta unit cost, and recalculates downstream Kefta Plate cost/margin
-
-Phase 12 demo flow:
-
-- Open a seeded table QR URL such as `http://127.0.0.1:4173/?qr=libabite-table-1`
-- Customer sees Table 1, adds QR-available menu items to cart, chooses online payment or pay later, and places the order
-- The order is sent to kitchen tickets as a QR table order, staff see the table on Orders/Kitchen screens, and recipe inventory is deducted
-- Owner/Admin can manage table QR codes in Settings
-
-Phase 13 demo flow:
-
-- Open the public ordering URL, for example `http://127.0.0.1:4173/?order=website`
-- Customer chooses Takeaway or Delivery, adds website-available menu items, enters time/contact details, and pays online
-- The website order is marked Paid with an online payment reference, appears in Orders, creates a receipt, routes items to kitchen screens, deducts recipe inventory, and assigns an available driver for delivery
-
-Phase 14 demo flow:
-
-- In Orders, choose `Phone/message order`, search a saved customer or enter a new name and phone number
-- Choose Takeaway or Delivery, add products, notes, payment method, requested time, and a driver for delivery if needed
-- Send to Kitchen; the order appears like a website order, kitchen tickets are created, inventory is deducted, and customer history updates
-
-Phase 15 demo flow:
-
-- Manager/Owner opens Team to assign or reassign active delivery orders and monitor active, late, completed, and driver performance sections
-- Driver logs in with `driver@libabite.nl`, opens Team, and sees only their assigned delivery orders with customer details, address, phone, order lines, notes, payment state, ETA, and status actions
-- Driver can move the delivery through Assigned, At restaurant, Picked up, On the way, Delivered, Failed delivery, or Returned
-- Driver can add a delivery note, optionally upload a photo proof filename, and mark cash collected for unpaid delivery orders
-
-Phase 18 demo flow:
-
-- Open Settings and review the seeded Uber Eats, Thuisbezorgd, and local delivery platform profiles
-- Review the external mapping `Sandwich Kefta` / `99301` to internal product `Kefta Sandwich`, its recipe, and Grill station routing
-- Use Push menu to prepare the external platform menu payload while API approval is pending
-- In the external order import form, import `99301,1`; the order is created as an external delivery app order, paid by external delivery app payment, sent to kitchen, and deducted from inventory through the normal recipe flow
-- Use Update platform status on the import record to log the outbound status sync
-
-Phase 19 demo flow:
-
-- Open `http://127.0.0.1:4173/?reservation=website`
-- Customer chooses date, time, guest count, name, phone/email, and notes, then confirms the reservation request
-- Staff open Bookings to approve/decline, edit the booking, assign a table, mark arrived/no-show, block unavailable times, and set capacity rules
-
-Phase 20 demo flow:
-
-- Log in as Owner/Admin or Manager
-- Scan or type `KEFTA-001` in the top-bar scan field or Inventory scanner
-- The system opens Kefta inventory, selects Kefta in the stock action form, and shows add/remove/transfer/waste shortcuts
-- Apply a stock action from that screen to update Kefta stock and inventory history
-
-Demo logins:
-
-- Owner/Admin: `owner@libabite.nl` / `admin123`
-- Manager: `manager@libabite.nl` / `demo123`
-- Waiter/Cashier: `waiter@libabite.nl` / `demo123`
-- Kitchen staff: `kitchen@libabite.nl` / `demo123`
-- Driver: `driver@libabite.nl` / `demo123`
-
-The current version is a static MVP using `localStorage` so it can be tested
-immediately before choosing a backend stack.
+- TypeScript
+- Vite
+- Tailwind CSS and shadcn/ui dependencies
+- shadcn-compatible design tokens and component primitives
+- Existing domain/data/shared restaurant modules
 
 ## Development
 
-Install dependencies once:
+Install dependencies:
 
 ```sh
 npm install
 ```
 
-Build the TypeScript source:
+Run the app:
+
+```sh
+npm run dev
+```
+
+Build the app:
 
 ```sh
 npm run build
 ```
 
-The source split is intentionally conservative:
+Run checks:
 
-- `src/main.ts` is the application entry point.
-- `src/app/init.ts` creates the runtime, binds DOM events, and starts periodic refreshes.
-- `src/app/runtime.ts` wires the focused app, UI, and domain modules together.
-- `src/app/*-selectors.ts` contains state-backed view adapters and lookup helpers.
-- `src/domain/`, `src/ui/`, `src/data/`, and `src/shared/` contain the extracted business logic, rendering, normalization, and utilities.
+```sh
+npm run check
+```
 
-The old `src/core.ts` monolith has been removed; new work should live in the
-focused module that owns the behavior.
+Run domain tests:
+
+```sh
+npm test
+```
+
+## Project Shape
+
+- `index.html` is the Vite entry point for the full restored app.
+- `styles.css` contains the current shadcn-style overhaul layer for the existing
+  screens.
+- `src/main.ts` starts the application.
+- `src/app/` contains runtime wiring, actions, state-backed selectors, and event
+  binding.
+- `src/ui/` contains the current screen renderers.
+- `src/domain/`, `src/data/`, and `src/shared/` contain reusable business logic,
+  seed data, and utilities.
+- `src/components/ui/` and `components.json` provide the shadcn/ui foundation for
+  continued React component migration.
+
+New UI work may rethink the existing app behavior and migrate screens into
+shadcn-style components incrementally when that fits the requested direction.
