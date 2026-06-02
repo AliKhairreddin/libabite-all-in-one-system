@@ -1,7 +1,7 @@
 import { resetState, saveState, state } from "./state.js";
 export function bindAppEvents(handlers) {
     const document = window.document;
-    const { addCustomerCartItem, addDeliveryNote, addOrderDraftLine, addReservation, addSellableRecipeLine, adjustCustomerCartItem, advanceOrder, advanceTicket, addTicketIssueNote, approveSupplierOrder, applyInventoryAction, assignDeliveryOrderToDriver, assignQrCode, cancelOrder, cancelStaffShiftEdit, can, clearSupplierForm, clearOrderDraft, clockInShift, clockOutShift, createOrder, createProcedure, createPurchasedProduct, createSellableProduct, createStaffShift, createStaffUser, createTableQrCode, findCustomerBySearchValue, getCustomerOrderingSession, getSelectedLineModifiers, getSelectedPaymentMethodFromAction, loadCustomerIntoManualOrder, logWaste, login, logout, markDeliveryCashCollected, markOrderPaid, markOrderServed, markSupplierOrderOrdered, markTicketDelayed, moveScheduleWeek, notifyStaffShift, openQrCustomerUrl, printOrderReceipt, promptAndRecordProcedureStatus, receiveSupplierOrder, recordProcedureCompletion, recordProduction, recordWaste, regenerateQrCode, removeCustomerCartItem, removeOrderDraftLine, removeSellableRecipeLine, render, renderInventoryActionForm, renderManualOrderControls, renderOrderBuilder, renderProcedureFormControls, renderProductionRecipeFields, renderProductsInSelects, renderReservationPlanner, renderSellableProductForm, renderSellableRecipeCostPreview, renderWasteForms, saveRestaurantSettings, saveSupplierRecord, sendOrderToKitchen, sendSupplierOrder, selectStaffShiftForEdit, selectSupplierForEdit, setProcedureStepProgress, setView, setWebsiteFulfillment, showOrderReceipt, showToast, startNewCustomerOrder, startShiftBreak, submitCustomerQrOrder, submitWebsiteOrder, tableById, togglePurchasedProduct, toggleQrCode, toggleSellableProduct, updateDeliveryStatus, updateIngredientPurchasePrice, updateProductionCostPreview, updateTicketStatus, uploadDeliveryProof, endShiftBreak } = handlers;
+    const { addCustomerCartItem, addDeliveryNote, addOrderDraftLine, addReservation, addReservationBlock, addSellableRecipeLine, adjustCustomerCartItem, advanceOrder, advanceTicket, addTicketIssueNote, applyScannedInventoryAction, approveSupplierOrder, applyInventoryAction, assignDeliveryOrderToDriver, assignQrCode, cancelOrder, cancelReservationEdit, cancelStaffShiftEdit, can, clearSupplierForm, clearOrderDraft, clockInShift, clockOutShift, createOrder, createProcedure, createPurchasedProduct, createSellableProduct, createStaffShift, createStaffUser, createTableQrCode, deleteReservationBlock, deleteReservationCapacityRule, findCustomerBySearchValue, getCustomerOrderingSession, getSelectedLineModifiers, getSelectedPaymentMethodFromAction, importExternalOrder, loadCustomerIntoManualOrder, logWaste, login, logout, markDeliveryCashCollected, markOrderPaid, markOrderServed, markSupplierOrderOrdered, markTicketDelayed, moveScheduleWeek, notifyStaffShift, openQrCustomerUrl, printOrderReceipt, promptAndRecordProcedureStatus, receiveSupplierOrder, recordProcedureCompletion, recordProduction, recordWaste, regenerateQrCode, removeCustomerCartItem, removeOrderDraftLine, removeSellableRecipeLine, render, renderInventoryActionForm, renderManualOrderControls, renderOrderBuilder, renderProcedureFormControls, renderProductionRecipeFields, renderProductsInSelects, renderReservationPlanner, renderSellableProductForm, renderSellableRecipeCostPreview, renderWasteForms, saveExternalPlatformRecord, saveExternalProductMapping, saveReservationCapacityRule, saveRestaurantSettings, saveSupplierRecord, scanCode, sendOrderToKitchen, sendSupplierOrder, selectStaffShiftForEdit, selectReservationForEdit, selectSupplierForEdit, setProcedureStepProgress, setView, setWebsiteFulfillment, showOrderReceipt, showToast, startNewCustomerOrder, startShiftBreak, submitCustomerQrOrder, submitWebsiteReservation, submitWebsiteOrder, tableById, pushExternalOrderStatus, pushMenuToExternalPlatform, toggleExternalProductMapping, togglePurchasedProduct, toggleQrCode, toggleSellableProduct, updateDeliveryStatus, updateIngredientPurchasePrice, updateReservationStatus, updateProductionCostPreview, updateTicketStatus, uploadDeliveryProof, endShiftBreak } = handlers;
     document.addEventListener("click", (event) => {
         const demoLogin = event.target.closest("[data-demo-login]");
         if (demoLogin) {
@@ -61,6 +61,15 @@ export function bindAppEvents(handlers) {
         const supplierReceived = event.target.closest("[data-supplier-received]");
         if (supplierReceived)
             receiveSupplierOrder(supplierReceived.dataset.supplierReceived);
+        const externalMenuPush = event.target.closest("[data-external-menu-push]");
+        if (externalMenuPush)
+            pushMenuToExternalPlatform(externalMenuPush.dataset.externalMenuPush);
+        const externalMappingToggle = event.target.closest("[data-toggle-external-mapping]");
+        if (externalMappingToggle)
+            toggleExternalProductMapping(externalMappingToggle.dataset.toggleExternalMapping);
+        const externalStatusPush = event.target.closest("[data-external-push-status]");
+        if (externalStatusPush)
+            pushExternalOrderStatus(externalStatusPush.dataset.externalPushStatus);
         const removeDraft = event.target.closest("[data-remove-draft-index]");
         if (removeDraft)
             removeOrderDraftLine(removeDraft.dataset.removeDraftIndex);
@@ -130,6 +139,9 @@ export function bindAppEvents(handlers) {
         const togglePurchased = event.target.closest("[data-toggle-purchased]");
         if (togglePurchased)
             togglePurchasedProduct(togglePurchased.dataset.togglePurchased);
+        const scanInventoryAction = event.target.closest("[data-scan-inventory-action]");
+        if (scanInventoryAction)
+            applyScannedInventoryAction(scanInventoryAction.dataset.scanInventoryAction);
         const updatePurchasePrice = event.target.closest("[data-update-purchase-price]");
         if (updatePurchasePrice) {
             const input = document.querySelector(`[data-purchase-price-input="${updatePurchasePrice.dataset.updatePurchasePrice}"]`);
@@ -156,6 +168,21 @@ export function bindAppEvents(handlers) {
         const toggleQr = event.target.closest("[data-toggle-qr]");
         if (toggleQr)
             toggleQrCode(toggleQr.dataset.toggleQr);
+        const reservationStatus = event.target.closest("[data-reservation-status][data-reservation-id]");
+        if (reservationStatus)
+            updateReservationStatus(reservationStatus.dataset.reservationId, reservationStatus.dataset.reservationStatus);
+        const editReservation = event.target.closest("[data-edit-reservation]");
+        if (editReservation)
+            selectReservationForEdit(editReservation.dataset.editReservation);
+        const cancelReservation = event.target.closest("[data-cancel-reservation-edit]");
+        if (cancelReservation)
+            cancelReservationEdit();
+        const deleteReservationBlockButton = event.target.closest("[data-delete-reservation-block]");
+        if (deleteReservationBlockButton)
+            deleteReservationBlock(deleteReservationBlockButton.dataset.deleteReservationBlock);
+        const deleteCapacityRuleButton = event.target.closest("[data-delete-capacity-rule]");
+        if (deleteCapacityRuleButton)
+            deleteReservationCapacityRule(deleteCapacityRuleButton.dataset.deleteCapacityRule);
         const customerAdd = event.target.closest("[data-customer-add]");
         if (customerAdd)
             addCustomerCartItem(customerAdd.dataset.customerAdd);
@@ -199,6 +226,11 @@ export function bindAppEvents(handlers) {
                 areaInput.value = table.zone;
             return;
         }
+        const externalPlatformControl = event.target.closest("#externalPlatformType, #externalOrderPlatform");
+        if (externalPlatformControl) {
+            render();
+            return;
+        }
         const sellableRecipeIngredient = event.target.closest("#sellableRecipeIngredient");
         if (sellableRecipeIngredient) {
             renderSellableProductForm();
@@ -219,6 +251,14 @@ export function bindAppEvents(handlers) {
         login(new FormData(event.currentTarget));
     });
     document.addEventListener("submit", (event) => {
+        const scanForm = event.target.closest("[data-scan-form]");
+        if (!scanForm)
+            return;
+        event.preventDefault();
+        if (scanCode(new FormData(scanForm)))
+            scanForm.reset();
+    });
+    document.addEventListener("submit", (event) => {
         const customerOrderForm = event.target.closest("#customerOrderForm");
         if (!customerOrderForm)
             return;
@@ -229,6 +269,13 @@ export function bindAppEvents(handlers) {
         else {
             submitCustomerQrOrder(new FormData(customerOrderForm));
         }
+    });
+    document.addEventListener("submit", (event) => {
+        const customerReservationForm = event.target.closest("#customerReservationForm");
+        if (!customerReservationForm)
+            return;
+        event.preventDefault();
+        submitWebsiteReservation(new FormData(customerReservationForm));
     });
     document.querySelector("#orderForm").addEventListener("submit", (event) => {
         event.preventDefault();
@@ -290,6 +337,18 @@ export function bindAppEvents(handlers) {
         event.preventDefault();
         saveSupplierRecord(new FormData(event.currentTarget));
     });
+    document.querySelector("#externalPlatformForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveExternalPlatformRecord(new FormData(event.currentTarget));
+    });
+    document.querySelector("#externalMappingForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveExternalProductMapping(new FormData(event.currentTarget));
+    });
+    document.querySelector("#externalOrderImportForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        importExternalOrder(new FormData(event.currentTarget));
+    });
     document.querySelectorAll("[data-waste-form]").forEach((form) => {
         form.addEventListener("submit", (event) => {
             event.preventDefault();
@@ -316,6 +375,14 @@ export function bindAppEvents(handlers) {
     });
     document.querySelector("#reservationForm").addEventListener("input", renderReservationPlanner);
     document.querySelector("#reservationForm").addEventListener("change", renderReservationPlanner);
+    document.querySelector("#reservationBlockForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        addReservationBlock(new FormData(event.currentTarget));
+    });
+    document.querySelector("#reservationCapacityForm")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveReservationCapacityRule(new FormData(event.currentTarget));
+    });
     document.querySelector("#staffUserForm").addEventListener("submit", (event) => {
         event.preventDefault();
         createStaffUser(new FormData(event.currentTarget));

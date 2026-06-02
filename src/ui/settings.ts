@@ -1,5 +1,7 @@
 import { state } from "../app/state.js";
 import { DATA_MODEL, LANGUAGE_OPTIONS, ROLE_ORDER } from "../shared/constants.js";
+import { getReservationDateLabel, reservationStatusClass } from "../domain/reservations.js";
+import { toDateInputString } from "../domain/scheduling.js";
 import { escapeHtml } from "../shared/html.js";
 import { qrCodeSvg } from "../shared/qr.js";
 
@@ -13,6 +15,7 @@ export function createSettingsUi(deps) {
     getReservationIssues,
     getReservationValidation,
     getReservationWindowLabel,
+    getWebsiteReservationUrl,
     tableById
   } = deps;
 
@@ -58,8 +61,13 @@ export function createSettingsUi(deps) {
       customers: state.customers.length,
       orders: state.orders.length,
       kitchen_tickets: state.tickets.length,
+      external_delivery_platforms: state.externalPlatforms.length,
+      external_product_mappings: state.externalProductMappings.length,
+      external_order_imports: state.externalOrderImports.length,
       table_qr_codes: state.tableQrCodes.length,
       reservations: state.reservations.length,
+      reservation_blocks: state.reservationBlocks.length,
+      reservation_capacity_rules: state.reservationCapacityRules.length,
       procedures: state.procedures.length,
       procedure_completions: state.procedureCompletions.length,
       recipes: state.products.reduce((sum, product) => sum + (product.recipe?.length || 0), 0)
@@ -162,19 +170,62 @@ export function createSettingsUi(deps) {
     const tableSelect = document.querySelector("#reservationTable");
     const availabilityPanel = document.querySelector("#reservationAvailability");
     const submitButton = document.querySelector("#bookReservationBtn");
+    const title = document.querySelector("#reservationFormTitle");
+    const cancelButton = document.querySelector("#cancelReservationEditBtn");
+    const publicReservationInput = document.querySelector("#publicReservationLinkInput");
+    const publicReservationLink = document.querySelector("#publicReservationLink");
     if (!form || !tableSelect || !availabilityPanel || !submitButton) return;
   
+    const today = toDateInputString();
+    const editingReservation = state.reservations.find((reservation) => reservation.id === state.reservationEditingId);
+    const editingChanged = editingReservation && form.elements.reservationId.value !== editingReservation.id;
+    if (editingReservation && editingChanged) {
+      form.elements.reservationId.value = editingReservation.id;
+      form.elements.date.value = editingReservation.date || today;
+      form.elements.name.value = editingReservation.name || "";
+      form.elements.guests.value = editingReservation.guests || 1;
+      form.elements.time.value = editingReservation.time || "19:00";
+      form.elements.phone.value = editingReservation.phone || "";
+      form.elements.email.value = editingReservation.email || "";
+      form.elements.source.value = editingReservation.source || "Website";
+      form.elements.status.value = editingReservation.status || "Pending";
+      form.elements.notes.value = editingReservation.notes || "";
+    } else if (!editingReservation && form.elements.reservationId.value) {
+      form.reset();
+      form.elements.reservationId.value = "";
+      form.elements.name.value = "Nour Family";
+      form.elements.guests.value = 4;
+      form.elements.time.value = "19:30";
+      form.elements.status.value = "Confirmed";
+      form.elements.source.value = "Website";
+    }
+
+    if (!form.elements.date.value) form.elements.date.value = today;
+    document.querySelectorAll("#reservationBlockForm input[name='date']").forEach((input: any) => {
+      if (!input.value) input.value = today;
+    });
+
+    if (title) title.textContent = editingReservation ? "Edit reservation" : "Add reservation";
+    if (cancelButton) cancelButton.hidden = !editingReservation;
+    const websiteReservationUrl = getWebsiteReservationUrl ? getWebsiteReservationUrl() : "?reservation=website";
+    if (publicReservationInput) publicReservationInput.value = websiteReservationUrl;
+    if (publicReservationLink) publicReservationLink.href = websiteReservationUrl;
+
     const guests = Math.max(1, Math.floor(Number(form.elements.guests.value) || 1));
     const time = form.elements.time.value || "";
+    const date = form.elements.date.value || today;
     const currentTable = tableById(tableSelect.value);
-    const preferredTable = currentTable || getAvailableReservationTable({ guests, time }) || state.tables[0];
+    const editingTable = tableById(editingReservation?.tableId);
+    const preferredTable = editingChanged
+      ? editingTable || getAvailableReservationTable({ id: editingReservation?.id, date, guests, time }) || state.tables[0]
+      : currentTable || editingTable || getAvailableReservationTable({ id: editingReservation?.id, date, guests, time }) || state.tables[0];
   
     tableSelect.innerHTML = state.tables
       .map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)} - ${table.capacity} seats - ${escapeHtml(table.zone)}</option>`)
       .join("");
     tableSelect.value = preferredTable?.id || "";
   
-    const validation = getReservationValidation({ guests, time, tableId: tableSelect.value });
+    const validation = getReservationValidation({ id: editingReservation?.id, date, guests, time, tableId: tableSelect.value });
     availabilityPanel.className = `availability-card ${validation.className}`.trim();
     availabilityPanel.innerHTML = `
       <header>
@@ -183,14 +234,73 @@ export function createSettingsUi(deps) {
       </header>
       <p>${escapeHtml(validation.detail)}</p>
     `;
-    submitButton.disabled = !can("canManageReservations") || !validation.ok;
+    const editable = can("canManageReservations");
+    form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+      if (element.id === "publicReservationLinkInput") return;
+      element.disabled = !editable;
+    });
+    submitButton.disabled = !editable || !validation.ok;
   }
   
+  function reservationActionsHtml(reservation, editable) {
+    const buttons = [];
+    if (reservation.status === "Pending") {
+      buttons.push(`<button class="mini-btn" type="button" data-reservation-id="${escapeHtml(reservation.id)}" data-reservation-status="Confirmed" ${!editable ? "disabled" : ""}>Approve</button>`);
+      buttons.push(`<button class="mini-btn danger-action" type="button" data-reservation-id="${escapeHtml(reservation.id)}" data-reservation-status="Declined" ${!editable ? "disabled" : ""}>Decline</button>`);
+    }
+    if (reservation.status === "Confirmed") {
+      buttons.push(`<button class="mini-btn" type="button" data-reservation-id="${escapeHtml(reservation.id)}" data-reservation-status="Arrived" ${!editable ? "disabled" : ""}>Arrived</button>`);
+      buttons.push(`<button class="mini-btn danger-action" type="button" data-reservation-id="${escapeHtml(reservation.id)}" data-reservation-status="No-show" ${!editable ? "disabled" : ""}>No-show</button>`);
+    }
+    if (reservation.status === "Declined" || reservation.status === "Cancelled" || reservation.status === "No-show") {
+      buttons.push(`<button class="mini-btn" type="button" data-reservation-id="${escapeHtml(reservation.id)}" data-reservation-status="Confirmed" ${!editable ? "disabled" : ""}>Reopen</button>`);
+    }
+    buttons.push(`<button class="mini-btn" type="button" data-edit-reservation="${escapeHtml(reservation.id)}" ${!editable ? "disabled" : ""}>Edit</button>`);
+    return `<div class="mini-actions">${buttons.join("")}</div>`;
+  }
+
+  function renderReservationOps(editable) {
+    const container = document.querySelector("#reservationOpsGrid");
+    if (!container) return;
+
+    const blockCards = state.reservationBlocks.map((block) => `
+      <article class="reservation-ops-card">
+        <header>
+          <div>
+            <strong>${escapeHtml(block.date ? getReservationDateLabel(block.date) : "Daily")} ${escapeHtml(block.startTime)}-${escapeHtml(block.endTime)}</strong>
+            <p>${escapeHtml(block.reason || "Unavailable")}</p>
+          </div>
+          <button class="mini-btn danger-action" type="button" data-delete-reservation-block="${escapeHtml(block.id)}" ${!editable ? "disabled" : ""}>Remove</button>
+        </header>
+      </article>
+    `);
+
+    const ruleCards = state.reservationCapacityRules.map((rule) => `
+      <article class="reservation-ops-card">
+        <header>
+          <div>
+            <strong>${escapeHtml(rule.date ? getReservationDateLabel(rule.date) : "Daily")} ${escapeHtml(rule.startTime)}-${escapeHtml(rule.endTime)}</strong>
+            <p>${rule.maxGuests ? `${rule.maxGuests} guests` : "No guest cap"} | ${rule.maxReservations ? `${rule.maxReservations} bookings` : "No booking cap"}${rule.note ? ` | ${escapeHtml(rule.note)}` : ""}</p>
+          </div>
+          <button class="mini-btn danger-action" type="button" data-delete-capacity-rule="${escapeHtml(rule.id)}" ${!editable ? "disabled" : ""}>Remove</button>
+        </header>
+      </article>
+    `);
+
+    container.innerHTML = [...blockCards, ...ruleCards].length
+      ? [...blockCards, ...ruleCards].join("")
+      : emptyState("No blocked times or capacity rules.");
+  }
+
   function renderReservations() {
+    const editable = can("canManageReservations");
+    const today = toDateInputString();
+    renderReservationOps(editable);
+
     const tableSummary = document.querySelector("#tableCapacityGrid");
     if (tableSummary) {
       tableSummary.innerHTML = state.tables.map((table) => {
-        const reservations = state.reservations.filter((reservation) => reservation.tableId === table.id);
+        const reservations = state.reservations.filter((reservation) => reservation.date === today && reservation.tableId === table.id && !["Declined", "Cancelled", "No-show"].includes(reservation.status));
         const nextReservation = reservations.slice().sort((a, b) => a.time.localeCompare(b.time))[0];
         return `
           <article class="table-capacity-card">
@@ -202,27 +312,34 @@ export function createSettingsUi(deps) {
       }).join("");
     }
   
-    document.querySelector("#reservationList").innerHTML = state.reservations
+    const reservationList = document.querySelector("#reservationList");
+    if (!reservationList) return;
+    const reservations = state.reservations
       .slice()
-      .sort((a, b) => a.time.localeCompare(b.time))
+      .sort((a, b) => (a.date || "").localeCompare(b.date || "") || a.time.localeCompare(b.time));
+    reservationList.innerHTML = reservations.length
+      ? reservations
       .map((reservation) => {
         const table = tableById(reservation.tableId);
         const issues = getReservationIssues(reservation);
-        const statusClass = issues.length ? "danger" : "ok";
+        const statusClass = issues.length ? "danger" : reservationStatusClass(reservation.status);
         const statusText = issues.length ? "Review" : reservation.status;
+        const contact = [reservation.phone, reservation.email].filter(Boolean).join(" | ") || "No contact";
         return `
           <article class="reservation-card ${issues.length ? "is-conflict" : ""}">
             <header>
               <div>
-                <strong>${escapeHtml(reservation.time)} ${escapeHtml(reservation.name)}</strong>
-                <p>${reservation.guests} guests | ${escapeHtml(table ? table.name : "Unassigned")} | ${escapeHtml(reservation.source)}</p>
+                <strong>${escapeHtml(getReservationDateLabel(reservation.date))} ${escapeHtml(reservation.time)} ${escapeHtml(reservation.name)}</strong>
+                <p>${reservation.guests} guests | ${escapeHtml(table ? table.name : "Unassigned")} | ${escapeHtml(reservation.source)} | ${escapeHtml(contact)}</p>
               </div>
               <span class="pill ${statusClass}">${escapeHtml(statusText)}</span>
             </header>
-            <p>${escapeHtml(issues.length ? issues.join(" | ") : `${getReservationWindowLabel(reservation.time)} hold, seats up to ${table?.capacity || 0}.`)}</p>
+            <p>${escapeHtml(issues.length ? issues.join(" | ") : `${getReservationWindowLabel(reservation.time)} hold, seats up to ${table?.capacity || 0}.${reservation.notes ? ` ${reservation.notes}` : ""}`)}</p>
+            ${reservationActionsHtml(reservation, editable)}
           </article>
         `;
-      }).join("");
+      }).join("")
+      : emptyState("No reservations yet.");
   }
   
   return {

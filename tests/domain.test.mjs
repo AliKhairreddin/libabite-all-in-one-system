@@ -11,6 +11,14 @@ import {
 import { getProductAvailability, getStockRequirementsForItems, getStockShortages, planStockDeduction } from "../dist/domain/inventory.js";
 import { advanceStatus, getOrderProgressSummary, setTicketStatus } from "../dist/domain/kitchen.js";
 import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderItems } from "../dist/domain/orders.js";
+import {
+  buildExternalMenuPayload,
+  calculateExternalCommission,
+  findExternalProductMapping,
+  mapInternalOrderStatusToExternalStatus,
+  matchExternalOrderItems,
+  parseExternalOrderLines
+} from "../dist/domain/external-delivery.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../dist/domain/payments.js";
 import {
   getProductionExecutionDraft,
@@ -21,7 +29,16 @@ import {
 import { getProductMarginProfile, productAvailabilityLabel } from "../dist/domain/products.js";
 import { procedureAssignedToUser, procedureFrequencyWindowMs, procedureStatusClass } from "../dist/domain/procedures.js";
 import { convertActualUsageToStockUnits, convertRecipeLineToStockUnits, getRecipeUsageLabel, recipeLineAppliesToOrder } from "../dist/domain/recipes.js";
-import { getAvailableReservationTable, getReservationConflicts, getReservationIssues, getReservationValidation } from "../dist/domain/reservations.js";
+import { normalizeScanCode, resolveScanCode } from "../dist/domain/scanning.js";
+import {
+  getAvailableReservationTable,
+  getReservationBlockConflicts,
+  getReservationCapacityIssue,
+  getReservationConflicts,
+  getReservationIssues,
+  getReservationRequestValidation,
+  getReservationValidation
+} from "../dist/domain/reservations.js";
 import { formatShiftHours, getShiftMetrics, getWeekDates, getWeekStartDate } from "../dist/domain/scheduling.js";
 import {
   buildSupplierOrderDrafts,
@@ -109,6 +126,75 @@ test("order totals ignore missing products and multiply quantities", () => {
   assert.equal(countOrderItems(normalized), 3);
 });
 
+test("external delivery helpers parse, map, and prepare platform payloads", () => {
+  const products = new Map([
+    ["kefta-sandwich", { id: "kefta-sandwich", name: "Kefta Sandwich", code: "SW-KEFTA", station: "Grill station", price: 9.5, active: true }],
+    ["burger", { id: "burger", name: "Burger", code: "BG-001", station: "Burger station", price: 12.5, active: true }]
+  ]);
+  const productById = (id) => products.get(id);
+  const mappings = [
+    { id: "map-1", platformId: "uber-eats", externalName: "Sandwich Kefta", externalCode: "99301", productId: "kefta-sandwich", active: true },
+    { id: "map-2", platformId: "uber-eats", externalName: "Burger Libabite", externalCode: "99302", productId: "burger", active: true }
+  ];
+
+  assert.equal(findExternalProductMapping({ platformId: "Uber Eats", externalCode: "99301" }, mappings).productId, "kefta-sandwich");
+  assert.deepEqual(parseExternalOrderLines("code,qty\n99301,2,No onion\nBurger Libabite x1"), [
+    { externalCode: "99301", externalName: "99301", quantity: 2, note: "No onion" },
+    { externalCode: "Burger Libabite", externalName: "Burger Libabite", quantity: 1, note: "" }
+  ]);
+
+  const result = matchExternalOrderItems(parseExternalOrderLines("99301,2\nmissing,1"), {
+    platformId: "uber-eats",
+    mappings,
+    productById
+  });
+  assert.equal(result.matched[0].productId, "kefta-sandwich");
+  assert.equal(result.unmatched[0].reason, "No mapping");
+
+  const payload = buildExternalMenuPayload({ id: "uber-eats", name: "Uber Eats", commissionRate: 30 }, mappings, productById, { generatedAt: "2026-06-01T10:00:00.000Z" });
+  assert.deepEqual(payload.items.map((item) => [item.externalCode, item.internalProductName, item.kitchenStation]), [
+    ["99301", "Kefta Sandwich", "Grill station"],
+    ["99302", "Burger", "Burger station"]
+  ]);
+  assert.equal(calculateExternalCommission(19, 30), 5.7);
+  assert.equal(mapInternalOrderStatusToExternalStatus({ status: "Ready" }), "ready");
+});
+
+test("scan helpers resolve product barcodes, URL QR codes, and table tokens", () => {
+  const context = {
+    ingredients: [
+      { id: "kefta", name: "Kefta", barcode: "KEFTA-001" }
+    ],
+    products: [
+      { id: "kefta-plate", name: "Kefta Plate", code: "KP-001" }
+    ],
+    tables: [
+      { id: "table-1", name: "Table 1" }
+    ],
+    tableQrCodes: [
+      { id: "qr-table-1", tableId: "table-1", token: "libabite-table-1" }
+    ],
+    users: [],
+    locations: ["Fridge"]
+  };
+
+  assert.equal(normalizeScanCode("https://demo.local/?qr=libabite-table-1"), "libabite-table-1");
+  assert.deepEqual(
+    resolveScanCode("KEFTA-001", context),
+    {
+      ok: true,
+      code: "KEFTA-001",
+      scanType: "product_barcode",
+      targetKind: "ingredient",
+      targetId: "kefta",
+      label: "Kefta",
+      message: "Kefta inventory opened."
+    }
+  );
+  assert.equal(resolveScanCode("recipe:KP-001", context).targetId, "kefta-plate");
+  assert.equal(resolveScanCode("https://demo.local/?qr=libabite-table-1", context).targetId, "table-1");
+});
+
 test("customer helpers find history, favorites, and upsert records", () => {
   const customers = [
     { id: "cust-1", name: "Nour", phone: "+33 6 12 34 56", addresses: ["1 Rue A"], notes: "" }
@@ -173,28 +259,68 @@ test("kitchen order progress summary reflects ticket readiness", () => {
 
 test("reservation conflicts respect table, status, and turnover window", () => {
   const reservations = [
-    { id: "r1", tableId: "table-1", time: "19:00", status: "Confirmed", name: "Nour" },
-    { id: "r2", tableId: "table-2", time: "19:30", status: "Confirmed", name: "Dijk" },
-    { id: "r3", tableId: "table-1", time: "19:45", status: "Cancelled", name: "Cancelled" }
+    { id: "r1", date: "2026-06-01", tableId: "table-1", time: "19:00", status: "Confirmed", name: "Nour" },
+    { id: "r2", date: "2026-06-01", tableId: "table-2", time: "19:30", status: "Confirmed", name: "Dijk" },
+    { id: "r3", date: "2026-06-01", tableId: "table-1", time: "19:45", status: "Cancelled", name: "Cancelled" },
+    { id: "r4", date: "2026-06-02", tableId: "table-1", time: "19:30", status: "Confirmed", name: "Tomorrow" }
   ];
 
   assert.deepEqual(
-    getReservationConflicts({ id: "new", tableId: "table-1", time: "19:30" }, reservations).map((item) => item.id),
+    getReservationConflicts({ id: "new", date: "2026-06-01", tableId: "table-1", time: "19:30" }, reservations).map((item) => item.id),
     ["r1"]
   );
-  assert.equal(getReservationConflicts({ id: "new", tableId: "table-1", time: "20:30" }, reservations).length, 0);
+  assert.equal(getReservationConflicts({ id: "new", date: "2026-06-01", tableId: "table-1", time: "20:30" }, reservations).length, 0);
 
   const tables = [
     { id: "table-1", name: "Table 1", capacity: 4 },
     { id: "table-2", name: "Table 2", capacity: 2 },
     { id: "table-3", name: "Table 3", capacity: 6 }
   ];
-  assert.equal(getAvailableReservationTable({ guests: 4, time: "19:30" }, tables, reservations).id, "table-3");
-  assert.deepEqual(getReservationIssues({ id: "new", tableId: "table-1", guests: 5, time: "19:30", status: "Confirmed" }, tables, reservations), [
+  assert.equal(getAvailableReservationTable({ date: "2026-06-01", guests: 4, time: "19:30" }, tables, reservations).id, "table-3");
+  assert.deepEqual(getReservationIssues({ id: "new", date: "2026-06-01", tableId: "table-1", guests: 5, time: "19:30", status: "Confirmed" }, tables, reservations), [
     "Over capacity by 1",
     "Overlaps 19:00 Nour"
   ]);
-  assert.equal(getReservationValidation({ tableId: "table-3", guests: 4, time: "19:30" }, tables, reservations).ok, true);
+  assert.equal(getReservationValidation({ date: "2026-06-01", tableId: "table-3", guests: 4, time: "19:30" }, tables, reservations).ok, true);
+});
+
+test("reservation requests honor blocked windows and capacity rules", () => {
+  const tables = [
+    { id: "table-1", name: "Table 1", capacity: 4 },
+    { id: "table-2", name: "Table 2", capacity: 6 }
+  ];
+  const reservations = [
+    { id: "r1", date: "2026-06-01", tableId: "table-1", guests: 4, time: "18:30", status: "Confirmed", name: "Nour" }
+  ];
+  const blocks = [
+    { id: "b1", date: "2026-06-01", startTime: "19:00", endTime: "20:00", reason: "Private event", active: true }
+  ];
+  const rules = [
+    { id: "c1", date: "", startTime: "18:00", endTime: "21:00", maxGuests: 6, maxReservations: 3, active: true }
+  ];
+
+  assert.equal(getReservationBlockConflicts({ date: "2026-06-01", time: "19:15" }, blocks).length, 1);
+  assert.equal(getReservationRequestValidation({
+    date: "2026-06-01",
+    time: "19:15",
+    guests: 2,
+    name: "Sofia",
+    phone: "+31 6"
+  }, tables, reservations, blocks, rules).ok, false);
+  assert.equal(getReservationCapacityIssue({
+    date: "2026-06-01",
+    time: "18:45",
+    guests: 3,
+    name: "Sofia",
+    phone: "+31 6"
+  }, reservations, rules).title, "Capacity limit");
+  assert.equal(getReservationRequestValidation({
+    date: "2026-06-02",
+    time: "18:45",
+    guests: 3,
+    name: "Sofia",
+    phone: "+31 6"
+  }, tables, reservations, blocks, rules).ok, true);
 });
 
 test("staff shift metrics compare planned time with actual punches", () => {

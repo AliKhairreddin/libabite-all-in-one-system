@@ -94,6 +94,7 @@ export function createAppRenderer(deps) {
     procedurePeriodStatus,
     renderCustomerQrScreen,
     renderDashboard,
+    renderExternalDeliveryIntegrations,
     renderInventory,
     renderKitchen,
     renderMetrics,
@@ -108,6 +109,7 @@ export function createAppRenderer(deps) {
     renderTeam,
     renderWasteTracking,
     renderWebsiteOrderScreen,
+    renderWebsiteReservationScreen,
     roleDefinition,
     visibleViews
   } = deps;
@@ -173,6 +175,10 @@ export function createAppRenderer(deps) {
       renderWebsiteOrderScreen();
       return;
     }
+    if (customerSession?.mode === "reservation") {
+      renderWebsiteReservationScreen();
+      return;
+    }
     if (!currentUser()) return;
     ensureActiveViewAccess();
     renderNav();
@@ -188,6 +194,7 @@ export function createAppRenderer(deps) {
     renderProcedures();
     renderTeam();
     renderSettings();
+    renderExternalDeliveryIntegrations();
     renderReservationPlanner();
     renderReservations();
     updateView();

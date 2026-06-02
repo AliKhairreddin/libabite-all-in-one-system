@@ -35,6 +35,7 @@
         </form>
         <div class="demo-logins" id="demoLogins" aria-label="Demo accounts"></div>
         <a class="primary-btn public-order-link" href="?order=website">Order Online</a>
+        <a class="ghost-btn public-order-link" href="?reservation=website">Reserve Table</a>
       </div>
     </section>
 
@@ -57,6 +58,11 @@
             <h1 id="viewTitle">Live Command Center</h1>
           </div>
           <div class="topbar-actions">
+            <form class="topbar-scan-form" data-scan-form>
+              <label class="sr-only" for="topbarScanCode">Scan code</label>
+              <input id="topbarScanCode" name="code" type="text" placeholder="Scan code" autocomplete="off">
+              <button class="ghost-btn" type="submit">Scan</button>
+            </form>
             <button class="icon-btn" id="resetDemoBtn" type="button" title="Reset demo data" aria-label="Reset demo data">R</button>
             <button class="primary-btn" id="quickOrderBtn" type="button">
               <span aria-hidden="true">+</span>
@@ -75,6 +81,97 @@
         <section class="view is-active" id="view-dashboard" data-title="Live Command Center">
           <div class="metric-grid" id="metricGrid"></div>
           <div class="dashboard-grid">
+            <section class="panel wide-panel management-overview-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Owner snapshot</p>
+                  <h2>Restaurant situation now</h2>
+                </div>
+                <button class="ghost-btn" type="button" data-view-link="orders">Open Orders</button>
+              </div>
+              <div class="management-card-grid" id="dashboardSituationGrid"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Sales mix</p>
+                  <h2>Orders by type</h2>
+                </div>
+              </div>
+              <div class="dashboard-data-list" id="dashboardOrderTypeMix"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Menu</p>
+                  <h2>Best-selling products</h2>
+                </div>
+              </div>
+              <div class="dashboard-data-list" id="dashboardBestSellers"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Profit</p>
+                  <h2>Product margins</h2>
+                </div>
+              </div>
+              <div class="dashboard-data-list" id="dashboardProductMargins"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Stock and waste</p>
+                  <h2>Inventory risk</h2>
+                </div>
+              </div>
+              <div class="dashboard-stack" id="dashboardInventoryRisk"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Labor and delivery</p>
+                  <h2>People on duty</h2>
+                </div>
+              </div>
+              <div class="dashboard-stack" id="dashboardTeamOps"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Service risk</p>
+                  <h2>Late orders and kitchen delays</h2>
+                </div>
+              </div>
+              <div class="dashboard-stack" id="dashboardKitchenRisk"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Purchasing</p>
+                  <h2>Supplier orders</h2>
+                </div>
+              </div>
+              <div class="dashboard-data-list" id="dashboardSupplierOrders"></div>
+            </section>
+
+            <section class="panel management-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Bookings</p>
+                  <h2>Reservations today</h2>
+                </div>
+              </div>
+              <div class="dashboard-data-list" id="dashboardReservationsToday"></div>
+            </section>
+
             <section class="panel wide-panel">
               <div class="panel-header">
                 <div>
@@ -163,6 +260,16 @@
                 <div data-waste-preview></div>
                 <button class="primary-btn" type="submit">Record Waste</button>
               </form>
+            </section>
+
+            <section class="panel wide-panel reports-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Reports</p>
+                  <h2>Management reports</h2>
+                </div>
+              </div>
+              <div class="management-report-grid" id="managementReports"></div>
             </section>
           </div>
         </section>
@@ -332,6 +439,26 @@
 
         <section class="view" id="view-inventory" data-title="Products & Inventory">
           <div class="inventory-layout">
+            <section class="panel form-panel staff-scan-panel wide-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Staff scanner</p>
+                  <h2>Scan and act</h2>
+                </div>
+              </div>
+              <div class="staff-scan-grid">
+                <form class="stacked-form staff-scan-form" data-scan-form>
+                  <label>
+                    Barcode or QR code
+                    <input name="code" type="text" placeholder="KEFTA-001" autocomplete="off" inputmode="text">
+                  </label>
+                  <button class="primary-btn" type="submit">Scan</button>
+                  <div class="scan-type-list" id="scanTypeList" aria-label="Supported scan types"></div>
+                </form>
+                <div id="staffScanResult" aria-live="polite"></div>
+              </div>
+            </section>
+
             <section class="panel wide-panel supplier-management-panel">
               <div class="panel-header compact">
                 <div>
@@ -1154,6 +1281,135 @@ Switch off signs and lock the restaurant.</textarea>
               <div class="schema-grid" id="schemaGrid"></div>
             </section>
 
+            <section class="panel wide-panel external-delivery-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Phase 18</p>
+                  <h2>External delivery apps</h2>
+                </div>
+              </div>
+              <div class="supplier-management-grid external-delivery-grid">
+                <form id="externalPlatformForm" class="stacked-form supplier-form">
+                  <div class="form-row">
+                    <label>
+                      Platform
+                      <select name="platformId" id="externalPlatformType"></select>
+                    </label>
+                    <label>
+                      API status
+                      <select name="status" id="externalPlatformStatus"></select>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Default import
+                      <select name="integrationMethod" id="externalPlatformMethod"></select>
+                    </label>
+                    <label>
+                      Commission %
+                      <input name="commissionRate" type="number" min="0" max="100" step="0.01" value="0">
+                    </label>
+                  </div>
+                  <label>
+                    API details
+                    <textarea name="apiDetails" rows="3" placeholder="Endpoint, token note, or fallback routing"></textarea>
+                  </label>
+                  <button class="primary-btn" type="submit">Save Platform</button>
+                </form>
+
+                <form id="externalMappingForm" class="stacked-form supplier-form">
+                  <input name="mappingId" type="hidden">
+                  <div class="form-row">
+                    <label>
+                      Platform
+                      <select name="platformId" id="externalMappingPlatform"></select>
+                    </label>
+                    <label>
+                      Internal product
+                      <select name="productId" id="externalMappingProduct"></select>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      External name
+                      <input name="externalName" type="text" value="Sandwich Kefta" autocomplete="off">
+                    </label>
+                    <label>
+                      Platform code
+                      <input name="externalCode" type="text" value="99301" autocomplete="off">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Commission override %
+                      <input name="commissionRate" type="number" min="0" max="100" step="0.01" placeholder="Platform default">
+                    </label>
+                    <label class="check-row standalone-check">
+                      <input name="active" type="checkbox" value="on" checked>
+                      <span>Mapping active</span>
+                    </label>
+                  </div>
+                  <button class="primary-btn" type="submit">Save Mapping</button>
+                </form>
+
+                <form id="externalOrderImportForm" class="stacked-form supplier-form">
+                  <div class="form-row">
+                    <label>
+                      Platform
+                      <select name="platformId" id="externalOrderPlatform"></select>
+                    </label>
+                    <label>
+                      Import mode
+                      <select name="importMethod" id="externalOrderImportMethod"></select>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      External order ID
+                      <input name="externalOrderId" type="text" value="UE-1001" autocomplete="off">
+                    </label>
+                    <label>
+                      Requested time
+                      <input name="requestedTime" type="time">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Customer name
+                      <input name="customerName" type="text" autocomplete="name">
+                    </label>
+                    <label>
+                      Phone
+                      <input name="customerPhone" type="tel" autocomplete="tel">
+                    </label>
+                  </div>
+                  <label>
+                    Address
+                    <textarea name="deliveryAddress" rows="2" autocomplete="street-address"></textarea>
+                  </label>
+                  <label>
+                    Order lines
+                    <textarea name="rawOrder" rows="4" spellcheck="false">99301,1</textarea>
+                  </label>
+                  <div class="form-row">
+                    <label>
+                      Commission %
+                      <input name="commissionRate" type="number" min="0" max="100" step="0.01">
+                    </label>
+                    <label>
+                      Notes
+                      <input name="notes" type="text" autocomplete="off">
+                    </label>
+                  </div>
+                  <button class="primary-btn" type="submit">Import Order</button>
+                </form>
+
+                <div class="supplier-list" id="externalPlatformList"></div>
+                <div class="supplier-list" id="externalMappingList"></div>
+                <div class="supplier-list" id="externalImportList"></div>
+              </div>
+            </section>
+
             <section class="panel wide-panel">
               <div class="panel-header compact">
                 <div>
@@ -1184,14 +1440,20 @@ Switch off signs and lock the restaurant.</textarea>
             <section class="panel form-panel">
               <div class="panel-header compact">
                 <div>
-                  <p class="eyebrow">Own booking flow</p>
-                  <h2>Add reservation</h2>
+                  <p class="eyebrow">Booking desk</p>
+                  <h2 id="reservationFormTitle">Add reservation</h2>
                 </div>
+                <button class="mini-btn" type="button" data-cancel-reservation-edit hidden id="cancelReservationEditBtn">Cancel</button>
               </div>
               <form id="reservationForm" class="stacked-form">
+                <input name="reservationId" type="hidden" value="">
+                <label>
+                  Date
+                  <input name="date" type="date" required>
+                </label>
                 <label>
                   Name
-                  <input name="name" type="text" value="Nour Family" autocomplete="off">
+                  <input name="name" type="text" value="Nour Family" autocomplete="off" required>
                 </label>
                 <div class="form-row">
                   <label>
@@ -1205,6 +1467,16 @@ Switch off signs and lock the restaurant.</textarea>
                 </div>
                 <div class="form-row">
                   <label>
+                    Phone
+                    <input name="phone" type="tel" autocomplete="tel">
+                  </label>
+                  <label>
+                    Email
+                    <input name="email" type="email" autocomplete="email">
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
                     Table
                     <select name="tableId" id="reservationTable" required></select>
                   </label>
@@ -1212,24 +1484,117 @@ Switch off signs and lock the restaurant.</textarea>
                     Source
                     <select name="source">
                       <option value="Website">Website</option>
-                      <option value="Google">Google link</option>
+                      <option value="Google link">Google link</option>
+                      <option value="Facebook/Instagram">Facebook/Instagram</option>
                       <option value="Phone">Phone</option>
-                      <option value="Instagram">Instagram</option>
+                      <option value="Staff entry">Staff entry</option>
+                      <option value="Walk-in">Walk-in</option>
                     </select>
                   </label>
                 </div>
+                <label>
+                  Status
+                  <select name="status">
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Arrived">Arrived</option>
+                    <option value="No-show">No-show</option>
+                    <option value="Declined">Declined</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <label>
+                  Notes
+                  <textarea name="notes" rows="3" placeholder="Occasion, high chair, accessibility, allergies"></textarea>
+                </label>
+                <div class="reservation-link-card">
+                  <label>
+                    Website reservation link
+                    <input id="publicReservationLinkInput" type="url" readonly>
+                  </label>
+                  <a class="ghost-btn" id="publicReservationLink" href="?reservation=website" target="_blank" rel="noopener">Open</a>
+                </div>
                 <div class="availability-card" id="reservationAvailability" aria-live="polite"></div>
-                <button class="primary-btn" id="bookReservationBtn" type="submit">Book Table</button>
+                <button class="primary-btn" id="bookReservationBtn" type="submit">Save Reservation</button>
               </form>
+
+              <div class="reservation-admin-tools">
+                <form id="reservationBlockForm" class="stacked-form compact-form">
+                  <div class="panel-header compact">
+                    <div>
+                      <p class="eyebrow">Unavailable</p>
+                      <h2>Block time</h2>
+                    </div>
+                  </div>
+                  <label>
+                    Date
+                    <input name="date" type="date" required>
+                  </label>
+                  <div class="form-row">
+                    <label>
+                      Start
+                      <input name="startTime" type="time" value="16:00" required>
+                    </label>
+                    <label>
+                      End
+                      <input name="endTime" type="time" value="17:00" required>
+                    </label>
+                  </div>
+                  <label>
+                    Reason
+                    <input name="reason" type="text" value="Private event" autocomplete="off">
+                  </label>
+                  <button class="ghost-btn" type="submit">Block Time</button>
+                </form>
+
+                <form id="reservationCapacityForm" class="stacked-form compact-form">
+                  <div class="panel-header compact">
+                    <div>
+                      <p class="eyebrow">Capacity</p>
+                      <h2>Set rule</h2>
+                    </div>
+                  </div>
+                  <label>
+                    Date
+                    <input name="date" type="date">
+                  </label>
+                  <div class="form-row">
+                    <label>
+                      Start
+                      <input name="startTime" type="time" value="18:00" required>
+                    </label>
+                    <label>
+                      End
+                      <input name="endTime" type="time" value="21:00" required>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Max guests
+                      <input name="maxGuests" type="number" min="0" value="22">
+                    </label>
+                    <label>
+                      Max bookings
+                      <input name="maxReservations" type="number" min="0" value="8">
+                    </label>
+                  </div>
+                  <label>
+                    Note
+                    <input name="note" type="text" value="Dinner rush cap" autocomplete="off">
+                  </label>
+                  <button class="ghost-btn" type="submit">Save Rule</button>
+                </form>
+              </div>
             </section>
 
             <section class="panel">
               <div class="panel-header compact">
                 <div>
                   <p class="eyebrow">Floor planning</p>
-                  <h2>Tonight</h2>
+                  <h2>Reservations</h2>
                 </div>
               </div>
+              <div class="reservation-ops-grid" id="reservationOpsGrid"></div>
               <div class="table-capacity-grid" id="tableCapacityGrid"></div>
               <div class="reservation-list" id="reservationList"></div>
             </section>

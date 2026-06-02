@@ -1,4 +1,4 @@
-import { createAppRuntime } from "../core.js";
+import { createAppRuntime } from "./runtime.js";
 import { bindAppEvents } from "./events.js";
 export function initApp() {
     const runtime = createAppRuntime();

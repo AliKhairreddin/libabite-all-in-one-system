@@ -8,6 +8,7 @@ function seedShiftTimestamp(date, time) {
 export const seedState = {
     currentUserId: "",
     activeView: "dashboard",
+    activeScan: null,
     activeStation: "All",
     orderFilter: "All",
     scheduleWeekStart: seedWeekStart,
@@ -76,7 +77,9 @@ export const seedState = {
     customerLastOrderId: "",
     websiteCart: [],
     websiteLastOrderId: "",
+    websiteLastReservationId: "",
     websiteFulfillment: WEBSITE_DEFAULT_FULFILLMENT,
+    reservationEditingId: "",
     supplierFormSupplierId: "",
     customers: [
         {
@@ -194,6 +197,71 @@ export const seedState = {
         }
     ],
     supplierOrders: [],
+    externalPlatforms: [
+        {
+            id: "uber-eats",
+            name: "Uber Eats",
+            status: "Approval pending",
+            integrationMethod: "api",
+            commissionRate: 30,
+            apiDetails: "API approval pending. Use manual, email parser, CSV, or staff-entered imports until credentials are approved.",
+            lastMenuPushedAt: "",
+            lastMenuPayload: null
+        },
+        {
+            id: "thuisbezorgd",
+            name: "Thuisbezorgd",
+            status: "Approval pending",
+            integrationMethod: "api",
+            commissionRate: 13,
+            apiDetails: "API approval pending. CSV and email imports are available as fallback modes.",
+            lastMenuPushedAt: "",
+            lastMenuPayload: null
+        },
+        {
+            id: "local-delivery",
+            name: "Other local delivery platform",
+            status: "Draft",
+            integrationMethod: "manual",
+            commissionRate: 0,
+            apiDetails: "Use this profile for local couriers or temporary marketplace ordering.",
+            lastMenuPushedAt: "",
+            lastMenuPayload: null
+        }
+    ],
+    externalProductMappings: [
+        {
+            id: "MAP-UBER-99301",
+            platformId: "uber-eats",
+            externalName: "Sandwich Kefta",
+            externalCode: "99301",
+            productId: "kefta-sandwich",
+            commissionRate: "",
+            active: true,
+            lastPushedAt: ""
+        },
+        {
+            id: "MAP-THUIS-KEFTA-SANDWICH",
+            platformId: "thuisbezorgd",
+            externalName: "Sandwich Kefta",
+            externalCode: "TB-KEFTA-SAND",
+            productId: "kefta-sandwich",
+            commissionRate: "",
+            active: true,
+            lastPushedAt: ""
+        },
+        {
+            id: "MAP-LOCAL-KEFTA-SANDWICH",
+            platformId: "local-delivery",
+            externalName: "Sandwich Kefta",
+            externalCode: "LOCAL-KEFTA",
+            productId: "kefta-sandwich",
+            commissionRate: "",
+            active: true,
+            lastPushedAt: ""
+        }
+    ],
+    externalOrderImports: [],
     customInventoryLocations: [],
     inventoryHistory: [
         {
@@ -265,6 +333,30 @@ export const seedState = {
                 { ingredientId: "minced-beef", grams: 8500, wastePercent: 0, station: "Main kitchen", notes: "Combine chilled beef in the mixer." },
                 { ingredientId: "onion-herb-mix", grams: 1200, wastePercent: 0, station: "Main kitchen", notes: "Fold in onion and parsley mix." },
                 { ingredientId: "kefta-spice-blend", grams: 300, wastePercent: 0, station: "Main kitchen", notes: "Add spice blend and mix until even." }
+            ]
+        },
+        {
+            id: "kefta-sandwich",
+            name: "Kefta Sandwich",
+            code: "SW-KEFTA",
+            category: "Sandwiches",
+            station: "Grill station",
+            price: 9.5,
+            vatSetting: "standard",
+            active: true,
+            availability: {
+                dineIn: true,
+                qrOrdering: true,
+                takeaway: true,
+                delivery: true,
+                websiteOrdering: true,
+                externalDeliveryApps: true
+            },
+            targetMargin: 67,
+            minMargin: 55,
+            recipe: [
+                { ingredientId: "kefta", grams: 140, wastePercent: 0, station: "Grill station", notes: "Kefta Sandwich recipe: grill kefta for sandwich." },
+                { ingredientId: "packaging-box", units: 1, wastePercent: 0, station: "Packaging station", notes: "External delivery packaging.", appliesTo: "takeawayDelivery" }
             ]
         },
         {
@@ -399,7 +491,7 @@ export const seedState = {
             supplier: "Halal Butcher Limburg",
             active: true,
             expiryDate: "",
-            barcode: ""
+            barcode: "KEFTA-001"
         },
         {
             id: "minced-beef",
@@ -842,8 +934,15 @@ export const seedState = {
         { id: "omar", name: "Omar", status: "Available", eta: "-", orderId: null, location: "Restaurant" }
     ],
     reservations: [
-        { id: "RES-1", name: "Van Dijk", guests: 5, time: "18:45", tableId: "table-5", source: "Google link", status: "Confirmed" },
-        { id: "RES-2", name: "Nour Family", guests: 4, time: "19:30", tableId: "table-3", source: "Phone", status: "Confirmed" }
+        { id: "RES-1", date: seedToday, name: "Van Dijk", guests: 5, time: "18:45", tableId: "table-5", phone: "+31 6 8765 1102", email: "", notes: "Window if possible.", source: "Google link", status: "Confirmed", createdAt: "10:30", updatedAt: "" },
+        { id: "RES-2", date: seedToday, name: "Nour Family", guests: 4, time: "19:30", tableId: "table-3", phone: "+31 6 1234 8801", email: "", notes: "Children prefer mild spice.", source: "Phone", status: "Confirmed", createdAt: "11:10", updatedAt: "" },
+        { id: "RES-3", date: seedToday, name: "Sofia Bakri", guests: 2, time: "20:00", tableId: "table-1", phone: "+31 6 4411 2200", email: "sofia@example.com", notes: "Website request awaiting approval.", source: "Website", status: "Pending", createdAt: "12:05", updatedAt: "" }
+    ],
+    reservationBlocks: [
+        { id: "RB-1", date: seedToday, startTime: "16:00", endTime: "17:00", reason: "Private prep window", active: true }
+    ],
+    reservationCapacityRules: [
+        { id: "RC-1", date: "", startTime: "18:00", endTime: "21:00", maxGuests: 22, maxReservations: 8, note: "Dinner rush cap", active: true }
     ],
     productionLog: [
         { id: "LOG-1", text: "Kefta Plate recipe ready: 200g Kefta per plate from Fridge stock.", time: "09:35" }

@@ -17,6 +17,7 @@ import {
 } from "../shared/constants.js";
 import { formatDateTime } from "../shared/dates.js";
 import { escapeHtml } from "../shared/html.js";
+import { SCAN_TYPES, scanTypeLabel } from "../domain/scanning.js";
 
 export function createInventoryUi(deps) {
   const document: any = window.document;
@@ -380,6 +381,101 @@ export function createInventoryUi(deps) {
       ? rows.map((row) => `${formatStockAmount(row.quantity, ingredient.unit)} ${row.location}`).join(", ")
       : "No stock recorded";
   }
+
+  function renderScanTypePills() {
+    const container = document.querySelector("#scanTypeList");
+    if (!container) return;
+    container.innerHTML = SCAN_TYPES
+      .map((type) => `<span class="scan-type-pill">${escapeHtml(type.label)}</span>`)
+      .join("");
+  }
+
+  function activeScanResultHtml() {
+    const scan = state.activeScan;
+    if (!scan) return emptyState("No scan yet.");
+
+    if (scan.status === "error") {
+      return `
+        <article class="scan-result-card is-error">
+          <header>
+            <div>
+              <strong>Scan not matched</strong>
+              <p>${escapeHtml(scan.code || "No code")}</p>
+            </div>
+            <span class="pill danger">Unknown</span>
+          </header>
+          <p>${escapeHtml(scan.message || "No matching record found.")}</p>
+        </article>
+      `;
+    }
+
+    if (scan.targetKind === "ingredient") {
+      const ingredient = ingredientById(scan.targetId);
+      if (!ingredient) return emptyState("Scanned product is no longer available.");
+      const status = getIngredientStatus(ingredient);
+      const statusClass = status === "danger" ? "danger" : status === "over" || status === "warning" ? "warning" : "ok";
+      const statusLabel = status === "danger" ? "Low stock" : status === "over" ? "Over stock" : status === "warning" ? "Watch" : "OK";
+      return `
+        <article class="scan-result-card">
+          <header>
+            <div>
+              <strong>${escapeHtml(ingredient.name)}</strong>
+              <p>${escapeHtml(scanTypeLabel(scan.scanType))} | ${escapeHtml(scan.code || ingredient.barcode || ingredient.id)}</p>
+            </div>
+            <span class="pill ${statusClass}">${escapeHtml(statusLabel)}</span>
+          </header>
+          <div class="scan-result-grid">
+            <span>Stock</span><strong>${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))}</strong>
+            <span>Location</span><strong>${escapeHtml(getLocationSummaryText(ingredient))}</strong>
+            <span>Supplier</span><strong>${escapeHtml(supplierForIngredient(ingredient)?.name || ingredient.supplier)}</strong>
+            <span>Last scan</span><strong>${escapeHtml(scan.scannedAt || "-")}</strong>
+          </div>
+          <div class="mini-actions scan-result-actions">
+            <button class="mini-btn" type="button" data-scan-inventory-action="add">Add stock</button>
+            <button class="mini-btn" type="button" data-scan-inventory-action="remove">Remove stock</button>
+            <button class="mini-btn" type="button" data-scan-inventory-action="transfer">Transfer</button>
+            <button class="mini-btn danger-action" type="button" data-scan-inventory-action="waste">Waste</button>
+          </div>
+        </article>
+      `;
+    }
+
+    if (scan.targetKind === "product") {
+      const product = productById(scan.targetId);
+      if (!product) return emptyState("Scanned recipe is no longer available.");
+      return `
+        <article class="scan-result-card">
+          <header>
+            <div>
+              <strong>${escapeHtml(product.name)}</strong>
+              <p>${escapeHtml(scanTypeLabel(scan.scanType))} | ${escapeHtml(product.code || product.id)}</p>
+            </div>
+            <span class="pill info">Recipe</span>
+          </header>
+          <p>${escapeHtml(scan.message || "Recipe opened.")}</p>
+        </article>
+      `;
+    }
+
+    return `
+      <article class="scan-result-card">
+        <header>
+          <div>
+            <strong>${escapeHtml(scan.label || scan.code || "Scan")}</strong>
+            <p>${escapeHtml(scanTypeLabel(scan.scanType))} | ${escapeHtml(scan.code || "")}</p>
+          </div>
+          <span class="pill info">Recognized</span>
+        </header>
+        <p>${escapeHtml(scan.message || "Scan recognized.")}</p>
+      </article>
+    `;
+  }
+
+  function renderScannerPanel() {
+    renderScanTypePills();
+    const resultPanel = document.querySelector("#staffScanResult");
+    if (resultPanel) resultPanel.innerHTML = activeScanResultHtml();
+  }
   
   function locationStockHtml(ingredient) {
     const rows = getIngredientLocationRows(ingredient);
@@ -694,6 +790,7 @@ export function createInventoryUi(deps) {
   
   function renderInventory() {
     renderSupplierManagement();
+    renderScannerPanel();
     renderInventoryActionForm();
     const inventoryAlerts = [
       ...getLowStockIngredients().map(alertCard),

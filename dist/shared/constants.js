@@ -5,6 +5,7 @@ export const TICKET_STATUS_FLOW = ["Queued", "Accepted", "Preparing", "Ready", "
 export const TICKET_STATUSES = ["Queued", "Accepted", "Preparing", "Delayed", "Ready", "Done"];
 export const ORDER_STATUSES = ["New", "Sent to kitchen", "Preparing", "Delayed", "Ready", "Served", "Paid", "Cancelled"];
 export const PHONE_MESSAGE_ORDER_CHANNEL = "Phone/message order";
+export const EXTERNAL_DELIVERY_ORDER_CHANNEL = "External delivery app order";
 export const ORDER_TYPE_OPTIONS = [
     { value: "Dine-in", label: "Dine-in", availabilityKey: "dineIn", fulfillment: "Kitchen", requiresTable: true },
     { value: "Takeaway", label: "Takeaway", availabilityKey: "takeaway", fulfillment: "Pickup", requiresTable: false },
@@ -12,13 +13,14 @@ export const ORDER_TYPE_OPTIONS = [
     { value: PHONE_MESSAGE_ORDER_CHANNEL, label: "Phone/message order", availabilityKey: "takeaway", fulfillment: "Pickup", requiresTable: false },
     { value: "QR table order", label: "QR table order", availabilityKey: "qrOrdering", fulfillment: "Kitchen", requiresTable: true },
     { value: "Website order", label: "Website order", availabilityKey: "websiteOrdering", fulfillment: "Pickup", requiresTable: false },
-    { value: "External delivery app order", label: "External delivery app order", availabilityKey: "externalDeliveryApps", fulfillment: "Delivery", requiresTable: false }
+    { value: EXTERNAL_DELIVERY_ORDER_CHANNEL, label: "External delivery app order", availabilityKey: "externalDeliveryApps", fulfillment: "Delivery", requiresTable: false }
 ];
 export const LEGACY_ORDER_TYPE_MAP = {
     QR: "QR table order",
     Website: "Website order",
     Phone: "Phone/message order",
-    "Uber Eats": "External delivery app order"
+    "Uber Eats": EXTERNAL_DELIVERY_ORDER_CHANNEL,
+    Thuisbezorgd: EXTERNAL_DELIVERY_ORDER_CHANNEL
 };
 export const UNPAID_PAYMENT_METHOD = "Unpaid / pay later";
 export const DEFAULT_PAID_PAYMENT_METHOD = "Cash";
@@ -131,6 +133,19 @@ export const SUPPLIER_INTEGRATION_METHODS = [
     { id: "manual", label: "Manual order" }
 ];
 export const SUPPLIER_ORDER_STATUSES = ["Draft", "Approved", "Sent", "Ordered", "Received"];
+export const EXTERNAL_DELIVERY_PLATFORMS = [
+    { id: "uber-eats", name: "Uber Eats" },
+    { id: "thuisbezorgd", name: "Thuisbezorgd" },
+    { id: "local-delivery", name: "Other local delivery platform" }
+];
+export const EXTERNAL_DELIVERY_PLATFORM_STATUSES = ["Draft", "Approval pending", "Connected", "Paused"];
+export const EXTERNAL_DELIVERY_IMPORT_METHODS = [
+    { id: "api", label: "API receive" },
+    { id: "manual", label: "Manual import" },
+    { id: "email", label: "Email parser" },
+    { id: "csv", label: "CSV import" },
+    { id: "staff", label: "Staff-entered external order" }
+];
 export const WASTE_REASONS = [
     { id: "Spoiled", label: "Spoiled" },
     { id: "Dropped", label: "Dropped" },
@@ -149,6 +164,7 @@ export const DEFAULT_RECIPE_ORDER_CONTEXT = { channel: "Dine-in", fulfillment: "
 export const TAKEAWAY_DELIVERY_RECIPE_CONTEXT = { channel: "Takeaway", fulfillment: "Delivery" };
 export const PHASE_11_SEED_INGREDIENT_IDS = ["minced-beef", "onion-herb-mix", "kefta-spice-blend"];
 export const PHASE_11_SEED_PRODUCT_IDS = ["kefta-mix-batch"];
+export const PHASE_18_SEED_PRODUCT_IDS = ["kefta-sandwich"];
 export const CUSTOMER_QR_CHANNEL = "QR table order";
 export const CUSTOMER_QR_ORDER_CONTEXT = { channel: CUSTOMER_QR_CHANNEL, fulfillment: "Kitchen" };
 export const WEBSITE_ORDER_CHANNEL = "Website order";
@@ -163,6 +179,9 @@ export const PHONE_MESSAGE_FULFILLMENT_OPTIONS = [
     { value: "Delivery", label: "Delivery", channel: "Delivery" }
 ];
 export const QR_CODE_STATUSES = ["Active", "Disabled"];
+export const RESERVATION_STATUSES = ["Pending", "Confirmed", "Arrived", "No-show", "Declined", "Cancelled"];
+export const RESERVATION_ACTIVE_STATUSES = ["Pending", "Confirmed", "Arrived"];
+export const RESERVATION_SOURCES = ["Website", "Google link", "Facebook/Instagram", "Phone", "Staff entry", "Walk-in"];
 export const DRIVER_IDLE_STATUS = "Available";
 export const DRIVER_DELIVERY_STATUSES = ["Assigned", "At restaurant", "Picked up", "On the way", "Delivered", "Failed delivery", "Returned"];
 export const DRIVER_TERMINAL_DELIVERY_STATUSES = ["Delivered", "Returned"];
@@ -290,6 +309,9 @@ export const DATA_MODEL = [
     { name: "purchased_products", fields: "ingredient, supplier, purchase price, unit type, min/max, total stock, stock by location, expiry, barcode, status" },
     { name: "suppliers", fields: "name, contact person, email, phone, integration/API details, delivery days, minimum order amount, products supplied" },
     { name: "purchase_orders", fields: "supplier, status, suggested quantity, approved quantity, sent method, received quantity, inventory update log" },
+    { name: "external_delivery_platforms", fields: "platform, API approval status, import fallback mode, commission rate, API details, last menu push" },
+    { name: "external_product_mappings", fields: "platform, external product name/code, internal product, recipe, kitchen station, commission override" },
+    { name: "external_order_imports", fields: "platform, external order id, import method, matched items, unmatched items, internal order link, status push log" },
     { name: "inventory_locations", fields: "default restaurant locations, custom locations, per-location quantities" },
     { name: "inventory_actions", fields: "add, remove, transfer, waste, manual correction, stock history" },
     { name: "waste_records", fields: "product, quantity, unit, reason, staff member, date/time, notes, cost" },
@@ -300,7 +322,9 @@ export const DATA_MODEL = [
     { name: "driver_deliveries", fields: "driver, order, pickup status, delivery status, ETA, location, notes, proof photo, cash collection" },
     { name: "staff_shifts", fields: "staff, date, role/station, planned start/end, notification, clock-in/out, breaks, planned vs actual metrics" },
     { name: "table_qr_codes", fields: "token, table, area, active/disabled status, customer order URL" },
-    { name: "reservations", fields: "guest, time, table, source, status" },
+    { name: "reservations", fields: "date, time, guest, contact, table, notes, source, status" },
+    { name: "reservation_blocks", fields: "date, start/end time, reason, active unavailable windows" },
+    { name: "reservation_capacity_rules", fields: "date or daily rule, start/end time, max guests, max reservations" },
     { name: "procedures", fields: "title, department, language, steps, required tools/products, media, frequency, assigned role" },
     { name: "procedure_completions", fields: "procedure, staff member, status, completed at, checked steps, notes/issues" }
 ];

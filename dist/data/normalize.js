@@ -1,9 +1,10 @@
-import { AVAILABILITY_OPTIONS, DEFAULT_INVENTORY_LOCATIONS, DEFAULT_MARGIN_MINIMUM, DEFAULT_MARGIN_TARGET, DEFAULT_PAID_PAYMENT_METHOD, DEFAULT_PRODUCT_AVAILABILITY, DEFAULT_RESTAURANT_SETTINGS, INVENTORY_ACTIONS, KITCHEN_STATION_ALIASES, LANGUAGE_OPTIONS, ORDER_STATUSES, PHASE_11_SEED_INGREDIENT_IDS, PHASE_11_SEED_PRODUCT_IDS, PROCEDURE_ASSIGNED_ROLES, PROCEDURE_COMPLETION_STATUSES, PROCEDURE_FREQUENCIES, PRODUCT_CATEGORIES, QR_CODE_STATUSES, RECIPE_APPLIES_OPTIONS, ROLE_DEFINITIONS, SUPPLIER_INTEGRATION_METHODS, SUPPLIER_ORDER_STATUSES, TICKET_STATUSES, UNIT_TYPES, VAT_OPTIONS, WASTE_REASONS } from "../shared/constants.js";
+import { AVAILABILITY_OPTIONS, DEFAULT_INVENTORY_LOCATIONS, DEFAULT_MARGIN_MINIMUM, DEFAULT_MARGIN_TARGET, DEFAULT_PAID_PAYMENT_METHOD, DEFAULT_PRODUCT_AVAILABILITY, DEFAULT_RESTAURANT_SETTINGS, EXTERNAL_DELIVERY_ORDER_CHANNEL, EXTERNAL_DELIVERY_PLATFORMS, INVENTORY_ACTIONS, KITCHEN_STATION_ALIASES, LANGUAGE_OPTIONS, ORDER_STATUSES, PHASE_11_SEED_INGREDIENT_IDS, PHASE_11_SEED_PRODUCT_IDS, PHASE_18_SEED_PRODUCT_IDS, PROCEDURE_ASSIGNED_ROLES, PROCEDURE_COMPLETION_STATUSES, PROCEDURE_FREQUENCIES, PRODUCT_CATEGORIES, QR_CODE_STATUSES, RECIPE_APPLIES_OPTIONS, RESERVATION_SOURCES, ROLE_DEFINITIONS, SUPPLIER_INTEGRATION_METHODS, SUPPLIER_ORDER_STATUSES, TICKET_STATUSES, UNIT_TYPES, VAT_OPTIONS, WASTE_REASONS } from "../shared/constants.js";
 import { normalizeOptionalTimestamp, normalizeTimestamp, timeNow } from "../shared/dates.js";
 import { normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
+import { externalPlatformName, normalizeExternalCommissionRate, normalizeExternalImportMethod, normalizeExternalPlatformId, normalizeExternalPlatformStatus } from "../domain/external-delivery.js";
 import { normalizeOrderFulfillment, normalizeOrderType, normalizeWebsiteFulfillment, orderTypeDefinition } from "../domain/orders.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
-import { getAvailableReservationTable, getReservationConflicts, isReservationTime } from "../domain/reservations.js";
+import { getAvailableReservationTable, getReservationConflicts, isReservationDate, isReservationTime, normalizeReservationStatus } from "../domain/reservations.js";
 import { getWeekStartDate, normalizeScheduleRole, normalizeScheduleStation, normalizeShiftDate, normalizeShiftTime, sortShiftsByDateTime, toDateInputString } from "../domain/scheduling.js";
 import { getFreshSeedState, seedState } from "./seed.js";
 import { slugify } from "../shared/ids.js";
@@ -307,6 +308,20 @@ export function normalizeIngredients(ingredients) {
     })
         .filter(Boolean);
 }
+export function normalizeActiveScan(scan) {
+    if (!scan || typeof scan !== "object")
+        return null;
+    return {
+        code: String(scan.code || "").trim(),
+        scanType: String(scan.scanType || "unknown").trim() || "unknown",
+        targetKind: String(scan.targetKind || "").trim(),
+        targetId: String(scan.targetId || "").trim(),
+        label: String(scan.label || "").trim(),
+        message: String(scan.message || "").trim(),
+        status: scan.status === "error" ? "error" : "ok",
+        scannedAt: String(scan.scannedAt || "").trim()
+    };
+}
 export function normalizeSupplierIntegrationMethod(method) {
     const candidate = String(method || "").trim();
     return SUPPLIER_INTEGRATION_METHODS.some((item) => item.id === candidate) ? candidate : "manual";
@@ -406,6 +421,108 @@ export function normalizeSupplierOrders(orders, ingredientIds, suppliers = []) {
         };
     })
         .filter((order) => order.supplier && order.items.length)
+        .slice(-80);
+}
+function normalizeExternalText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+}
+export function normalizeExternalPlatforms(platforms) {
+    const byId = new Map();
+    function upsertPlatform(source = {}) {
+        const platformId = normalizeExternalPlatformId(source.id || source.platformId || source.name);
+        const defaultOption = EXTERNAL_DELIVERY_PLATFORMS.find((platform) => platform.id === platformId);
+        const existing = byId.get(platformId) || {};
+        byId.set(platformId, {
+            id: platformId,
+            name: defaultOption?.name || normalizeExternalText(source.name) || externalPlatformName(platformId),
+            status: normalizeExternalPlatformStatus(source.status),
+            integrationMethod: normalizeExternalImportMethod(source.integrationMethod || source.method),
+            commissionRate: normalizeExternalCommissionRate(source.commissionRate ?? source.commission),
+            apiDetails: normalizeExternalText(source.apiDetails || source.instructions),
+            lastMenuPushedAt: normalizeExternalText(source.lastMenuPushedAt),
+            lastMenuPushedAtMs: normalizeOptionalTimestamp(source.lastMenuPushedAtMs),
+            lastMenuPayload: source.lastMenuPayload && typeof source.lastMenuPayload === "object"
+                ? source.lastMenuPayload
+                : existing.lastMenuPayload || null
+        });
+    }
+    seedState.externalPlatforms.forEach(upsertPlatform);
+    (Array.isArray(platforms) ? platforms : []).forEach(upsertPlatform);
+    const order = new Map(EXTERNAL_DELIVERY_PLATFORMS.map((platform, index) => [platform.id, index]));
+    return [...byId.values()].sort((first, second) => (order.get(first.id) ?? 99) - (order.get(second.id) ?? 99));
+}
+export function normalizeExternalProductMappings(mappings, productIds, platforms = []) {
+    const platformIds = new Set(platforms.map((platform) => platform.id));
+    const byId = new Map();
+    function upsertMapping(mapping = {}, index = 0) {
+        const platformId = normalizeExternalPlatformId(mapping.platformId || mapping.platform || mapping.source);
+        if (!platformIds.has(platformId))
+            return;
+        const externalName = normalizeExternalText(mapping.externalName || mapping.name || mapping.productName);
+        const externalCode = normalizeExternalText(mapping.externalCode || mapping.platformCode || mapping.code || mapping.sku);
+        const productId = String(mapping.productId || mapping.internalProductId || "").trim();
+        if (!productIds.has(productId) || (!externalName && !externalCode))
+            return;
+        const id = normalizeExternalText(mapping.id) || `MAP-${platformId}-${slugify(externalCode || externalName || `mapping-${index + 1}`)}`;
+        byId.set(id, {
+            id,
+            platformId,
+            externalName,
+            externalCode,
+            productId,
+            commissionRate: mapping.commissionRate === "" || mapping.commissionRate === undefined
+                ? ""
+                : normalizeExternalCommissionRate(mapping.commissionRate),
+            active: mapping.active === undefined ? true : Boolean(mapping.active),
+            lastPushedAt: normalizeExternalText(mapping.lastPushedAt),
+            lastPushedAtMs: normalizeOptionalTimestamp(mapping.lastPushedAtMs)
+        });
+    }
+    seedState.externalProductMappings.forEach(upsertMapping);
+    (Array.isArray(mappings) ? mappings : []).forEach(upsertMapping);
+    return [...byId.values()]
+        .sort((first, second) => first.platformId.localeCompare(second.platformId) || first.externalName.localeCompare(second.externalName));
+}
+export function normalizeExternalOrderImports(imports, productIds, platforms = []) {
+    const platformIds = new Set(platforms.map((platform) => platform.id));
+    return (Array.isArray(imports) ? imports : [])
+        .map((record, index) => {
+        const platformId = normalizeExternalPlatformId(record.platformId || record.platform);
+        if (!platformIds.has(platformId))
+            return null;
+        return {
+            id: normalizeExternalText(record.id) || `EXT-IMP-${Date.now()}-${index + 1}`,
+            platformId,
+            platformName: externalPlatformName(platformId),
+            externalOrderId: normalizeExternalText(record.externalOrderId || record.platformOrderId || record.orderCode),
+            importMethod: normalizeExternalImportMethod(record.importMethod || record.method),
+            orderId: normalizeExternalText(record.orderId || record.internalOrderId),
+            importedAt: normalizeExternalText(record.importedAt) || timeNow(),
+            importedAtMs: normalizeOptionalTimestamp(record.importedAtMs) || normalizeTimestamp(record.timeMs, record.importedAt || timeNow()),
+            status: normalizeExternalText(record.status) || "Imported",
+            matchedItems: (Array.isArray(record.matchedItems) ? record.matchedItems : [])
+                .map((item) => ({
+                productId: productIds.has(item.productId) ? item.productId : "",
+                quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+                externalCode: normalizeExternalText(item.externalCode),
+                externalName: normalizeExternalText(item.externalName)
+            }))
+                .filter((item) => item.productId),
+            unmatchedItems: (Array.isArray(record.unmatchedItems) ? record.unmatchedItems : [])
+                .map((item) => ({
+                externalCode: normalizeExternalText(item.externalCode),
+                externalName: normalizeExternalText(item.externalName),
+                quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+                reason: normalizeExternalText(item.reason)
+            }))
+                .filter((item) => item.externalCode || item.externalName),
+            rawText: String(record.rawText || record.rawOrder || "").trim(),
+            lastPushedStatus: normalizeExternalText(record.lastPushedStatus),
+            statusPushedAt: normalizeExternalText(record.statusPushedAt),
+            statusPushedAtMs: normalizeOptionalTimestamp(record.statusPushedAtMs)
+        };
+    })
+        .filter(Boolean)
         .slice(-80);
 }
 export function normalizeProducts(products, ingredientIds) {
@@ -983,6 +1100,49 @@ export function normalizeTableQrCodes(codes, tables) {
     });
     return normalized;
 }
+export function normalizeReservationSource(source) {
+    const candidate = String(source || "").trim();
+    return RESERVATION_SOURCES.includes(candidate) ? candidate : "Website";
+}
+export function normalizeReservationBlocks(blocks) {
+    return (Array.isArray(blocks) ? blocks : [])
+        .map((block, index) => {
+        const startTime = isReservationTime(block.startTime) ? block.startTime : "";
+        const endTime = isReservationTime(block.endTime) ? block.endTime : "";
+        if (!startTime || !endTime)
+            return null;
+        return {
+            id: block.id || `RB-${Date.now()}-${index + 1}`,
+            date: isReservationDate(block.date) ? block.date : "",
+            startTime,
+            endTime,
+            reason: String(block.reason || "Unavailable").trim(),
+            active: block.active !== false
+        };
+    })
+        .filter(Boolean);
+}
+export function normalizeReservationCapacityRules(rules) {
+    return (Array.isArray(rules) ? rules : [])
+        .map((rule, index) => {
+        const startTime = isReservationTime(rule.startTime) ? rule.startTime : "";
+        const endTime = isReservationTime(rule.endTime) ? rule.endTime : "";
+        if (!startTime || !endTime)
+            return null;
+        return {
+            id: rule.id || `RC-${Date.now()}-${index + 1}`,
+            date: isReservationDate(rule.date) ? rule.date : "",
+            startTime,
+            endTime,
+            maxGuests: Math.max(0, Math.floor(Number(rule.maxGuests) || 0)),
+            maxReservations: Math.max(0, Math.floor(Number(rule.maxReservations) || 0)),
+            note: String(rule.note || "").trim(),
+            active: rule.active !== false
+        };
+    })
+        .filter(Boolean)
+        .filter((rule) => rule.maxGuests > 0 || rule.maxReservations > 0);
+}
 export function normalizeState(candidate) {
     const source = candidate ? structuredClone(candidate) : {};
     const next = { ...getFreshSeedState(), ...source };
@@ -998,12 +1158,17 @@ export function normalizeState(candidate) {
         "customers",
         "suppliers",
         "supplierOrders",
+        "externalPlatforms",
+        "externalProductMappings",
+        "externalOrderImports",
         "procedures",
         "procedureCompletions",
         "staff",
         "staffShifts",
         "drivers",
         "reservations",
+        "reservationBlocks",
+        "reservationCapacityRules",
         "productionLog",
         "productionBatches",
         "users",
@@ -1029,9 +1194,16 @@ export function normalizeState(candidate) {
     const procedureIds = new Set(next.procedures.map((procedure) => procedure.id));
     next.procedureCompletions = normalizeProcedureCompletions(next.procedureCompletions, procedureIds, next.users);
     next.procedureProgress = normalizeProcedureProgress(source.procedureProgress, procedureIds, next.users);
+    const normalizedSeedIngredients = normalizeIngredients(seedState.ingredients);
+    const seedIngredientById = new Map(normalizedSeedIngredients.map((ingredient) => [ingredient.id, ingredient]));
     next.ingredients = normalizeIngredients(next.ingredients);
+    next.ingredients.forEach((ingredient) => {
+        const seedIngredient = seedIngredientById.get(ingredient.id);
+        if (!ingredient.barcode && seedIngredient?.barcode)
+            ingredient.barcode = seedIngredient.barcode;
+    });
     const existingIngredientIds = new Set(next.ingredients.map((ingredient) => ingredient.id));
-    normalizeIngredients(seedState.ingredients)
+    normalizedSeedIngredients
         .filter((ingredient) => PHASE_11_SEED_INGREDIENT_IDS.includes(ingredient.id) && !existingIngredientIds.has(ingredient.id))
         .forEach((ingredient) => {
         next.ingredients.push(ingredient);
@@ -1046,10 +1218,13 @@ export function normalizeState(candidate) {
     next.wasteRecords = normalizeWasteRecords(next.wasteRecords, next.ingredients, next.users);
     const existingProductIds = new Set((Array.isArray(next.products) ? next.products : []).map((product) => slugify(product.id || product.name || "", "")));
     seedState.products
-        .filter((product) => PHASE_11_SEED_PRODUCT_IDS.includes(product.id) && !existingProductIds.has(product.id))
+        .filter((product) => [...PHASE_11_SEED_PRODUCT_IDS, ...PHASE_18_SEED_PRODUCT_IDS].includes(product.id) && !existingProductIds.has(product.id))
         .forEach((product) => next.products.push(structuredClone(product)));
     next.products = normalizeProducts(next.products, ingredientIds);
     const productIds = new Set(next.products.map((product) => product.id));
+    next.externalPlatforms = normalizeExternalPlatforms(next.externalPlatforms);
+    next.externalProductMappings = normalizeExternalProductMappings(next.externalProductMappings, productIds, next.externalPlatforms);
+    next.externalOrderImports = normalizeExternalOrderImports(candidate?.externalOrderImports, productIds, next.externalPlatforms);
     next.productionBatches = normalizeProductionBatches(next.productionBatches, productIds, ingredientIds, next.users);
     next.orderDraft = Array.isArray(candidate?.orderDraft)
         ? candidate.orderDraft
@@ -1080,31 +1255,52 @@ export function normalizeState(candidate) {
             .filter(Boolean)
         : [];
     next.websiteFulfillment = normalizeWebsiteFulfillment(candidate?.websiteFulfillment);
+    next.websiteLastReservationId = String(candidate?.websiteLastReservationId || "");
+    next.reservationEditingId = String(candidate?.reservationEditingId || "");
+    next.activeScan = normalizeActiveScan(candidate?.activeScan);
     const tableIds = new Set(next.tables.map((table) => table.id));
+    next.reservationBlocks = normalizeReservationBlocks(next.reservationBlocks);
+    next.reservationCapacityRules = normalizeReservationCapacityRules(next.reservationCapacityRules);
     const normalizedReservations = [];
     next.reservations.forEach((reservation, index) => {
         const id = reservation.id || `RES-${Date.now()}-${index + 1}`;
         const guests = Math.max(1, Math.floor(Number(reservation.guests) || 1));
+        const date = isReservationDate(reservation.date) ? reservation.date : toDateInputString();
         const time = isReservationTime(reservation.time) ? reservation.time : "19:00";
+        const status = normalizeReservationStatus(reservation.status, normalizeReservationSource(reservation.source) === "Website" ? "Pending" : "Confirmed");
+        const source = normalizeReservationSource(reservation.source);
         const requestedTable = tableIds.has(reservation.tableId)
             ? next.tables.find((table) => table.id === reservation.tableId)
             : null;
-        const assignedTable = requestedTable
+        const shouldAssignTable = status === "Pending" || status === "Confirmed" || status === "Arrived";
+        const assignedTable = shouldAssignTable && requestedTable
             && requestedTable.capacity >= guests
-            && !getReservationConflicts({ id, tableId: requestedTable.id, time }, normalizedReservations).length
+            && !getReservationConflicts({ id, date, tableId: requestedTable.id, time }, normalizedReservations).length
             ? requestedTable
-            : getAvailableReservationTable({ id, guests, time }, next.tables, normalizedReservations);
+            : shouldAssignTable
+                ? getAvailableReservationTable({ id, date, guests, time }, next.tables, normalizedReservations)
+                : requestedTable;
         normalizedReservations.push({
             id,
-            name: reservation.name || "Guest",
+            date,
+            name: String(reservation.name || "Guest").trim(),
             guests,
             time,
             tableId: assignedTable?.id || requestedTable?.id || next.tables[0]?.id || "",
-            source: reservation.source || "Website",
-            status: reservation.status || "Confirmed"
+            phone: String(reservation.phone || "").trim(),
+            email: String(reservation.email || "").trim(),
+            notes: String(reservation.notes || "").trim(),
+            source,
+            status,
+            createdAt: reservation.createdAt || timeNow(),
+            updatedAt: reservation.updatedAt || ""
         });
     });
     next.reservations = normalizedReservations;
+    if (!next.reservations.some((reservation) => reservation.id === next.websiteLastReservationId))
+        next.websiteLastReservationId = "";
+    if (!next.reservations.some((reservation) => reservation.id === next.reservationEditingId))
+        next.reservationEditingId = "";
     next.supplierOrders = normalizeSupplierOrders(candidate?.supplierOrders, ingredientIds, next.suppliers);
     next.orders = next.orders
         .map((order) => {
@@ -1144,6 +1340,15 @@ export function normalizeState(candidate) {
                 || normalizeOptionalTimestamp(order.deliveryUpdatedAtMs)
                 || deliveryAssignedAtMs
             : "";
+        const isExternalOrder = channel === EXTERNAL_DELIVERY_ORDER_CHANNEL
+            || Boolean(order.externalPlatformId || order.platformId || order.externalOrderId);
+        const externalPlatformId = isExternalOrder
+            ? normalizeExternalPlatformId(order.externalPlatformId || order.platformId || order.externalPlatform || order.platform)
+            : "";
+        const externalPlatform = next.externalPlatforms.find((platform) => platform.id === externalPlatformId);
+        const externalCommissionRate = isExternalOrder
+            ? normalizeExternalCommissionRate(order.externalCommissionRate, externalPlatform?.commissionRate)
+            : 0;
         return {
             ...order,
             orderType: channel,
@@ -1172,6 +1377,15 @@ export function normalizeState(candidate) {
             deliveryAddress: String(order.deliveryAddress || order.address || "").trim(),
             paymentReference: String(order.paymentReference || "").trim(),
             paymentProcessor: String(order.paymentProcessor || "").trim(),
+            externalPlatformId,
+            externalPlatformName: externalPlatformId ? externalPlatform?.name || externalPlatformName(externalPlatformId) : "",
+            externalOrderId: isExternalOrder ? String(order.externalOrderId || order.platformOrderId || "").trim() : "",
+            externalImportMethod: isExternalOrder ? normalizeExternalImportMethod(order.externalImportMethod || order.importMethod) : "",
+            externalCommissionRate,
+            externalCommissionAmount: isExternalOrder ? Math.max(0, Number(order.externalCommissionAmount) || 0) : 0,
+            externalStatus: isExternalOrder ? String(order.externalStatus || "").trim() : "",
+            externalStatusPushedAt: isExternalOrder ? String(order.externalStatusPushedAt || "").trim() : "",
+            externalStatusPushedAtMs: isExternalOrder ? normalizeOptionalTimestamp(order.externalStatusPushedAtMs) : "",
             customerNotes: String(order.customerNotes || "").trim(),
             assignedDriver: fulfillment === "Delivery" ? assignedDriverId : "",
             pickupStatus: normalizePickupStatus(order.pickupStatus, deliveryStatus),

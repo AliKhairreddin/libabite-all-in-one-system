@@ -79,7 +79,7 @@ const NAV_ICONS = {
 };
 export function createAppRenderer(deps) {
     const document = window.document;
-    const { can, createNode, currentUser, ensureActiveViewAccess, getCurrentUserProcedures, getCustomerOrderingSession, getLowStockIngredients, getOpenTickets, isActiveDelivery, procedurePeriodStatus, renderCustomerQrScreen, renderDashboard, renderInventory, renderKitchen, renderMetrics, renderOrderBuilder, renderOrders, renderProductManagement, renderProductsInSelects, renderProcedures, renderReservationPlanner, renderReservations, renderSettings, renderTeam, renderWasteTracking, renderWebsiteOrderScreen, roleDefinition, visibleViews } = deps;
+    const { can, createNode, currentUser, ensureActiveViewAccess, getCurrentUserProcedures, getCustomerOrderingSession, getLowStockIngredients, getOpenTickets, isActiveDelivery, procedurePeriodStatus, renderCustomerQrScreen, renderDashboard, renderExternalDeliveryIntegrations, renderInventory, renderKitchen, renderMetrics, renderOrderBuilder, renderOrders, renderProductManagement, renderProductsInSelects, renderProcedures, renderReservationPlanner, renderReservations, renderSettings, renderTeam, renderWasteTracking, renderWebsiteOrderScreen, renderWebsiteReservationScreen, roleDefinition, visibleViews } = deps;
     function renderAuthShell() {
         const user = currentUser();
         const customerSession = getCustomerOrderingSession();
@@ -137,6 +137,10 @@ export function createAppRenderer(deps) {
             renderWebsiteOrderScreen();
             return;
         }
+        if (customerSession?.mode === "reservation") {
+            renderWebsiteReservationScreen();
+            return;
+        }
         if (!currentUser())
             return;
         ensureActiveViewAccess();
@@ -153,6 +157,7 @@ export function createAppRenderer(deps) {
         renderProcedures();
         renderTeam();
         renderSettings();
+        renderExternalDeliveryIntegrations();
         renderReservationPlanner();
         renderReservations();
         updateView();

@@ -1,9 +1,11 @@
 import { state } from "../app/state.js";
 import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS } from "../shared/constants.js";
+import { getReservationDateLabel } from "../domain/reservations.js";
 import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
+import { toDateInputString } from "../domain/scheduling.js";
 export function createPublicOrderingUi(deps) {
-    const { emptyState, fulfillmentLabel, formatStockAmount, getCustomerCartItems, getCustomerOrderContext, getItemCount, getItemsTotal, getOrderPaymentSummary, getOrderTotal, getOrderableProductsForContext, getProductAvailability, getStaffUrl, getStockShortages, getCustomerQrSession, getWebsiteOrderSession, money, orderById, orderLocationLabel, productById } = deps;
+    const { emptyState, fulfillmentLabel, formatStockAmount, getCustomerCartItems, getCustomerOrderContext, getItemCount, getItemsTotal, getOrderPaymentSummary, getOrderTotal, getOrderableProductsForContext, getProductAvailability, getStaffUrl, getStockShortages, getCustomerQrSession, getWebsiteOrderSession, getWebsiteReservationSession, money, orderById, orderLocationLabel, productById } = deps;
     function customerProductCard(product, cartItems, orderContext = CUSTOMER_QR_ORDER_CONTEXT) {
         const availability = getProductAvailability(product, cartItems, orderContext);
         const cartQuantity = cartItems
@@ -53,6 +55,13 @@ export function createPublicOrderingUi(deps) {
         now.setMinutes(now.getMinutes() + 30);
         const minutes = now.getMinutes();
         now.setMinutes(Math.ceil(minutes / 5) * 5, 0, 0);
+        return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    }
+    function getDefaultReservationTime() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 120);
+        const minutes = now.getMinutes();
+        now.setMinutes(Math.ceil(minutes / 15) * 15, 0, 0);
         return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     }
     function websiteFulfillmentControlsHtml() {
@@ -314,9 +323,103 @@ export function createPublicOrderingUi(deps) {
       </main>
     `;
     }
+    function renderWebsiteReservationScreen() {
+        const screen = document.querySelector("#customerQrScreen");
+        const session = getWebsiteReservationSession();
+        if (!screen || !session)
+            return;
+        const lastReservation = state.reservations.find((reservation) => reservation.id === state.websiteLastReservationId);
+        const confirmation = lastReservation ? `
+      <section class="customer-confirmation">
+        <div>
+          <p class="eyebrow">Reservation received</p>
+          <h2>${escapeHtml(getReservationDateLabel(lastReservation.date))} at ${escapeHtml(lastReservation.time)}</h2>
+          <p>${escapeHtml(lastReservation.name)} · ${lastReservation.guests} guests · ${escapeHtml(lastReservation.status)}</p>
+        </div>
+        <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
+      </section>
+    ` : "";
+        screen.innerHTML = `
+      <header class="customer-topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <div>
+            <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
+            <span>${escapeHtml(state.restaurantSettings.location)}</span>
+          </div>
+        </div>
+        <div class="customer-topbar-actions">
+          <div class="customer-table-badge">
+            <span>Website</span>
+            <strong>Table reservation</strong>
+          </div>
+          <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
+        </div>
+      </header>
+      <main class="customer-shell reservation-customer-shell">
+        ${confirmation}
+        <section class="customer-menu-panel website-reservation-panel">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Reserve</p>
+              <h1>Book a table</h1>
+            </div>
+          </div>
+          <form id="customerReservationForm" class="stacked-form">
+            <div class="customer-checkout-grid">
+              <label>
+                Date
+                <input name="date" type="date" min="${escapeHtml(toDateInputString())}" value="${escapeHtml(toDateInputString())}" required>
+              </label>
+              <label>
+                Time
+                <input name="time" type="time" value="${escapeHtml(getDefaultReservationTime())}" required>
+              </label>
+              <label>
+                Guests
+                <input name="guests" type="number" min="1" max="30" value="2" required>
+              </label>
+              <label>
+                Name
+                <input name="name" type="text" autocomplete="name" required>
+              </label>
+              <label>
+                Phone
+                <input name="phone" type="tel" autocomplete="tel">
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" autocomplete="email">
+              </label>
+            </div>
+            <label>
+              Notes
+              <textarea name="notes" rows="4" placeholder="Occasion, high chair, accessibility, allergies"></textarea>
+            </label>
+            <button class="primary-btn" type="submit">Confirm Reservation</button>
+          </form>
+        </section>
+        <aside class="customer-cart-panel reservation-info-panel">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Channels</p>
+              <h2>Website booking</h2>
+            </div>
+          </div>
+          <div class="reservation-channel-list">
+            <span class="pill ok">Website</span>
+            <span class="pill warning">Google later</span>
+            <span class="pill warning">Facebook/Instagram later</span>
+            <span class="pill info">Manual staff entry</span>
+          </div>
+        </aside>
+      </main>
+    `;
+    }
     return {
         renderCustomerQrScreen,
-        renderWebsiteOrderScreen
+        renderWebsiteOrderScreen,
+        renderWebsiteReservationScreen
     };
 }
 //# sourceMappingURL=public-ordering.js.map

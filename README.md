@@ -38,7 +38,11 @@ It includes:
 - Phase 15 driver delivery app with assigned orders, customer contact/address, item details, pickup and delivery statuses, notes, proof photo filename capture, and cash collection
 - manager delivery tracking with driver assignment, current location, active/late/completed deliveries, ETA, proof status, and driver performance
 - staff scheduling and driver status
-- reservations
+- Phase 19 internal reservation system with public website booking, pending manager approval, table assignment, arrived/no-show tracking, blocked unavailable times, capacity rules, notes/contact capture, and channel/source labels for Website, Google link, Facebook/Instagram, phone, walk-in, and staff entry
+- Phase 18 external delivery app integrations for Uber Eats, Thuisbezorgd, and other local delivery platforms
+- external product mappings from platform names/codes to internal products, recipes, and kitchen stations, including `Sandwich Kefta` / `99301` to `Kefta Sandwich`
+- external menu payload preparation, fallback order import by manual entry/email/CSV/staff entry, external commission tracking, internal kitchen routing, inventory deduction, and platform status push logging
+- Phase 20 staff scanning with a global scan field, inventory scan panel, product barcode/QR resolution, table/storage/staff/recipe scan recognition, and scanned-product stock actions
 
 Phase 5 demo flow:
 
@@ -80,6 +84,27 @@ Phase 15 demo flow:
 - Driver can move the delivery through Assigned, At restaurant, Picked up, On the way, Delivered, Failed delivery, or Returned
 - Driver can add a delivery note, optionally upload a photo proof filename, and mark cash collected for unpaid delivery orders
 
+Phase 18 demo flow:
+
+- Open Settings and review the seeded Uber Eats, Thuisbezorgd, and local delivery platform profiles
+- Review the external mapping `Sandwich Kefta` / `99301` to internal product `Kefta Sandwich`, its recipe, and Grill station routing
+- Use Push menu to prepare the external platform menu payload while API approval is pending
+- In the external order import form, import `99301,1`; the order is created as an external delivery app order, paid by external delivery app payment, sent to kitchen, and deducted from inventory through the normal recipe flow
+- Use Update platform status on the import record to log the outbound status sync
+
+Phase 19 demo flow:
+
+- Open `http://127.0.0.1:4173/?reservation=website`
+- Customer chooses date, time, guest count, name, phone/email, and notes, then confirms the reservation request
+- Staff open Bookings to approve/decline, edit the booking, assign a table, mark arrived/no-show, block unavailable times, and set capacity rules
+
+Phase 20 demo flow:
+
+- Log in as Owner/Admin or Manager
+- Scan or type `KEFTA-001` in the top-bar scan field or Inventory scanner
+- The system opens Kefta inventory, selects Kefta in the stock action form, and shows add/remove/transfer/waste shortcuts
+- Apply a stock action from that screen to update Kefta stock and inventory history
+
 Demo logins:
 
 - Owner/Admin: `owner@libabite.nl` / `admin123`
@@ -108,7 +133,10 @@ npm run build
 The source split is intentionally conservative:
 
 - `src/main.ts` is the application entry point.
-- `src/core.ts` contains the migrated prototype logic and exported initializer.
+- `src/app/init.ts` creates the runtime, binds DOM events, and starts periodic refreshes.
+- `src/app/runtime.ts` wires the focused app, UI, and domain modules together.
+- `src/app/*-selectors.ts` contains state-backed view adapters and lookup helpers.
+- `src/domain/`, `src/ui/`, `src/data/`, and `src/shared/` contain the extracted business logic, rendering, normalization, and utilities.
 
-This keeps the static demo stable while making future splits into domain,
-rendering, and persistence modules much easier.
+The old `src/core.ts` monolith has been removed; new work should live in the
+focused module that owns the behavior.

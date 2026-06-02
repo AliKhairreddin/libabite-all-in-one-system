@@ -27,6 +27,10 @@ export function createQrRuntime(deps) {
         const separator = getQrBaseUrl().includes("?") ? "&" : "?";
         return `${getQrBaseUrl()}${separator}order=website`;
     }
+    function getWebsiteReservationUrl() {
+        const separator = getQrBaseUrl().includes("?") ? "&" : "?";
+        return `${getQrBaseUrl()}${separator}reservation=website`;
+    }
     function getCustomerQrSession() {
         const params = new URLSearchParams(window.location.search);
         const token = String(params.get("qr") || "").trim();
@@ -59,11 +63,18 @@ export function createQrRuntime(deps) {
             return null;
         return { error: "", mode: "website" };
     }
+    function getWebsiteReservationSession() {
+        const params = new URLSearchParams(window.location.search);
+        const route = String(params.get("reservation") || params.get("book") || params.get("booking") || "").trim().toLowerCase();
+        if (route !== "website" && route !== "online" && route !== "table" && route !== "reserve")
+            return null;
+        return { error: "", mode: "reservation" };
+    }
     function getCustomerOrderingSession() {
         const qrSession = getCustomerQrSession();
         if (qrSession)
             return { ...qrSession, mode: "qr" };
-        return getWebsiteOrderSession();
+        return getWebsiteOrderSession() || getWebsiteReservationSession();
     }
     function createTableQrCode(formData) {
         if (!can("canEditSettings")) {
@@ -176,6 +187,8 @@ export function createQrRuntime(deps) {
         getStaffUrl,
         getWebsiteOrderSession,
         getWebsiteOrderingUrl,
+        getWebsiteReservationSession,
+        getWebsiteReservationUrl,
         openQrCustomerUrl,
         qrCodeById,
         regenerateQrCode,

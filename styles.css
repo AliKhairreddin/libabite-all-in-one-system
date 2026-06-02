@@ -1,18 +1,43 @@
 :root {
   color-scheme: light;
-  --ink: #1d2426;
-  --muted: #667275;
-  --line: #d9e0dd;
-  --soft: #f4f7f5;
-  --panel: #ffffff;
-  --brand: #185c4a;
-  --brand-2: #2d7b66;
-  --accent: #c45738;
-  --accent-2: #efb65b;
-  --danger: #b83b3b;
-  --ok: #2f7a44;
-  --info: #315d87;
-  --shadow: 0 18px 40px rgba(29, 36, 38, 0.08);
+  --background: #f7f8f5;
+  --foreground: #1f241f;
+  --card: #ffffff;
+  --card-foreground: #1f241f;
+  --popover: #ffffff;
+  --popover-foreground: #1f241f;
+  --primary: #1f4d3a;
+  --primary-foreground: #fbfdf9;
+  --secondary: #eef1ea;
+  --secondary-foreground: #273128;
+  --muted-surface: #eef1ea;
+  --muted-foreground: #667064;
+  --accent-surface: #f2eee7;
+  --accent-foreground: #5d3b21;
+  --destructive: #b42318;
+  --destructive-foreground: #fffafa;
+  --success: #25724d;
+  --warning: #a66315;
+  --info-tone: #3c6878;
+  --border: #dde3d8;
+  --input: #d8dfd4;
+  --ring: #3f7f61;
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(31, 36, 31, 0.05), 0 12px 26px rgba(31, 36, 31, 0.06);
+  --shadow-sm: 0 1px 2px rgba(31, 36, 31, 0.06);
+
+  --ink: var(--foreground);
+  --muted: var(--muted-foreground);
+  --line: var(--border);
+  --soft: var(--background);
+  --panel: var(--card);
+  --brand: var(--primary);
+  --brand-2: var(--ring);
+  --accent: #b96b3b;
+  --accent-2: #d89a38;
+  --danger: var(--destructive);
+  --ok: var(--success);
+  --info: var(--info-tone);
 }
 
 * {
@@ -22,6 +47,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   background: var(--soft);
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -42,6 +68,15 @@ button {
 
 [hidden] {
   display: none !important;
+}
+
+.sr-only {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .customer-qr-screen {
@@ -327,6 +362,7 @@ button {
 }
 
 .sidebar {
+  min-width: 0;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -471,6 +507,34 @@ button {
   justify-content: flex-end;
 }
 
+.topbar-scan-form {
+  min-width: min(100%, 300px);
+  min-height: 44px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.topbar-scan-form input {
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+}
+
+.topbar-scan-form input:focus {
+  outline: 2px solid rgba(24, 92, 74, 0.18);
+  outline-offset: 1px;
+}
+
+.topbar-scan-form .ghost-btn {
+  min-height: 34px;
+}
+
 .user-menu {
   min-height: 44px;
   padding: 5px 5px 5px 12px;
@@ -560,9 +624,7 @@ button:disabled {
   padding: 24px;
   display: grid;
   place-items: center;
-  background:
-    linear-gradient(135deg, rgba(24, 92, 74, 0.08), rgba(196, 87, 56, 0.08)),
-    var(--soft);
+  background: var(--soft);
 }
 
 .login-screen.is-hidden,
@@ -704,6 +766,188 @@ button:disabled {
   grid-row: span 2;
 }
 
+.dashboard-grid .management-overview-panel,
+.dashboard-grid .reports-panel {
+  grid-column: 1 / -1;
+  grid-row: auto;
+}
+
+.panel.management-overview-panel,
+.panel.management-panel,
+.panel.reports-panel {
+  padding: 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  align-self: start;
+}
+
+.management-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.management-signal-card {
+  min-height: 104px;
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.management-signal-card span,
+.management-signal-card small,
+.dashboard-subtitle {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.management-signal-card strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.management-signal-card small {
+  font-weight: 700;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.dashboard-data-list,
+.dashboard-stack,
+.dashboard-subsection {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-subsection + .dashboard-subsection {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.dashboard-data-row {
+  min-height: 58px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.dashboard-data-row span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-data-row strong,
+.dashboard-data-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-data-row small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.progress-track.compact {
+  height: 6px;
+  margin-top: 2px;
+}
+
+.management-report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.report-card {
+  min-width: 0;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.report-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.report-card header div {
+  min-width: 0;
+}
+
+.report-card header span,
+.report-card header small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.report-card header strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.report-card header small {
+  max-width: 140px;
+  text-align: right;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.mini-report-table-wrap {
+  overflow-x: auto;
+}
+
+.mini-report-table {
+  width: 100%;
+  min-width: 260px;
+  border-collapse: collapse;
+}
+
+.mini-report-table th,
+.mini-report-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.82rem;
+}
+
+.mini-report-table th {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.mini-report-table td {
+  overflow-wrap: anywhere;
+}
+
 .panel {
   min-width: 0;
   padding: 4px 0;
@@ -726,9 +970,7 @@ button:disabled {
   gap: 8px;
   margin-bottom: 16px;
   padding: 14px;
-  background:
-    linear-gradient(135deg, rgba(24, 92, 74, 0.08), rgba(196, 87, 56, 0.08)),
-    #f8fbf9;
+  background: #f8fbf9;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -1365,6 +1607,75 @@ textarea {
   font-size: 0.82rem;
 }
 
+.reservation-link-card,
+.reservation-admin-tools,
+.reservation-ops-grid,
+.reservation-channel-list {
+  display: grid;
+  gap: 10px;
+}
+
+.reservation-link-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.reservation-admin-tools {
+  margin-top: 16px;
+}
+
+.compact-form {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.reservation-ops-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.reservation-ops-card {
+  min-height: 76px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.reservation-ops-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.reservation-ops-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.reservation-customer-shell {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+}
+
+.website-reservation-panel {
+  align-self: start;
+}
+
+.reservation-info-panel {
+  position: sticky;
+  top: 86px;
+}
+
+.reservation-channel-list {
+  align-content: start;
+}
+
 .draft-lines {
   display: grid;
   gap: 8px;
@@ -1503,6 +1814,100 @@ textarea {
 }
 
 .qr-actions {
+  justify-content: flex-start;
+}
+
+.staff-scan-panel {
+  padding: 18px;
+  background: #ffffff;
+}
+
+.staff-scan-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.staff-scan-form {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.scan-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.scan-type-pill {
+  min-height: 26px;
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f7faf8;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.scan-result-card {
+  min-height: 100%;
+  padding: 13px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.scan-result-card.is-error {
+  border-color: #efaaa5;
+  background: #fff4f3;
+}
+
+.scan-result-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.scan-result-card header p,
+.scan-result-card > p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.scan-result-grid {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.28fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.scan-result-grid span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.scan-result-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.scan-result-actions {
   justify-content: flex-start;
 }
 
@@ -2821,7 +3226,712 @@ textarea {
   text-align: center;
 }
 
+/* shadcn-inspired component skin for the vanilla UI. */
+::selection {
+  background: rgba(63, 127, 97, 0.18);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  letter-spacing: 0;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 0;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px rgba(63, 127, 97, 0.18);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.login-screen,
+.customer-qr-screen {
+  background: var(--background);
+}
+
+.app-shell {
+  background: var(--background);
+  overflow-x: hidden;
+}
+
+.workspace {
+  padding: 22px;
+}
+
+.sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: #203427;
+  color: #f8fbf7;
+}
+
+.brand-mark {
+  background: #f0eadf;
+  color: #203427;
+  border: 1px solid rgba(32, 52, 39, 0.08);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar .brand span {
+  color: rgba(248, 251, 247, 0.66);
+}
+
+.nav-item {
+  border: 1px solid transparent;
+  color: rgba(248, 251, 247, 0.72);
+  font-weight: 700;
+}
+
+.nav-item:hover,
+.nav-item.is-active {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+}
+
+.nav-icon {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d8b16d;
+  border-radius: var(--radius);
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.is-active .nav-icon,
+.nav-count {
+  background: #efe5d0;
+  color: #203427;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -22px 18px;
+  padding: 18px 22px;
+  background: rgba(247, 248, 245, 0.9);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 1.7rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.topbar > div:first-child {
+  flex: 1 1 300px;
+}
+
+.topbar-actions {
+  flex: 1 1 560px;
+}
+
+.eyebrow {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.login-card,
+.customer-error-card,
+.customer-confirmation,
+.customer-menu-panel,
+.customer-cart-panel,
+.form-panel,
+.panel.management-overview-panel,
+.panel.management-panel,
+.panel.reports-panel,
+.driver-app-panel,
+.delivery-management-panel,
+.time-clock-panel,
+.schedule-management-panel {
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.panel {
+  color: var(--foreground);
+}
+
+.panel h2,
+.login-card h1,
+.customer-menu-panel h1 {
+  color: var(--foreground);
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.panel-header {
+  gap: 14px;
+}
+
+.panel-header.compact {
+  margin-bottom: 12px;
+}
+
+.metric,
+.management-signal-card,
+.dashboard-data-row,
+.report-card,
+.phase-loop-card,
+.phase-loop-metric,
+.production-guide,
+.production-ingredient-line,
+.production-usage-row,
+.cost-preview,
+.waste-summary-card,
+.procedure-summary-card,
+.check-row,
+.modifier-chip,
+.availability-card,
+.manual-order-panel,
+.order-draft,
+.customer-history-card,
+.customer-history-grid section,
+.table-capacity-card,
+.reservation-link-card,
+.reservation-ops-card,
+.order-card,
+.ticket-card,
+.station-card,
+.alert-card,
+.recipe-card,
+.supplier-card,
+.procedure-card,
+.procedure-step,
+.procedure-detail-grid div,
+.delivery-order-card,
+.delivery-assignment-card,
+.manager-delivery-card,
+.driver-performance-card,
+.delivery-detail-grid div,
+.delivery-proof-grid div,
+.order-progress-card,
+.kds-summary-card,
+.shift-card,
+.attendance-report-card,
+.shift-metrics-grid div,
+.user-card,
+.schema-card,
+.log-card,
+.qr-admin-card,
+.qr-code-box,
+.staff-scan-form,
+.scan-result-card,
+.scan-result-grid,
+.customer-table-badge,
+.customer-product-card,
+.customer-payment-card {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-data-row,
+.management-signal-card,
+.report-card,
+.check-row,
+.modifier-chip,
+.availability-card,
+.manual-order-panel,
+.order-draft,
+.customer-history-grid section,
+.table-capacity-card,
+.reservation-ops-card,
+.station-card,
+.recipe-card,
+.supplier-card,
+.procedure-card,
+.delivery-order-card,
+.delivery-assignment-card,
+.manager-delivery-card,
+.driver-performance-card,
+.order-progress-card,
+.kds-summary-card,
+.shift-card,
+.attendance-report-card,
+.qr-admin-card,
+.scan-result-grid,
+.customer-product-card {
+  background: #fbfcf9;
+}
+
+.metric {
+  min-height: 106px;
+}
+
+.metric span,
+.management-signal-card span,
+.management-signal-card small,
+.dashboard-subtitle,
+.report-card header span,
+.report-card header small,
+.mini-report-table th,
+.waste-summary-card span,
+.waste-summary-card small,
+.procedure-summary-card span,
+.procedure-summary-card small,
+.scan-result-grid span,
+.kds-summary-card span,
+.ticket-kicker,
+.ticket-notes span,
+.ticket-issue span,
+.procedure-kicker,
+.delivery-kicker,
+.delivery-detail-grid span,
+.delivery-notes > span,
+.delivery-note-row span,
+.delivery-proof-grid span,
+.delivery-performance-grid span,
+.shift-metrics-grid span {
+  color: var(--muted-foreground);
+  letter-spacing: 0.03em;
+}
+
+.metric strong {
+  font-size: 1.85rem;
+  font-weight: 760;
+}
+
+label,
+legend,
+.schedule-form-grid label {
+  color: #344036;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  border-color: var(--input);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: calc(var(--radius) - 1px);
+  box-shadow: 0 1px 0 rgba(31, 36, 31, 0.02);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8a9488;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #c9d2c6;
+}
+
+.topbar-scan-form,
+.user-menu {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.topbar-scan-form input {
+  box-shadow: none;
+}
+
+.primary-btn,
+.ghost-btn,
+.icon-btn,
+.mini-btn,
+.quiet-btn,
+.customer-add-btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-weight: 750;
+}
+
+.primary-btn,
+.customer-add-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.primary-btn:hover,
+.customer-add-btn:hover {
+  background: #173f2f;
+  filter: none;
+}
+
+.ghost-btn,
+.mini-btn,
+.quiet-btn {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.ghost-btn:hover,
+.mini-btn:hover,
+.quiet-btn:hover {
+  background: #e4e8df;
+  filter: none;
+}
+
+.icon-btn {
+  background: var(--card);
+  color: var(--primary);
+  border-color: var(--border);
+}
+
+.icon-btn:hover {
+  background: var(--secondary);
+  filter: none;
+}
+
+.danger-action {
+  background: #f8e9e7;
+  color: var(--destructive);
+}
+
+.segmented,
+.tabs,
+.customer-service-toggle {
+  background: var(--muted-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.segmented button,
+.tabs button,
+.customer-service-toggle button {
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.segmented button.is-selected,
+.tabs button.is-selected,
+.customer-service-toggle button.is-selected {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.pill,
+.scan-type-pill,
+.tab-count {
+  min-height: 24px;
+  border: 1px solid rgba(31, 36, 31, 0.06);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border-radius: 999px;
+  font-weight: 750;
+}
+
+.pill.ok,
+.inline-status.ok,
+.procedure-summary-card small.ok,
+.kds-summary-card small.ok {
+  color: var(--success);
+}
+
+.pill.ok {
+  background: #e7f3eb;
+}
+
+.pill.info,
+.inline-status.info,
+.procedure-summary-card small.info,
+.kds-summary-card small.info {
+  color: var(--info-tone);
+}
+
+.pill.info {
+  background: #e7f0f2;
+}
+
+.pill.warning,
+.inline-status.warning,
+.procedure-summary-card small.warning,
+.kds-summary-card small.warning {
+  color: var(--warning);
+}
+
+.pill.warning,
+.supplier-minimum {
+  background: #f8eddc;
+}
+
+.pill.danger,
+.inline-status.danger,
+.procedure-summary-card small.danger,
+.kds-summary-card small.danger {
+  color: var(--destructive);
+}
+
+.pill.danger,
+.danger-action {
+  background: #f8e9e7;
+}
+
+.progress-track,
+.sla-meter {
+  background: #e5eae1;
+}
+
+.progress-bar {
+  background: var(--ring);
+}
+
+.stock-meter.ok .progress-bar,
+.sla-meter.ready .progress-bar {
+  background: var(--success);
+}
+
+.stock-meter.warning .progress-bar,
+.stock-meter.over .progress-bar,
+.sla-meter.warning .progress-bar {
+  background: #d89a38;
+}
+
+.stock-meter .progress-bar,
+.sla-meter .progress-bar {
+  background: var(--info-tone);
+}
+
+.stock-meter.inactive .progress-bar {
+  background: #879184;
+}
+
+.sla-meter.escalated .progress-bar,
+.sla-meter.delayed .progress-bar {
+  background: var(--destructive);
+}
+
+.flow-map,
+.staff-scan-panel {
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.flow-node {
+  background: #fbfcf9;
+  color: var(--primary);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.flow-line {
+  background: var(--ring);
+}
+
+.flow-line::after {
+  border-left-color: var(--ring);
+}
+
+.phase-loop-card {
+  border-left-color: var(--ring);
+}
+
+.alert-card {
+  border-left-color: #b96b3b;
+}
+
+.alert-card.warning,
+.station-card.sla-warning,
+.ticket-card.sla-warning,
+.procedure-sop-card.status-skipped,
+.procedure-sop-card.status-missed,
+.availability-card.warning,
+.production-usage-row.warning,
+.inventory-row.over,
+.supplier-minimum {
+  border-color: #ead6b8;
+  background: #fff8ed;
+}
+
+.alert-card.danger,
+.station-card.sla-escalated,
+.ticket-card.sla-escalated,
+.ticket-card.sla-delayed,
+.ticket-card.status-delayed,
+.procedure-sop-card.status-problem,
+.availability-card.danger,
+.production-usage-row.danger,
+.scan-result-card.is-error,
+.reservation-card.is-conflict,
+.delivery-order-card.is-late,
+.manager-delivery-card.is-late,
+.shift-card.is-missed,
+.inventory-row.danger,
+.recipe-card.is-low-margin,
+.phase-loop-card.danger {
+  border-color: #efc6c0;
+  background: #fff7f5;
+}
+
+.procedure-card.is-done,
+.procedure-sop-card.status-completed {
+  border-color: #bdd9c8;
+  background: #f0f8f3;
+}
+
+.supplier-card.is-ordered {
+  border-color: #c6d7dc;
+  background: #f2f8f9;
+}
+
+.recipe-card.is-inactive,
+.qr-admin-card.is-disabled {
+  background: #f0f2ee;
+  color: var(--muted-foreground);
+}
+
+.data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table th {
+  color: var(--muted-foreground);
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.data-table td,
+.data-table th,
+.mini-report-table td,
+.mini-report-table th {
+  border-bottom-color: var(--border);
+}
+
+.inventory-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.receipt-card {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.driver-map {
+  background: #eef1ea;
+  border-color: var(--border);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.map-grid {
+  background-image:
+    linear-gradient(rgba(31, 77, 58, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 77, 58, 0.08) 1px, transparent 1px);
+}
+
+.map-pin,
+.toast {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow);
+}
+
+.map-pin.restaurant {
+  background: #203427;
+}
+
+.map-pin.driver-a {
+  background: #b96b3b;
+}
+
+.map-pin.driver-b {
+  background: var(--info-tone);
+}
+
+.empty-state {
+  border-color: #cad3c6;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+@media (max-width: 1240px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar > div:first-child,
+  .topbar-actions {
+    flex: none;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .topbar-scan-form {
+    flex: 1 1 260px;
+  }
+}
+
 @media (max-width: 1120px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar > div:first-child,
+  .topbar-actions {
+    flex: none;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .topbar-scan-form {
+    flex: 1 1 260px;
+  }
+
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2836,7 +3946,8 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .customer-cart-panel {
+  .customer-cart-panel,
+  .reservation-info-panel {
     position: static;
   }
 
@@ -2867,12 +3978,17 @@ textarea {
   }
 
   .sidebar {
+    width: 100%;
+    min-width: 0;
     position: static;
     height: auto;
     padding: 14px;
+    overflow: hidden;
   }
 
   .nav-list {
+    width: 100%;
+    min-width: 0;
     display: flex;
     overflow-x: auto;
     padding-bottom: 4px;
@@ -2888,8 +4004,11 @@ textarea {
   }
 
   .topbar {
+    margin: 0 -16px 16px;
+    padding: 16px;
     align-items: flex-start;
     flex-direction: column;
+    gap: 14px;
   }
 
   .topbar h1 {
@@ -2901,8 +4020,32 @@ textarea {
     justify-content: stretch;
   }
 
+  .topbar-scan-form {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .topbar-actions .primary-btn {
     flex: 1;
+  }
+
+  .topbar-actions .icon-btn {
+    flex: 0 0 40px;
+  }
+
+  .user-menu {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .nav-list {
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
   }
 
   .metric-grid,
@@ -2923,6 +4066,10 @@ textarea {
     .customer-history-grid,
     .qr-admin-grid,
     .qr-admin-body,
+    .staff-scan-grid,
+    .scan-result-grid,
+    .reservation-link-card,
+    .reservation-ops-grid,
     .delivery-management-grid,
     .delivery-detail-grid,
     .delivery-proof-grid,
@@ -2931,12 +4078,14 @@ textarea {
     .schedule-form-grid,
     .shift-metrics-grid,
     .supplier-management-grid,
+    .management-card-grid,
     .attendance-report-grid {
     grid-template-columns: 1fr;
   }
 
   .customer-topbar,
   .customer-confirmation,
+  .report-card header,
   .delivery-order-card header,
   .delivery-assignment-card header,
   .manager-delivery-card header,
@@ -3012,6 +4161,11 @@ textarea {
 @media (max-width: 440px) {
   .workspace {
     padding: 12px;
+  }
+
+  .topbar {
+    margin: 0 -12px 14px;
+    padding: 14px 12px;
   }
 
   .panel,

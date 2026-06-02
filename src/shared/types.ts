@@ -44,9 +44,34 @@ export interface OrderContext {
 
 export interface Reservation {
   id?: Id;
+  date?: string;
   tableId?: Id;
   guests?: number;
   time?: string;
   status?: string;
   name?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  source?: string;
+}
+
+export interface ReservationBlock {
+  id?: Id;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  reason?: string;
+  active?: boolean;
+}
+
+export interface ReservationCapacityRule {
+  id?: Id;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  maxGuests?: number;
+  maxReservations?: number;
+  note?: string;
+  active?: boolean;
 }
