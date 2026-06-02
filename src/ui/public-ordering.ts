@@ -19,10 +19,12 @@ export function createPublicOrderingUi(deps) {
     getOrderableProductsForContext,
     getProductAvailability,
     getStaffUrl,
+    getWebsiteOrderingUrl,
     getStockShortages,
     getCustomerQrSession,
     getWebsiteOrderSession,
     getWebsiteReservationSession,
+    getWebsiteReservationUrl,
     money,
     orderById,
     orderLocationLabel,
@@ -357,6 +359,71 @@ export function createPublicOrderingUi(deps) {
     `;
   }
 
+  function renderPublicHomeScreen() {
+    const screen = document.querySelector("#customerQrScreen");
+    if (!screen) return;
+
+    const orderContext = getCustomerOrderContext("website");
+    const orderableProducts = getOrderableProductsForContext(orderContext).slice(0, 4);
+    const activeReservations = state.reservations
+      .filter((reservation) => ["Pending", "Confirmed", "Arrived"].includes(reservation.status))
+      .sort((first, second) => `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`));
+    const nextReservation = activeReservations[0];
+
+    screen.innerHTML = `
+      <header class="customer-topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <div>
+            <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
+            <span>${escapeHtml(state.restaurantSettings.location)}</span>
+          </div>
+        </div>
+        <div class="customer-topbar-actions">
+          <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
+        </div>
+      </header>
+      <main class="customer-shell customer-home-shell">
+        <section class="customer-menu-panel customer-home-panel">
+          <div>
+            <p class="eyebrow">Libabite Roermond</p>
+            <h1>Order online or book a table</h1>
+            <p>Fresh grill plates, sandwiches, sweets, and drinks for pickup, delivery, or dine-in planning.</p>
+          </div>
+          <div class="customer-home-actions">
+            <a class="primary-btn" href="${escapeHtml(getWebsiteOrderingUrl())}">Order Online</a>
+            <a class="ghost-btn" href="${escapeHtml(getWebsiteReservationUrl())}">Reserve Table</a>
+          </div>
+          <div class="customer-home-menu">
+            ${orderableProducts.length ? orderableProducts.map((product) => `
+              <article class="customer-product-card">
+                <div>
+                  <span class="customer-product-kicker">${escapeHtml(product.category)}</span>
+                  <strong>${escapeHtml(product.name)}</strong>
+                  <p>${escapeHtml(product.station)} · ${escapeHtml(money(product.price))}</p>
+                </div>
+              </article>
+            `).join("") : emptyState("Online ordering opens soon.")}
+          </div>
+        </section>
+        <aside class="customer-cart-panel customer-home-info">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Today</p>
+              <h2>${escapeHtml(state.restaurantSettings.opensAt)}-${escapeHtml(state.restaurantSettings.closesAt)}</h2>
+            </div>
+          </div>
+          <div class="reservation-channel-list">
+            <span class="pill ok">Pickup</span>
+            <span class="pill ok">Delivery</span>
+            <span class="pill info">Table booking</span>
+          </div>
+          <p>${nextReservation ? `Next table: ${escapeHtml(getReservationDateLabel(nextReservation.date))} ${escapeHtml(nextReservation.time)}` : "Tables are open for website booking."}</p>
+        </aside>
+      </main>
+    `;
+  }
+
   function renderWebsiteReservationScreen() {
     const screen = document.querySelector("#customerQrScreen");
     const session = getWebsiteReservationSession();
@@ -454,6 +521,7 @@ export function createPublicOrderingUi(deps) {
   
   return {
     renderCustomerQrScreen,
+    renderPublicHomeScreen,
     renderWebsiteOrderScreen,
     renderWebsiteReservationScreen
   };

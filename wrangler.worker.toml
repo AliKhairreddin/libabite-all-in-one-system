@@ -1,0 +1,4 @@
+name = "libabite-edge"
+main = "worker/libabite-edge.ts"
+compatibility_date = "2026-06-02"
+workers_dev = true

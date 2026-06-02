@@ -88,6 +88,8 @@ export function createAppRenderer(deps) {
     ensureActiveViewAccess,
     getCurrentUserProcedures,
     getCustomerOrderingSession,
+    getWebsiteOrderingUrl,
+    getWebsiteReservationUrl,
     getLowStockIngredients,
     getOpenTickets,
     isActiveDelivery,
@@ -103,6 +105,7 @@ export function createAppRenderer(deps) {
     renderProductManagement,
     renderProductsInSelects,
     renderProcedures,
+    renderPublicHomeScreen,
     renderReservationPlanner,
     renderReservations,
     renderSettings,
@@ -125,8 +128,12 @@ export function createAppRenderer(deps) {
     const currentUserRole = document.querySelector("#currentUserRole");
     const quickOrderButton = document.querySelector("#quickOrderBtn");
     const resetDemoButton = document.querySelector("#resetDemoBtn");
+    const publicOrderLink = document.querySelector('[data-public-link="order"]');
+    const publicReservationLink = document.querySelector('[data-public-link="reservation"]');
   
     renderDemoLogins();
+    if (publicOrderLink) publicOrderLink.href = getWebsiteOrderingUrl();
+    if (publicReservationLink) publicReservationLink.href = getWebsiteReservationUrl();
     document.body.classList.toggle("is-authenticated", Boolean(user) && !customerSession);
     document.body.classList.toggle("is-customer-ordering", Boolean(customerSession));
     customerScreen.hidden = !customerSession;
@@ -169,6 +176,10 @@ export function createAppRenderer(deps) {
     const customerSession = getCustomerOrderingSession();
     if (customerSession?.mode === "qr") {
       renderCustomerQrScreen();
+      return;
+    }
+    if (customerSession?.mode === "public") {
+      renderPublicHomeScreen();
       return;
     }
     if (customerSession?.mode === "website") {

@@ -1,6 +1,12 @@
 import { createQrToken } from "../data/normalize.js";
 import { saveState, state } from "./state.js";
 import { timeNow } from "../shared/dates.js";
+import {
+  getCustomerSiteUrl,
+  getStaffAppUrl,
+  isCustomerHost,
+  withQuery
+} from "./domain-routing.js";
 
 export function createQrRuntime(deps) {
   const {
@@ -22,28 +28,28 @@ export function createQrRuntime(deps) {
     return state.tableQrCodes.find((code) => code.tableId === tableId && code.status === "Active") || null;
   }
 
-  function getQrBaseUrl() {
-    const base = `${window.location.origin}${window.location.pathname}`;
-    return window.location.protocol === "file:" ? window.location.pathname : base;
-  }
-
   function getQrOrderUrl(code) {
-    const separator = getQrBaseUrl().includes("?") ? "&" : "?";
-    return `${getQrBaseUrl()}${separator}qr=${encodeURIComponent(code.token)}`;
+    return withQuery(getCustomerSiteUrl(), { qr: code.token });
   }
 
   function getStaffUrl() {
-    return getQrBaseUrl();
+    return getStaffAppUrl();
   }
 
   function getWebsiteOrderingUrl() {
-    const separator = getQrBaseUrl().includes("?") ? "&" : "?";
-    return `${getQrBaseUrl()}${separator}order=website`;
+    return withQuery(getCustomerSiteUrl(), { order: "website" });
   }
 
   function getWebsiteReservationUrl() {
-    const separator = getQrBaseUrl().includes("?") ? "&" : "?";
-    return `${getQrBaseUrl()}${separator}reservation=website`;
+    return withQuery(getCustomerSiteUrl(), { reservation: "website" });
+  }
+
+  function getPublicHomeSession() {
+    const params = new URLSearchParams(window.location.search);
+    const route = String(params.get("public") || params.get("home") || "").trim().toLowerCase();
+    if (route === "home" || route === "website" || route === "customer") return { error: "", mode: "public" };
+    if (isCustomerHost()) return { error: "", mode: "public" };
+    return null;
   }
 
   function getCustomerQrSession() {
@@ -85,7 +91,7 @@ export function createQrRuntime(deps) {
   function getCustomerOrderingSession() {
     const qrSession = getCustomerQrSession();
     if (qrSession) return { ...qrSession, mode: "qr" };
-    return getWebsiteOrderSession() || getWebsiteReservationSession();
+    return getWebsiteOrderSession() || getWebsiteReservationSession() || getPublicHomeSession();
   }
 
   function createTableQrCode(formData) {

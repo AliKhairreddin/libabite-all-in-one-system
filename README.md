@@ -63,6 +63,8 @@ the local fallback. Copy `.env.example` to `.env.local` and fill in:
 ```sh
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 VITE_CONVEX_STATE_KEY=libabite-main
+VITE_CUSTOMER_SITE_URL=https://thatcanadian.dev
+VITE_STAFF_APP_URL=https://app.thatcanadian.dev
 ```
 
 Start the Convex backend in one terminal:
@@ -84,6 +86,23 @@ connecting, saving, synced, or in an error state.
 The Convex snapshot stores shared restaurant data. Per-browser session fields
 like the current login, active view, filters, carts, and in-progress drafts stay
 local so one device does not take over another device's workspace.
+
+## Temporary Domains
+
+Until `libabite.nl` is ready, use these Cloudflare Pages custom domains:
+
+- `thatcanadian.dev` for the customer website, online ordering, reservations,
+  and table QR links.
+- `app.thatcanadian.dev` for staff, kitchen, manager, owner/admin, inventory,
+  reservations desk, and settings access.
+
+Both domains can point to the same Cloudflare Pages project. The app detects
+the hostname and shows the customer entry screen on `thatcanadian.dev`, while
+`app.thatcanadian.dev` opens the staff login/workspace.
+
+The repo also deploys a small Cloudflare Worker named `libabite-edge` for edge
+health checks and short redirects (`/health`, `/staff`, `/order`, `/reserve`).
+GitHub Actions deploys Convex first, then the Worker, then Pages.
 
 Convex backend files:
 

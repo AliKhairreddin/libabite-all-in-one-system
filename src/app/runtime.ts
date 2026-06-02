@@ -174,6 +174,7 @@ const {
   getQrOrderUrl,
   getStaffUrl,
   getWebsiteOrderSession,
+  getWebsiteOrderingUrl,
   getWebsiteReservationSession,
   getWebsiteReservationUrl,
   openQrCustomerUrl,
@@ -366,7 +367,7 @@ const {
   validateOrderForKitchen
 });
 
-const { renderCustomerQrScreen, renderWebsiteOrderScreen, renderWebsiteReservationScreen } = createPublicOrderingUi({
+const { renderCustomerQrScreen, renderPublicHomeScreen, renderWebsiteOrderScreen, renderWebsiteReservationScreen } = createPublicOrderingUi({
   emptyState,
   fulfillmentLabel,
   formatStockAmount,
@@ -379,10 +380,12 @@ const { renderCustomerQrScreen, renderWebsiteOrderScreen, renderWebsiteReservati
   getOrderableProductsForContext,
   getProductAvailability,
   getStaffUrl,
+  getWebsiteOrderingUrl,
   getStockShortages,
   getCustomerQrSession,
   getWebsiteOrderSession,
   getWebsiteReservationSession,
+  getWebsiteReservationUrl,
   money,
   orderById,
   orderLocationLabel,
@@ -781,6 +784,8 @@ const { render, renderNav, updateView } = createAppRenderer({
   ensureActiveViewAccess,
   getCurrentUserProcedures,
   getCustomerOrderingSession,
+  getWebsiteOrderingUrl,
+  getWebsiteReservationUrl,
   getLowStockIngredients,
   getOpenTickets,
   isActiveDelivery,
@@ -795,6 +800,7 @@ const { render, renderNav, updateView } = createAppRenderer({
   renderProductManagement,
   renderProductsInSelects,
   renderProcedures,
+  renderPublicHomeScreen,
   renderReservationPlanner,
   renderReservations,
   renderSettings,
