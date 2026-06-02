@@ -1,6 +1,7 @@
 import { createAppRenderer } from "./render.js";
 import { createQrRuntime } from "./qr.js";
 import { createCustomerOrderingRuntime } from "./customer-ordering.js";
+import { createWebsiteCheckoutSession, handleWebsitePaymentReturn } from "./payment-actions.js";
 import { createStaffOrderRuntime } from "./staff-orders.js";
 import { createDeliveryRuntime } from "./delivery-actions.js";
 import { createExternalDeliveryRuntime } from "./external-delivery-actions.js";
@@ -330,6 +331,7 @@ const {
   submitCustomerQrOrder,
   submitWebsiteOrder
 } = createCustomerOrderingRuntime({
+  createWebsiteCheckoutSession,
   getCustomerOrderingSession,
   getCustomerQrSession,
   getItemsTotal,
@@ -946,6 +948,11 @@ export function createAppRuntime() {
       cancelStaffShiftEdit,
       endShiftBreak
     },
+    handleWebsitePaymentReturn: () => handleWebsitePaymentReturn({
+      render,
+      sendOrderToKitchen,
+      showToast
+    }),
     render,
     renderTimingSurfaces
   };

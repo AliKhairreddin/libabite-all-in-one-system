@@ -87,6 +87,16 @@ The Convex snapshot stores shared restaurant data. Per-browser session fields
 like the current login, active view, filters, carts, and in-progress drafts stay
 local so one device does not take over another device's workspace.
 
+Website checkout uses Stripe Checkout through Convex. Set the backend secret
+before deploying live checkout:
+
+```sh
+npx convex env set STRIPE_SECRET_KEY sk_live_...
+```
+
+Successful Stripe returns are verified by Convex before the browser marks the
+website order paid and sends it to the kitchen.
+
 ## Temporary Domains
 
 Until `libabite.nl` is ready, use these Cloudflare Pages custom domains:

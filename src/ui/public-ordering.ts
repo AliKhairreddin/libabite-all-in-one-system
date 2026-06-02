@@ -143,23 +143,9 @@ export function createPublicOrderingUi(deps) {
         </label>
         <fieldset class="customer-payment-options customer-payment-card">
           <legend>Online payment</legend>
-          <label>
-            Name on card
-            <input name="cardName" type="text" autocomplete="cc-name" required>
-          </label>
-          <label>
-            Card number
-            <input name="cardNumber" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" required>
-          </label>
-          <div class="form-row">
-            <label>
-              Expiry
-              <input name="cardExpiry" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="12/30" required>
-            </label>
-            <label>
-              CVC
-              <input name="cardCvc" type="text" inputmode="numeric" autocomplete="cc-csc" required>
-            </label>
+          <div class="check-row">
+            <input name="paymentProvider" type="radio" value="stripe" checked>
+            <span>Secure checkout</span>
           </div>
         </fieldset>
     ` : `
@@ -197,7 +183,7 @@ export function createPublicOrderingUi(deps) {
           <span>Total</span>
           <strong>${escapeHtml(money(total))}</strong>
         </div>
-        <button class="primary-btn" type="submit" ${blocked ? "disabled" : ""}>${mode === "website" ? "Pay & Place Order" : "Place Order"} · ${escapeHtml(money(total))}</button>
+        <button class="primary-btn" type="submit" ${blocked ? "disabled" : ""}>${mode === "website" ? "Continue to payment" : "Place Order"} · ${escapeHtml(money(total))}</button>
       </form>
     `;
   }

@@ -1,5 +1,10 @@
-import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
+import {
+  closeSharedConvexClient,
+  getConvexStateKey,
+  getSharedConvexClient,
+  isConvexEnabled
+} from "./convex-client.js";
 
 type SyncState = "disabled" | "connecting" | "ready" | "syncing" | "error";
 
@@ -20,7 +25,6 @@ interface ConvexStateSyncOptions {
 }
 
 const CLIENT_ID_STORAGE_KEY = "libabite-convex-client-id";
-const DEFAULT_STATE_KEY = "libabite-main";
 const SAVE_DEBOUNCE_MS = 450;
 const LOCAL_ONLY_STATE_KEYS = new Set([
   "currentUserId",
@@ -42,10 +46,6 @@ const LOCAL_ONLY_STATE_KEYS = new Set([
   "productRecipeDraft",
   "procedureProgress"
 ]);
-
-function readEnv(name: string) {
-  return String(import.meta.env[name] || "").trim();
-}
 
 function createClientId() {
   try {
@@ -109,12 +109,11 @@ export function renderConvexSyncStatus(status: ConvexSyncStatus) {
 }
 
 export function createConvexStateSync(options: ConvexStateSyncOptions) {
-  const url = readEnv("VITE_CONVEX_URL");
-  const stateKey = readEnv("VITE_CONVEX_STATE_KEY") || DEFAULT_STATE_KEY;
-  const enabled = Boolean(url) && readEnv("VITE_CONVEX_DISABLED") !== "true";
+  const stateKey = getConvexStateKey();
+  const enabled = isConvexEnabled();
   const clientId = createClientId();
   const listeners = new Set<(status: ConvexSyncStatus) => void>();
-  let client: ConvexClient | null = null;
+  let client = getSharedConvexClient();
   let unsubscribeState: (() => void) | null = null;
   let unsubscribeConnection: (() => void) | null = null;
   let knownRemoteVersion = 0;
@@ -229,7 +228,12 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
   }
 
   async function flush() {
-    if (!enabled || !client || flushPromise || !pendingState) return;
+    if (!enabled || !client) return;
+    if (flushPromise) {
+      await flushPromise;
+      return;
+    }
+    if (!pendingState) return;
 
     flushPromise = (async () => {
       while (pendingState) {
@@ -288,12 +292,23 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
     }, SAVE_DEBOUNCE_MS);
   }
 
+  async function flushNow(nextState = options.getState()) {
+    if (!enabled) return;
+    queueSave(nextState);
+    if (saveTimer) {
+      window.clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    await flush();
+  }
+
   function start() {
     renderConvexSyncStatus(status);
     if (!enabled) return;
 
     try {
-      client = new ConvexClient(url, { unsavedChangesWarning: true });
+      client = getSharedConvexClient();
+      if (!client) return;
       unsubscribeConnection = client.subscribeToConnectionState((connectionState) => {
         if (connectionState.isWebSocketConnected) {
           emit({
@@ -340,7 +355,7 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
     if (saveTimer) window.clearTimeout(saveTimer);
     unsubscribeState?.();
     unsubscribeConnection?.();
-    void client?.close();
+    void closeSharedConvexClient();
   }
 
   function subscribe(listener: (status: ConvexSyncStatus) => void) {
@@ -351,6 +366,7 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
 
   return {
     getStatus: () => status,
+    flushNow,
     queueSave,
     start,
     stop,

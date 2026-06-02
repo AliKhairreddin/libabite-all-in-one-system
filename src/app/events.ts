@@ -379,7 +379,7 @@ export function bindAppEvents(handlers) {
     if (!customerOrderForm) return;
     event.preventDefault();
     if (getCustomerOrderingSession()?.mode === "website") {
-      submitWebsiteOrder(new FormData(customerOrderForm));
+      void submitWebsiteOrder(new FormData(customerOrderForm));
     } else {
       submitCustomerQrOrder(new FormData(customerOrderForm));
     }

@@ -169,7 +169,7 @@ export const PHASE_18_SEED_PRODUCT_IDS = ["kefta-sandwich"];
 export const CUSTOMER_QR_CHANNEL = "QR table order";
 export const CUSTOMER_QR_ORDER_CONTEXT = { channel: CUSTOMER_QR_CHANNEL, fulfillment: "Kitchen" };
 export const WEBSITE_ORDER_CHANNEL = "Website order";
-export const WEBSITE_PAYMENT_PROCESSOR = "Libabite Online Checkout";
+export const WEBSITE_PAYMENT_PROCESSOR = "Stripe";
 export const WEBSITE_DEFAULT_FULFILLMENT = "Pickup";
 export const WEBSITE_FULFILLMENT_OPTIONS = [
   { value: "Pickup", label: "Takeaway", channel: "Takeaway" },

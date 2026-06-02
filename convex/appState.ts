@@ -1,5 +1,6 @@
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
+import { mirrorOperationalTables } from "./operationalSync";
 
 const appStateArgs = {
   key: v.string()
@@ -66,6 +67,7 @@ export const bootstrap = mutationGeneric({
       at: now,
       ...optionalEventMetadata({ actorId: args.updatedBy, clientId: args.clientId })
     });
+    await mirrorOperationalTables(ctx, args.key, args.state, now);
 
     return { status: "created", id, version: 1, updatedAt: now };
   }
@@ -99,6 +101,7 @@ export const saveSnapshot = mutationGeneric({
         at: now,
         ...optionalEventMetadata({ actorId: args.updatedBy, clientId: args.clientId })
       });
+      await mirrorOperationalTables(ctx, args.key, args.state, now);
 
       return { status: "created", id, version: 1, updatedAt: now };
     }
@@ -122,6 +125,7 @@ export const saveSnapshot = mutationGeneric({
       at: now,
       ...optionalEventMetadata({ actorId: args.updatedBy, clientId: args.clientId })
     });
+    await mirrorOperationalTables(ctx, args.key, args.state, now);
 
     return { status: "updated", version: nextVersion, updatedAt: now };
   }

@@ -8,7 +8,7 @@ import {
 import { getPaymentStatusForMethod } from "../domain/payments.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext } from "../domain/orders.js";
 import { isReservationTime } from "../domain/reservations.js";
-import { saveState, state } from "./state.js";
+import { flushRemoteState, saveState, state } from "./state.js";
 import { timeNow } from "../shared/dates.js";
 
 export function createCustomerOrderingRuntime(deps) {
@@ -19,6 +19,7 @@ export function createCustomerOrderingRuntime(deps) {
     getProductAvailability,
     getStockShortages,
     getItemsTotal,
+    createWebsiteCheckoutSession,
     normalizeOrderItems,
     productById,
     render,
@@ -199,30 +200,7 @@ export function createCustomerOrderingRuntime(deps) {
     showToast(`Order #${number} sent to the kitchen.`);
   }
 
-  function normalizeCardDigits(value) {
-    return String(value || "").replace(/\D/g, "");
-  }
-
-  function processWebsiteOnlinePayment(formData, amount) {
-    const cardName = String(formData.get("cardName") || "").trim();
-    const cardNumber = normalizeCardDigits(formData.get("cardNumber"));
-    const expiry = String(formData.get("cardExpiry") || "").replace(/\s+/g, "").trim();
-    const cvc = normalizeCardDigits(formData.get("cardCvc"));
-
-    if (amount <= 0) return { ok: false, message: "Add a paid item before checkout." };
-    if (cardName.length < 2) return { ok: false, message: "Enter the cardholder name." };
-    if (cardNumber.length < 12 || cardNumber.length > 19) return { ok: false, message: "Enter a valid card number." };
-    if (!/^\d{2}\/?\d{2}$/.test(expiry)) return { ok: false, message: "Enter the card expiry as MM/YY." };
-    if (cvc.length < 3 || cvc.length > 4) return { ok: false, message: "Enter a valid CVC." };
-
-    return {
-      ok: true,
-      reference: `PAY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-      processor: WEBSITE_PAYMENT_PROCESSOR
-    };
-  }
-
-  function submitWebsiteOrder(formData) {
+  async function submitWebsiteOrder(formData) {
     if (!getWebsiteOrderSession()) return;
 
     const fulfillment = normalizeWebsiteFulfillment(formData.get("fulfillment") || state.websiteFulfillment);
@@ -253,12 +231,11 @@ export function createCustomerOrderingRuntime(deps) {
       return;
     }
 
-    const payment = processWebsiteOnlinePayment(formData, getItemsTotal(items));
-    if (!payment.ok) {
-      showToast(payment.message);
+    const total = getItemsTotal(items);
+    if (total <= 0) {
+      showToast("Add a paid item before checkout.");
       return;
     }
-
     const number = state.nextOrderNumber;
     const orderId = `ORD-${number}`;
     const createdAt = timeNow();
@@ -275,21 +252,21 @@ export function createCustomerOrderingRuntime(deps) {
       customerEmail,
       deliveryAddress,
       requestedTime,
-      paymentStatus: "Paid",
+      paymentStatus: "Unpaid",
       paymentMethod: "Online payment",
-      paymentReference: payment.reference,
-      paymentProcessor: payment.processor,
+      paymentReference: "",
+      paymentProcessor: WEBSITE_PAYMENT_PROCESSOR,
       fulfillment,
       status: "New",
       createdAt,
       createdAtMs,
       sentAt: "",
-      paidAt: createdAt,
-      paidAtMs: createdAtMs,
+      paidAt: "",
+      paidAtMs: "",
       staffId: "",
       staffName: "Website checkout",
       paidByUserId: "",
-      paidByName: "Website checkout",
+      paidByName: "",
       inventoryDeducted: false,
       assignedDriver: "",
       pickupStatus: "",
@@ -333,8 +310,16 @@ export function createCustomerOrderingRuntime(deps) {
     state.websiteCart = [];
     state.websiteLastOrderId = order.id;
     state.receiptOrderId = order.id;
-    sendOrderToKitchen(order.id, { silent: true, skipPermission: true });
-    showToast(`Order #${number} confirmed.`);
+    saveState();
+    await flushRemoteState();
+
+    const checkout = await createWebsiteCheckoutSession(order, Math.round(total * 100));
+    if (!checkout?.ok || !checkout.checkoutUrl) {
+      showToast(checkout?.message || "Online checkout is not ready yet.");
+      return;
+    }
+
+    window.location.assign(checkout.checkoutUrl);
   }
 
   return {
