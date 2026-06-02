@@ -9,6 +9,8 @@
  */
 
 import type * as appState from "../appState.js";
+import type * as operationalSync from "../operationalSync.js";
+import type * as payments from "../payments.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +20,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   appState: typeof appState;
+  operationalSync: typeof operationalSync;
+  payments: typeof payments;
 }>;
 
 /**
