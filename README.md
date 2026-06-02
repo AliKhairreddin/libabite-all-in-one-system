@@ -55,6 +55,43 @@ Run domain tests:
 npm test
 ```
 
+## Convex Connection
+
+The app now supports Convex-backed state sync while keeping browser storage as
+the local fallback. Copy `.env.example` to `.env.local` and fill in:
+
+```sh
+VITE_CONVEX_URL=https://your-deployment.convex.cloud
+VITE_CONVEX_STATE_KEY=libabite-main
+```
+
+Start the Convex backend in one terminal:
+
+```sh
+npm run convex:dev
+```
+
+Start the Vite app in another terminal:
+
+```sh
+npm run dev
+```
+
+Until `VITE_CONVEX_URL` is set, the app stays in local browser-storage mode.
+When Convex is configured, the topbar status pill shows whether it is
+connecting, saving, synced, or in an error state.
+
+The Convex snapshot stores shared restaurant data. Per-browser session fields
+like the current login, active view, filters, carts, and in-progress drafts stay
+local so one device does not take over another device's workspace.
+
+Convex backend files:
+
+- `convex/schema.ts` defines the shared app snapshot, sync event log, and
+  integration config tables.
+- `convex/appState.ts` exposes `get`, `bootstrap`, `saveSnapshot`, and
+  `logEvent` functions for the browser sync adapter.
+
 ## Project Shape
 
 - `index.html` is the Vite entry point for the full restored app.

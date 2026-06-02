@@ -7,6 +7,8 @@
     "build": "tsc --noEmit && vite build",
     "build:domain": "tsc -p tsconfig.domain.json",
     "check": "tsc --noEmit",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy",
     "dev": "vite --host 127.0.0.1",
     "test": "npm run build:domain && node --test tests/*.test.mjs"
   },
@@ -24,6 +26,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "convex": "^1.40.0",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

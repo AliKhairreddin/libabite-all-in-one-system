@@ -535,6 +535,53 @@ button {
   min-height: 34px;
 }
 
+.sync-status {
+  min-height: 34px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.sync-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.sync-status.is-ready {
+  border-color: rgba(28, 122, 77, 0.28);
+  background: #edf8f0;
+  color: var(--ok);
+}
+
+.sync-status.is-syncing,
+.sync-status.is-connecting {
+  border-color: rgba(51, 107, 123, 0.25);
+  background: #eef6f7;
+  color: var(--info);
+}
+
+.sync-status.is-error {
+  border-color: rgba(180, 35, 24, 0.24);
+  background: #fff0ee;
+  color: var(--danger);
+}
+
+.sync-status.is-disabled {
+  background: #f4f5f2;
+}
+
 .user-menu {
   min-height: 44px;
   padding: 5px 5px 5px 12px;
