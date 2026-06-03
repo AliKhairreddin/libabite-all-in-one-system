@@ -658,17 +658,19 @@ export function createTeamUi(deps) {
   }
   
   function renderTeam() {
-    const isDriverRole = currentRoleKey() === "driver";
-    const user = currentUser();
     const staffRoleSelect = document.querySelector("#staffRoleSelect");
     const userList = document.querySelector("#userList");
     const driversPanel = document.querySelector("#driversPanel");
+    const showDriverDirectory = canManageDeliveryOperations();
   
     document.querySelectorAll(".admin-only").forEach((panel) => {
       panel.hidden = !can("canCreateUsers");
     });
   
-    if (driversPanel) driversPanel.classList.toggle("wide-panel", isDriverRole);
+    if (driversPanel) {
+      driversPanel.hidden = !showDriverDirectory;
+      driversPanel.classList.toggle("wide-panel", false);
+    }
   
     if (staffRoleSelect) {
       staffRoleSelect.innerHTML = ROLE_ORDER
@@ -691,29 +693,33 @@ export function createTeamUi(deps) {
         .join("");
     }
   
-    const driversToShow = isDriverRole
-      ? state.drivers.filter((driver) => driver.id === user.id || driver.name.split(" ")[0] === user.name.split(" ")[0])
-      : state.drivers;
+    const driversToShow = showDriverDirectory ? state.drivers : [];
   
     const driverList = document.querySelector("#driverList");
-    if (driverList) driverList.innerHTML = driversToShow.length
-      ? driversToShow.map((driver) => {
-      const order = driver.orderId ? orderById(driver.orderId) : null;
-      const statusClass = driver.status === DRIVER_IDLE_STATUS ? "ok" : driver.status === "Failed delivery" ? "danger" : "info";
-      return `
-        <article class="driver-card">
-          <header>
-            <div>
-              <strong>${escapeHtml(driver.name)}</strong>
-              <p>${escapeHtml(driver.location)}</p>
-            </div>
-            <span class="pill ${statusClass}">${escapeHtml(driver.status)}</span>
-          </header>
-          <p>${escapeHtml(order ? `Order #${order.number} | ETA ${formatDeliveryEta(order)}` : "Ready for next delivery.")}</p>
-        </article>
-      `;
-    }).join("")
-      : emptyState("No driver profile found for this account.");
+    if (driverList) {
+      if (!showDriverDirectory) {
+        driverList.innerHTML = "";
+      } else {
+        driverList.innerHTML = driversToShow.length
+          ? driversToShow.map((driver) => {
+            const order = driver.orderId ? orderById(driver.orderId) : null;
+            const statusClass = driver.status === DRIVER_IDLE_STATUS ? "ok" : driver.status === "Failed delivery" ? "danger" : "info";
+            return `
+              <article class="driver-card">
+                <header>
+                  <div>
+                    <strong>${escapeHtml(driver.name)}</strong>
+                    <p>${escapeHtml(driver.location)}</p>
+                  </div>
+                  <span class="pill ${statusClass}">${escapeHtml(driver.status)}</span>
+                </header>
+                <p>${escapeHtml(order ? `Order #${order.number} | ETA ${formatDeliveryEta(order)}` : "Ready for next delivery.")}</p>
+              </article>
+            `;
+          }).join("")
+          : emptyState("No drivers created yet.");
+      }
+    }
   
     renderTimeClock();
     renderScheduleManagement();

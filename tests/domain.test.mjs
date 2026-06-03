@@ -52,6 +52,7 @@ import { getCurrentUser, roleCan, roleDefinition, visibleViewsForRole } from "..
 import { formatActualUsageLabel, formatSignedAmount, formatStockAmount } from "../dist/shared/formatters.js";
 import { slugify, uniqueRecordId } from "../dist/shared/ids.js";
 import { formatMoney } from "../dist/shared/money.js";
+import { ROLE_DEFINITIONS } from "../dist/shared/constants.js";
 
 test("payment methods normalize into paid and pay-later states", () => {
   assert.equal(normalizePaymentMethod("Paid"), "Cash");
@@ -77,6 +78,18 @@ test("user role helpers resolve active users and permissions", () => {
   assert.equal(roleDefinition("missing", roleDefinitions), roleDefinitions.waiter_cashier);
   assert.equal(roleCan(roleDefinition(user.role, roleDefinitions), "canEditSettings"), true);
   assert.deepEqual(visibleViewsForRole(views, roleDefinition(user.role, roleDefinitions)).map((view) => view.id), ["dashboard", "orders"]);
+});
+
+test("staff role matrix keeps command access to management roles", () => {
+  const rolesWithCommand = Object.entries(ROLE_DEFINITIONS)
+    .filter(([, definition]) => definition.views.includes("dashboard"))
+    .map(([role]) => role);
+
+  assert.deepEqual(rolesWithCommand, ["owner_admin", "manager"]);
+  assert.deepEqual(ROLE_DEFINITIONS.waiter_cashier.views, ["orders", "procedures", "team", "reservations"]);
+  assert.deepEqual(ROLE_DEFINITIONS.kitchen_staff.views, ["kitchen", "procedures", "team"]);
+  assert.deepEqual(ROLE_DEFINITIONS.driver.views, ["procedures", "team"]);
+  assert.equal(ROLE_DEFINITIONS.driver.canCreateOrders, undefined);
 });
 
 test("procedure helpers classify status and role assignments", () => {

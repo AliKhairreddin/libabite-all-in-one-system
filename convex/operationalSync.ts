@@ -41,7 +41,7 @@ const ROLE_PERMISSIONS = [
   {
     role: "waiter_cashier",
     label: "Waiter/Cashier",
-    views: ["dashboard", "orders", "procedures", "team", "reservations"],
+    views: ["orders", "procedures", "team", "reservations"],
     permissions: {
       canCreateOrders: true,
       canRecordWaste: true,
@@ -52,7 +52,7 @@ const ROLE_PERMISSIONS = [
   {
     role: "kitchen_staff",
     label: "Kitchen staff",
-    views: ["dashboard", "kitchen", "procedures", "team"],
+    views: ["kitchen", "procedures", "team"],
     permissions: {
       canAdvanceTickets: true,
       canRecordWaste: true,
@@ -63,9 +63,8 @@ const ROLE_PERMISSIONS = [
   {
     role: "driver",
     label: "Driver",
-    views: ["dashboard", "team"],
+    views: ["procedures", "team"],
     permissions: {
-      canRecordWaste: true,
       canCompleteProcedures: true
     }
   }

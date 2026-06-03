@@ -213,12 +213,14 @@ export function createAppRenderer(deps) {
   
   function renderNav() {
     const navList = document.querySelector("#navList");
+    const user = currentUser();
+    const canSeeDeliveryOperations = ["owner_admin", "manager"].includes(user?.role);
     const counts = {
       orders: state.orders.filter((order) => order.status !== "Paid" && order.status !== "Cancelled").length,
       kitchen: getOpenTickets().length,
       inventory: getLowStockIngredients().length,
       procedures: getCurrentUserProcedures().filter((procedure) => procedurePeriodStatus(procedure).status !== "Completed").length,
-      team: state.orders.filter(isActiveDelivery).length,
+      team: canSeeDeliveryOperations ? state.orders.filter(isActiveDelivery).length : 0,
       reservations: state.reservations.length
     };
   
@@ -236,8 +238,13 @@ export function createAppRenderer(deps) {
   }
   
   function updateView() {
+    const allowedViewIds = new Set(visibleViews().map((view) => view.id));
     document.querySelectorAll(".view").forEach((view) => {
-      view.classList.toggle("is-active", view.id === `view-${state.activeView}`);
+      const viewId = view.id.replace(/^view-/, "");
+      const active = allowedViewIds.has(viewId) && view.id === `view-${state.activeView}`;
+      view.classList.toggle("is-active", active);
+      view.hidden = !active;
+      view.setAttribute("aria-hidden", active ? "false" : "true");
     });
     const currentView = document.querySelector(`#view-${state.activeView}`);
     document.querySelector("#viewTitle").textContent = currentView?.dataset.title || "Dashboard";
