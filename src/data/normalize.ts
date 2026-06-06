@@ -31,6 +31,11 @@ import {
   WASTE_REASONS
 } from "../shared/constants.js";
 import { normalizeOptionalTimestamp, normalizeTimestamp, timeNow } from "../shared/dates.js";
+import {
+  normalizePrecautionaryAllergenStatus,
+  normalizeProductAllergens,
+  normalizeVatSetting
+} from "../domain/commerce.js";
 import { normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
 import {
   externalPlatformName,
@@ -39,8 +44,22 @@ import {
   normalizeExternalPlatformId,
   normalizeExternalPlatformStatus
 } from "../domain/external-delivery.js";
-import { normalizeOrderFulfillment, normalizeOrderType, normalizeWebsiteFulfillment, orderTypeDefinition } from "../domain/orders.js";
-import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
+import {
+  normalizeFulfillmentStatus,
+  normalizeOrderFulfillment,
+  normalizeOrderOperationalStatus,
+  normalizeOrderType,
+  normalizeWebsiteFulfillment,
+  orderTypeDefinition
+} from "../domain/orders.js";
+import {
+  buildPaymentLedgerRecord,
+  getPaymentStatusForMethod,
+  isPaidPaymentMethod,
+  normalizePaymentMethod,
+  normalizePaymentStatus as normalizeLedgerPaymentStatus,
+  upsertPaymentLedgerRecord
+} from "../domain/payments.js";
 import {
   getAvailableReservationTable,
   getReservationConflicts,
@@ -637,7 +656,7 @@ export function normalizeProducts(products, ingredientIds) {
           ? product.station
           : "Other";
       const station = normalizeKitchenStation(product.station || product.kitchenStation || "Main kitchen");
-      const vatSetting = VAT_OPTIONS.some((option) => option.id === product.vatSetting) ? product.vatSetting : "standard";
+      const vatSetting = normalizeVatSetting(product.vatSetting, "reduced");
       const targetMargin = normalizeMarginPercent(product.targetMargin, DEFAULT_MARGIN_TARGET);
       const minMargin = Math.min(targetMargin, normalizeMarginPercent(product.minMargin ?? product.minimumMargin, DEFAULT_MARGIN_MINIMUM));
 
@@ -649,6 +668,9 @@ export function normalizeProducts(products, ingredientIds) {
         station,
         price: Math.max(0, Number(product.price ?? product.sellingPrice) || 0),
         vatSetting,
+        allergens: normalizeProductAllergens(product.allergens),
+        precautionaryAllergenStatus: normalizePrecautionaryAllergenStatus(product.precautionaryAllergenStatus),
+        precautionaryAllergenNote: String(product.precautionaryAllergenNote || product.allergenNote || "").trim(),
         active: product.active === undefined ? product.status !== "Inactive" : Boolean(product.active),
         availability: normalizeProductAvailability(product.availability),
         targetMargin,
@@ -1032,7 +1054,7 @@ export function normalizeOrderStatus(status, paymentStatus = "") {
 }
 
 export function normalizePaymentStatus(status) {
-  return ["Paid", "Unpaid", "Pay later"].includes(status) ? status : "Unpaid";
+  return normalizeLedgerPaymentStatus(status);
 }
 
 export function normalizeDeliveryNotes(notes) {
@@ -1260,6 +1282,94 @@ export function normalizeReservationCapacityRules(rules) {
     .filter((rule) => rule.maxGuests > 0 || rule.maxReservations > 0);
 }
 
+export function normalizePaymentLedger(records) {
+  const normalized = [];
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    normalized.push(buildPaymentLedgerRecord(record, {
+      nowMs: normalizeOptionalTimestamp(record?.createdAtMs || record?.updatedAtMs) || Date.now()
+    }));
+  });
+  return normalized.slice(-250);
+}
+
+function orderPaymentLedgerInput(order, productById) {
+  const paymentStatus = normalizeLedgerPaymentStatus(order.paymentStatus);
+  const hasPaymentEvidence = paymentStatus !== "Unpaid"
+    || order.paymentReference
+    || order.paymentProcessor
+    || order.stripeCheckoutSessionId
+    || order.stripePaymentIntentId;
+  if (!hasPaymentEvidence) return null;
+
+  const amount = (Array.isArray(order.items) ? order.items : []).reduce((sum, item) => {
+    const product = productById.get(item.productId);
+    return sum + ((Number(product?.price) || 0) * (Number(item.quantity) || 0));
+  }, 0);
+
+  return {
+    id: `PAY-order-${order.id}`,
+    externalId: `order-summary:${order.id}`,
+    kind: "order",
+    provider: order.paymentProcessor || order.externalPlatformId || "",
+    status: paymentStatus,
+    currency: "eur",
+    amountCents: Math.round(amount * 100),
+    orderId: order.id,
+    paymentMethod: order.paymentMethod,
+    providerPaymentId: order.paymentReference,
+    checkoutSessionId: order.stripeCheckoutSessionId,
+    paymentIntentId: order.stripePaymentIntentId,
+    customerName: order.customerName || order.customer,
+    customerEmail: order.customerEmail,
+    captureMode: order.externalPlatformId ? "external_platform" : order.paymentMethod === "Online payment" ? "online_checkout" : "staff_recorded",
+    sourceChannel: order.channel,
+    paidAt: order.paidAt,
+    paidAtMs: order.paidAtMs,
+    raw: {
+      orderId: order.id,
+      orderNumber: order.number,
+      channel: order.channel,
+      externalPlatformId: order.externalPlatformId,
+      externalOrderId: order.externalOrderId
+    }
+  };
+}
+
+function reservationPaymentLedgerInput(reservation) {
+  const paymentStatus = normalizeLedgerPaymentStatus(reservation.paymentStatus);
+  const amountCents = Math.round((Number(reservation.depositAmount) || 0) * 100);
+  const hasPaymentEvidence = paymentStatus !== "Unpaid"
+    || amountCents > 0
+    || reservation.paymentReference
+    || reservation.paymentProcessor;
+  if (!hasPaymentEvidence) return null;
+
+  return {
+    id: `PAY-reservation-${reservation.id}`,
+    externalId: `reservation-deposit:${reservation.id}`,
+    kind: "reservation_deposit",
+    provider: reservation.paymentProcessor || "",
+    status: paymentStatus,
+    currency: "eur",
+    amountCents,
+    reservationId: reservation.id,
+    paymentMethod: reservation.paymentMethod || "Online payment",
+    providerPaymentId: reservation.paymentReference,
+    customerName: reservation.name,
+    customerEmail: reservation.email,
+    captureMode: "online_checkout",
+    sourceChannel: reservation.source,
+    paidAt: reservation.paidAt,
+    paidAtMs: reservation.paidAtMs,
+    raw: {
+      reservationId: reservation.id,
+      date: reservation.date,
+      time: reservation.time,
+      guests: reservation.guests
+    }
+  };
+}
+
 export function normalizeState(candidate) {
   const source = candidate ? structuredClone(candidate) : {};
   const next = { ...getFreshSeedState(), ...source };
@@ -1267,6 +1377,7 @@ export function normalizeState(candidate) {
     "products",
     "ingredients",
     "orders",
+    "payments",
     "tickets",
     "tables",
     "tableQrCodes",
@@ -1398,6 +1509,7 @@ export function normalizeState(candidate) {
       : shouldAssignTable
         ? getAvailableReservationTable({ id, date, guests, time }, next.tables, normalizedReservations)
         : requestedTable;
+    const paymentStatus = normalizePaymentStatus(reservation.paymentStatus);
 
     normalizedReservations.push({
       id,
@@ -1412,7 +1524,14 @@ export function normalizeState(candidate) {
       source,
       status,
       createdAt: reservation.createdAt || timeNow(),
-      updatedAt: reservation.updatedAt || ""
+      updatedAt: reservation.updatedAt || "",
+      paymentStatus,
+      paymentMethod: normalizePaymentMethod(reservation.paymentMethod || "Unpaid / pay later", reservation.paymentStatus),
+      paymentReference: String(reservation.paymentReference || "").trim(),
+      paymentProcessor: String(reservation.paymentProcessor || "").trim(),
+      depositAmount: Math.max(0, Number(reservation.depositAmount) || 0),
+      paidAt: paymentStatus === "Paid" ? reservation.paidAt || reservation.createdAt || timeNow() : String(reservation.paidAt || "").trim(),
+      paidAtMs: paymentStatus === "Paid" ? normalizeOptionalTimestamp(reservation.paidAtMs) || normalizeTimestamp(reservation.createdAtMs, reservation.paidAt || reservation.createdAt || timeNow()) : normalizeOptionalTimestamp(reservation.paidAtMs)
     });
   });
   next.reservations = normalizedReservations;
@@ -1478,6 +1597,8 @@ export function normalizeState(candidate) {
         paymentStatus,
         paymentMethod,
         fulfillment,
+        operationalStatus: normalizeOrderOperationalStatus(order.operationalStatus || order.lifecycleStatus || order.status),
+        fulfillmentStatus: normalizeFulfillmentStatus(order.fulfillmentStatus || order.status),
         status: normalizeOrderStatus(order.status, paymentStatus),
         createdAt,
         createdAtMs: normalizeTimestamp(order.createdAtMs, createdAt),
@@ -1537,6 +1658,18 @@ export function normalizeState(candidate) {
   if (next.customerLastOrderId && !next.orders.some((order) => order.id === next.customerLastOrderId)) next.customerLastOrderId = "";
   next.websiteLastOrderId = String(candidate?.websiteLastOrderId || "");
   if (next.websiteLastOrderId && !next.orders.some((order) => order.id === next.websiteLastOrderId)) next.websiteLastOrderId = "";
+
+  const productByIdForPayments = new Map(next.products.map((product) => [product.id, product]));
+  next.payments = normalizePaymentLedger(candidate?.payments || next.payments);
+  next.orders.forEach((order) => {
+    const ledgerInput = orderPaymentLedgerInput(order, productByIdForPayments);
+    if (ledgerInput) next.payments = upsertPaymentLedgerRecord(next.payments, ledgerInput);
+  });
+  next.reservations.forEach((reservation) => {
+    const ledgerInput = reservationPaymentLedgerInput(reservation);
+    if (ledgerInput) next.payments = upsertPaymentLedgerRecord(next.payments, ledgerInput);
+  });
+  next.payments = normalizePaymentLedger(next.payments);
 
   const orderIds = new Set(next.orders.map((order) => order.id));
   next.tickets = next.tickets

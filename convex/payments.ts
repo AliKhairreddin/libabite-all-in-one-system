@@ -8,6 +8,8 @@ declare const process: {
 };
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
+const MOLLIE_API_BASE = "https://api.mollie.com/v2";
+const STRIPE_NL_PAYMENT_METHOD_TYPES = ["ideal", "card"];
 
 function cleanText(value: any) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -15,6 +17,10 @@ function cleanText(value: any) {
 
 function stripeSecretKey() {
   return cleanText(process.env.STRIPE_SECRET_KEY);
+}
+
+function mollieApiKey() {
+  return cleanText(process.env.MOLLIE_API_KEY);
 }
 
 function stripeId(value: any) {
@@ -65,6 +71,35 @@ async function stripeRequest(path: string, options: { method?: string; body?: UR
     return {
       ok: false,
       message: cleanText(payload?.error?.message) || "Stripe rejected the checkout request."
+    };
+  }
+
+  return { ok: true, payload };
+}
+
+async function mollieRequest(path: string, options: { method?: string; body?: Record<string, any> } = {}) {
+  const apiKey = mollieApiKey();
+  if (!apiKey) {
+    return {
+      ok: false,
+      message: "Mollie checkout is missing MOLLIE_API_KEY in Convex."
+    };
+  }
+
+  const response = await fetch(`${MOLLIE_API_BASE}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      ...(options.body ? { "Content-Type": "application/json" } : {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: cleanText(payload?.detail || payload?.title || payload?.message) || "Mollie rejected the payment request."
     };
   }
 
@@ -130,6 +165,7 @@ export const markCheckoutSessionStarted = mutationGeneric({
     order: v.any(),
     checkoutSessionId: v.string(),
     checkoutUrl: v.string(),
+    provider: v.optional(v.string()),
     paymentIntentId: v.optional(v.string())
   },
   handler: async (ctx, args) => {
@@ -142,8 +178,10 @@ export const markCheckoutSessionStarted = mutationGeneric({
       order: args.order,
       eventType: "payment:checkout_started",
       patch: {
+        paymentStatus: "Pending",
+        paymentMethod: "Online payment",
         paymentReference: args.checkoutSessionId,
-        paymentProcessor: "Stripe",
+        paymentProcessor: cleanText(args.provider) || "Stripe",
         stripeCheckoutSessionId: args.checkoutSessionId,
         stripeCheckoutUrl: args.checkoutUrl,
         ...(args.paymentIntentId ? { stripePaymentIntentId: args.paymentIntentId } : {})
@@ -158,6 +196,7 @@ export const markCheckoutSessionPaid = mutationGeneric({
     order: v.optional(v.any()),
     orderId: v.string(),
     checkoutSessionId: v.string(),
+    provider: v.optional(v.string()),
     paymentIntentId: v.optional(v.string())
   },
   handler: async (ctx, args) => {
@@ -170,7 +209,7 @@ export const markCheckoutSessionPaid = mutationGeneric({
         paymentStatus: "Paid",
         paymentMethod: "Online payment",
         paymentReference: args.checkoutSessionId,
-        paymentProcessor: "Stripe",
+        paymentProcessor: cleanText(args.provider) || "Stripe",
         stripeCheckoutSessionId: args.checkoutSessionId,
         ...(args.paymentIntentId ? { stripePaymentIntentId: args.paymentIntentId } : {}),
         paidAt: new Date().toISOString(),
@@ -200,6 +239,9 @@ export const createStripeCheckoutSession = actionGeneric({
 
     const body = new URLSearchParams();
     body.set("mode", "payment");
+    STRIPE_NL_PAYMENT_METHOD_TYPES.forEach((method, index) => {
+      body.set(`payment_method_types[${index}]`, method);
+    });
     body.set("success_url", appendStripeSessionPlaceholder(args.successUrl));
     body.set("cancel_url", args.cancelUrl);
     body.set("client_reference_id", orderId);
@@ -233,6 +275,7 @@ export const createStripeCheckoutSession = actionGeneric({
       order: args.order,
       checkoutSessionId,
       checkoutUrl,
+      provider: "Stripe",
       ...(paymentIntentId ? { paymentIntentId } : {})
     });
 
@@ -242,6 +285,93 @@ export const createStripeCheckoutSession = actionGeneric({
       checkoutSessionId,
       ...(paymentIntentId ? { paymentIntentId } : {})
     };
+  }
+});
+
+export const createMollieCheckoutPayment = actionGeneric({
+  args: {
+    appStateKey: v.string(),
+    order: v.any(),
+    amountCents: v.number(),
+    currency: v.string(),
+    successUrl: v.string(),
+    cancelUrl: v.string()
+  },
+  handler: async (ctx, args) => {
+    const orderId = cleanText(args.order?.id);
+    const amountCents = Math.max(0, Math.round(args.amountCents));
+    const currency = cleanText(args.currency).toUpperCase() || "EUR";
+
+    if (!orderId) return { ok: false, message: "The order is missing an id." };
+    if (amountCents <= 0) return { ok: false, message: "Add a paid item before checkout." };
+
+    const result = await mollieRequest("/payments", {
+      method: "POST",
+      body: {
+        amount: {
+          currency,
+          value: (amountCents / 100).toFixed(2)
+        },
+        description: orderLabel(args.order),
+        redirectUrl: args.successUrl,
+        cancelUrl: args.cancelUrl,
+        metadata: {
+          app_state_key: args.appStateKey,
+          order_id: orderId,
+          order_number: cleanText(args.order?.number)
+        }
+      }
+    });
+    if (!result.ok) return result;
+
+    const payment = result.payload;
+    const paymentId = stripeId(payment);
+    const checkoutUrl = cleanText(payment?._links?.checkout?.href);
+    if (!paymentId || !checkoutUrl) {
+      return { ok: false, message: "Mollie did not return a checkout URL." };
+    }
+
+    await ctx.runMutation(anyApi.payments.markCheckoutSessionStarted as any, {
+      appStateKey: args.appStateKey,
+      order: args.order,
+      checkoutSessionId: paymentId,
+      checkoutUrl,
+      provider: "Mollie"
+    });
+
+    return {
+      ok: true,
+      provider: "mollie",
+      checkoutUrl,
+      checkoutSessionId: paymentId
+    };
+  }
+});
+
+export const createOnlineCheckoutSession = actionGeneric({
+  args: {
+    provider: v.optional(v.string()),
+    appStateKey: v.string(),
+    order: v.any(),
+    amountCents: v.number(),
+    currency: v.string(),
+    successUrl: v.string(),
+    cancelUrl: v.string()
+  },
+  handler: async (ctx, args) => {
+    const provider = cleanText(args.provider).toLowerCase() || "stripe";
+    const payload = {
+      appStateKey: args.appStateKey,
+      order: args.order,
+      amountCents: args.amountCents,
+      currency: args.currency,
+      successUrl: args.successUrl,
+      cancelUrl: args.cancelUrl
+    };
+    if (provider === "mollie") {
+      return await ctx.runAction(anyApi.payments.createMollieCheckoutPayment as any, payload);
+    }
+    return await ctx.runAction(anyApi.payments.createStripeCheckoutSession as any, payload);
   }
 });
 
@@ -280,6 +410,7 @@ export const confirmStripeCheckoutSession = actionGeneric({
       checkoutSessionId,
       orderId,
       ...(args.order ? { order: args.order } : {}),
+      provider: "Stripe",
       ...(paymentIntentId ? { paymentIntentId } : {})
     });
 
@@ -289,6 +420,53 @@ export const confirmStripeCheckoutSession = actionGeneric({
       orderId,
       checkoutSessionId,
       ...(paymentIntentId ? { paymentIntentId } : {})
+    };
+  }
+});
+
+export const confirmMollieCheckoutPayment = actionGeneric({
+  args: {
+    appStateKey: v.string(),
+    checkoutSessionId: v.string(),
+    orderId: v.optional(v.string()),
+    order: v.optional(v.any())
+  },
+  handler: async (ctx, args) => {
+    const paymentId = cleanText(args.checkoutSessionId);
+    if (!paymentId) return { ok: false, message: "Missing Mollie payment id." };
+
+    const result = await mollieRequest(`/payments/${encodeURIComponent(paymentId)}`);
+    if (!result.ok) return result;
+
+    const payment = result.payload;
+    const orderId = cleanText(args.orderId || payment?.metadata?.order_id);
+    const paid = payment?.status === "paid";
+
+    if (!orderId) return { ok: false, message: "Mollie payment is not linked to an order." };
+    if (!paid) {
+      return {
+        ok: false,
+        message: "Mollie has not marked this payment as paid yet.",
+        checkoutSessionId: paymentId,
+        orderId,
+        paymentStatus: cleanText(payment?.status)
+      };
+    }
+
+    await ctx.runMutation(anyApi.payments.markCheckoutSessionPaid as any, {
+      appStateKey: args.appStateKey,
+      checkoutSessionId: paymentId,
+      orderId,
+      ...(args.order ? { order: args.order } : {}),
+      provider: "Mollie"
+    });
+
+    return {
+      ok: true,
+      provider: "mollie",
+      paid: true,
+      orderId,
+      checkoutSessionId: paymentId
     };
   }
 });

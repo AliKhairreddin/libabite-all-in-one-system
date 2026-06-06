@@ -26,7 +26,7 @@ import {
   productCanBeOrdered,
   productCanBeOrderedForOrderContext
 } from "../domain/orders.js";
-import { isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
+import { isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus } from "../domain/payments.js";
 
 export function getOrderableProducts(channel) {
   return state.products.filter((product) => productCanBeOrdered(product, channel));
@@ -155,12 +155,15 @@ export function isOrderPaid(order) {
 
 export function getOrderPaymentSummary(order) {
   const paid = isOrderPaid(order);
+  const paymentStatus = normalizePaymentStatus(order.paymentStatus);
   const paymentMethod = normalizePaymentMethod(order.paymentMethod, order.paymentStatus);
+  const statusLabel = paid ? "Paid" : paymentStatus === "Pending" ? "Pending" : paymentStatus === "Pay later" ? "Pay later" : paymentStatus;
+  const className = paid ? "ok" : paymentStatus === "Pending" || paymentStatus === "Pay later" ? "warning" : paymentStatus === "Failed" ? "danger" : "warning";
   return {
     paid,
-    method: paid ? paymentMethod : UNPAID_PAYMENT_METHOD,
-    statusLabel: paid ? "Paid" : "Unpaid",
-    className: paid ? "ok" : "warning"
+    method: paid || paymentStatus === "Pending" || paymentStatus === "Authorized" ? paymentMethod : UNPAID_PAYMENT_METHOD,
+    statusLabel,
+    className
   };
 }
 

@@ -8,6 +8,7 @@ import {
   externalPlatformName,
   normalizeExternalPlatformId
 } from "../domain/external-delivery.js";
+import { getExternalPlatformReadiness } from "../domain/external-platform-adapters.js";
 import { escapeHtml } from "../shared/html.js";
 
 export function createExternalDeliveryUi(deps) {
@@ -108,6 +109,7 @@ export function createExternalDeliveryUi(deps) {
   function platformCard(platform) {
     const payload = platform.lastMenuPayload;
     const mappedItems = state.externalProductMappings.filter((mapping) => mapping.platformId === platform.id && mapping.active !== false).length;
+    const readiness = getExternalPlatformReadiness(platform);
     const payloadText = payload?.items?.length
       ? payload.items.map((item) => `${item.externalCode || item.externalName} -> ${item.internalProductName} (${item.kitchenStation})`).join("\n")
       : "";
@@ -124,6 +126,7 @@ export function createExternalDeliveryUi(deps) {
           <span>Commission</span><strong>${platform.commissionRate}%</strong>
           <span>Last menu push</span><strong>${escapeHtml(platform.lastMenuPushedAt || "Not pushed")}</strong>
           <span>Fallback</span><strong>${escapeHtml(platform.integrationMethod === "api" ? "Manual, email, CSV, staff entry ready" : externalImportMethodLabel(platform.integrationMethod))}</strong>
+          <span>Adapter</span><strong>${escapeHtml(readiness.apiReady ? "API ready" : readiness.missing.length ? readiness.missing.join(", ") : "Manual ready")}</strong>
         </div>
         ${platform.apiDetails ? `<p class="line-detail">${escapeHtml(platform.apiDetails)}</p>` : ""}
         ${payloadText ? `<textarea readonly aria-label="${escapeHtml(platform.name)} menu payload preview">${escapeHtml(payloadText)}</textarea>` : ""}

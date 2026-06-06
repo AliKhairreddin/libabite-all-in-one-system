@@ -10,7 +10,9 @@ import {
   syncDriverWithDeliveryOrder
 } from "../domain/delivery.js";
 import { setTicketStatus } from "../domain/kitchen.js";
+import { normalizeFulfillmentStatus, normalizeOrderOperationalStatus } from "../domain/orders.js";
 import { saveState, state } from "./state.js";
+import { applyPaidPaymentToOrder } from "./payment-ledger.js";
 
 export function createDeliveryRuntime(deps) {
   const {
@@ -68,6 +70,7 @@ export function createDeliveryRuntime(deps) {
     });
     order.deliveryStatus = getDeliveryStatus(order) || "Assigned";
     order.pickupStatus = normalizePickupStatus(order.pickupStatus, order.deliveryStatus);
+    order.fulfillmentStatus = "Scheduled";
     order.deliveryAssignedAtMs = order.deliveryAssignedAtMs || Date.now();
     order.deliveryStatusUpdatedAtMs = order.deliveryStatusUpdatedAtMs || order.deliveryAssignedAtMs;
     order.assignedDriver = driver.id;
@@ -131,6 +134,7 @@ export function createDeliveryRuntime(deps) {
 
     if (nextStatus === "At restaurant") order.pickupStatus = "At restaurant";
     if (["Picked up", "On the way", "Delivered", "Failed delivery"].includes(nextStatus)) order.pickupStatus = "Picked up";
+    if (["Picked up", "On the way", "Delivered"].includes(nextStatus)) order.fulfillmentStatus = normalizeFulfillmentStatus(nextStatus);
     if (nextStatus === "Delivered") {
       order.deliveredAt = nowText;
       order.deliveredAtMs = now;
@@ -139,6 +143,8 @@ export function createDeliveryRuntime(deps) {
         .filter((ticket) => ticket.orderId === order.id)
         .forEach((ticket) => setTicketStatus(ticket, "Done"));
       order.status = isOrderPaid(order) ? "Paid" : "Served";
+      order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+      order.fulfillmentStatus = "Delivered";
     }
     if (nextStatus === "Failed delivery") {
       order.failedAt = nowText;
@@ -150,6 +156,8 @@ export function createDeliveryRuntime(deps) {
       order.deliveryWasLate = order.deliveryWasLate || wasLate;
       order.pickupStatus = "Returned";
       if (!isOrderPaid(order)) order.status = "Cancelled";
+      order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+      order.fulfillmentStatus = "Cancelled";
     }
 
     const driver = driverById(order.assignedDriver);
@@ -177,13 +185,19 @@ export function createDeliveryRuntime(deps) {
     order.cashCollectedAt = nowText;
     order.cashCollectedAtMs = now;
     order.cashCollectedByName = user?.name || "Driver";
-    order.paymentStatus = "Paid";
-    order.paymentMethod = "Cash";
-    order.paidAt = order.paidAt || nowText;
-    order.paidAtMs = order.paidAtMs || now;
-    order.paidByUserId = user?.id || order.paidByUserId || "";
-    order.paidByName = user?.name || order.paidByName || "Driver";
+    applyPaidPaymentToOrder(order, {
+      provider: "cash",
+      paymentMethod: "Cash",
+      paymentProcessor: "Cash",
+      paidAt: nowText,
+      paidAtMs: now,
+      paidByUserId: user?.id || order.paidByUserId || "",
+      paidByName: user?.name || order.paidByName || "Driver",
+      captureMode: "staff_recorded"
+    });
     if (order.status === "Served" || getDeliveryStatus(order) === "Delivered") order.status = "Paid";
+    order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+    order.fulfillmentStatus = normalizeFulfillmentStatus(order.fulfillmentStatus || order.status);
     saveState();
     render();
     showToast(`Cash collected for order #${order.number}.`);

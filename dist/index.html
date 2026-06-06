@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Libabite Ops</title>
-    <script type="module" crossorigin src="/assets/app-BGQh1tiL.js"></script>
+    <script type="module" crossorigin src="/assets/app-DsCsk3rp.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/app-CHwzogbG.css">
   </head>
   <body>
@@ -581,6 +581,24 @@
                       <option value="true">Active</option>
                       <option value="false">Inactive</option>
                     </select>
+                  </label>
+                </div>
+                <fieldset class="check-fieldset">
+                  <legend>Allergens</legend>
+                  <div class="language-checks" id="sellableAllergenChecks"></div>
+                </fieldset>
+                <div class="form-row">
+                  <label>
+                    Precautionary allergen status
+                    <select name="precautionaryAllergenStatus" id="sellablePrecautionaryAllergenStatus">
+                      <option value="none">None</option>
+                      <option value="may_contain">May contain traces</option>
+                      <option value="ask_staff" selected>Ask staff</option>
+                    </select>
+                  </label>
+                  <label>
+                    Allergen note
+                    <input name="precautionaryAllergenNote" type="text" value="Ask staff for current allergen details." autocomplete="off">
                   </label>
                 </div>
                 <fieldset class="check-fieldset">
@@ -1505,6 +1523,37 @@ Switch off signs and lock the restaurant.</textarea>
                     <option value="Cancelled">Cancelled</option>
                   </select>
                 </label>
+                <div class="form-row">
+                  <label>
+                    Deposit amount
+                    <input name="depositAmount" type="number" min="0" step="0.01" value="0">
+                  </label>
+                  <label>
+                    Deposit status
+                    <select name="paymentStatus">
+                      <option value="Unpaid">Unpaid</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Paid">Paid</option>
+                      <option value="Refunded">Refunded</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Deposit provider
+                    <select name="paymentProcessor">
+                      <option value="">None</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Manual">Manual</option>
+                      <option value="Stripe">Stripe</option>
+                      <option value="Mollie">Mollie</option>
+                    </select>
+                  </label>
+                  <label>
+                    Payment reference
+                    <input name="paymentReference" type="text" autocomplete="off">
+                  </label>
+                </div>
                 <label>
                   Notes
                   <textarea name="notes" rows="3" placeholder="Occasion, high chair, accessibility, allergies"></textarea>

@@ -1,6 +1,8 @@
 import {
   DEFAULT_RECIPE_ORDER_CONTEXT,
+  FULFILLMENT_STATUSES,
   LEGACY_ORDER_TYPE_MAP,
+  ORDER_OPERATIONAL_STATUSES,
   ORDER_TYPE_OPTIONS,
   PHONE_MESSAGE_FULFILLMENT_OPTIONS,
   PHONE_MESSAGE_ORDER_CHANNEL,
@@ -43,6 +45,28 @@ export function calculateItemsTotal(items, productById) {
 
 export function calculateOrderTotal(order, productById) {
   return calculateItemsTotal(order?.items || [], productById);
+}
+
+export function normalizeOrderOperationalStatus(status, fallback = "New") {
+  const legacyMap = {
+    Paid: "Completed",
+    Served: "Served",
+    "Sent to kitchen": "Sent to kitchen"
+  };
+  const candidate = legacyMap[status] || status || fallback;
+  return ORDER_OPERATIONAL_STATUSES.includes(candidate) ? candidate : fallback;
+}
+
+export function normalizeFulfillmentStatus(status, fallback = "Not started") {
+  const legacyMap = {
+    "Sent to kitchen": "Preparing",
+    Preparing: "Preparing",
+    Ready: "Ready",
+    Served: "Served",
+    Paid: "Completed"
+  };
+  const candidate = legacyMap[status] || status || fallback;
+  return FULFILLMENT_STATUSES.includes(candidate) ? candidate : fallback;
 }
 
 export function normalizeWebsiteFulfillment(value) {

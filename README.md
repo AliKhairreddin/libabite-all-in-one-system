@@ -94,8 +94,43 @@ before deploying live checkout:
 npx convex env set STRIPE_SECRET_KEY sk_live_...
 ```
 
-Successful Stripe returns are verified by Convex before the browser marks the
-website order paid and sends it to the kitchen.
+Stripe Checkout is configured for the Netherlands with iDEAL and card payment
+method types. Successful Stripe returns are verified by Convex before the
+browser marks the website order paid and sends it to the kitchen.
+
+Mollie checkout infrastructure is also present, but stays inactive until a
+Mollie API key is configured:
+
+```sh
+npx convex env set MOLLIE_API_KEY live_...
+```
+
+The app keeps an explicit payment ledger in `state.payments` and mirrors it to
+Convex `payments`. Orders and reservations still carry quick display fields
+such as `paymentStatus`, `paymentMethod`, and `paymentReference`, but provider
+references, checkout sessions, terminal reader ids, refund timestamps, and
+reservation deposits belong in the ledger.
+
+External delivery integrations are modeled as marketplace-owned payment
+channels. Uber Eats and Thuisbezorgd orders should enter as paid external
+platform orders, with commission tracked separately from the restaurant's direct
+payments. API adapter metadata is included for the credentials and webhook
+events needed later:
+
+```sh
+# Uber Eats
+UBER_EATS_CLIENT_ID=...
+UBER_EATS_CLIENT_SECRET=...
+UBER_EATS_STORE_ID=...
+
+# Just Eat Takeaway / Thuisbezorgd
+JET_CONNECT_CLIENT_ID=...
+JET_CONNECT_CLIENT_SECRET=...
+JET_CONNECT_LOCATION_ID=...
+```
+
+Until those approvals and secrets exist, the external delivery area supports
+manual, email, CSV, and staff-entered imports.
 
 ## Temporary Domains
 

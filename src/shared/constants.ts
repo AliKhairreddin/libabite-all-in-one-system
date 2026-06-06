@@ -31,6 +31,25 @@ export const PAYMENT_METHOD_OPTIONS = [
   { value: "Online payment", label: "Online payment", paid: true },
   { value: "External delivery app payment", label: "External delivery app payment", paid: true }
 ];
+export const PAYMENT_STATUSES = ["Unpaid", "Pending", "Authorized", "Paid", "Pay later", "Failed", "Cancelled", "Refunded", "Partially refunded"];
+export const PAYMENT_LEDGER_KINDS = ["order", "reservation_deposit", "reservation_no_show_fee", "terminal", "external_platform", "refund"];
+export const PAYMENT_PROVIDERS = [
+  { id: "manual", label: "Manual / recorded by staff", supportsOnline: false, supportsTerminal: false },
+  { id: "cash", label: "Cash", supportsOnline: false, supportsTerminal: false },
+  { id: "stripe", label: "Stripe", supportsOnline: true, supportsTerminal: true },
+  { id: "mollie", label: "Mollie", supportsOnline: true, supportsTerminal: true },
+  { id: "uber-eats", label: "Uber Eats", supportsOnline: false, supportsTerminal: false },
+  { id: "thuisbezorgd", label: "Thuisbezorgd", supportsOnline: false, supportsTerminal: false }
+];
+export const ONLINE_PAYMENT_PROVIDER_OPTIONS = ["stripe", "mollie"];
+export const IN_PERSON_PAYMENT_PROVIDER_OPTIONS = ["cash", "manual", "stripe", "mollie"];
+export const DEFAULT_ONLINE_PAYMENT_PROVIDER = "stripe";
+export const DEFAULT_TERMINAL_PAYMENT_PROVIDER = "manual";
+export const STRIPE_CHECKOUT_PAYMENT_METHOD_TYPES_NL = ["ideal", "card"];
+export const MOLLIE_ONLINE_PAYMENT_METHODS_NL = ["ideal", "creditcard", "applepay"];
+export const PAYMENT_CAPTURE_MODES = ["online_checkout", "qr_order", "staff_recorded", "terminal", "external_platform"];
+export const ORDER_OPERATIONAL_STATUSES = ["New", "Accepted", "Sent to kitchen", "Preparing", "Delayed", "Ready", "Served", "Completed", "Cancelled"];
+export const FULFILLMENT_STATUSES = ["Not started", "Scheduled", "Preparing", "Ready", "Picked up", "On the way", "Delivered", "Served", "Completed", "Cancelled"];
 export const VAT_RATES = {
   standard: 0.21,
   reduced: 0.09,
@@ -79,10 +98,27 @@ export const KITCHEN_STATION_ALIASES = {
 };
 export const PRODUCT_CATEGORIES = ["Kefta", "Sandwiches", "Burgers", "Cold Mezza", "Sweets", "Drinks", "Packaging", "Other"];
 export const VAT_OPTIONS = [
-  { id: "standard", label: "Standard VAT" },
-  { id: "reduced", label: "Reduced VAT" },
-  { id: "zero", label: "Zero VAT" }
+  { id: "standard", label: "Standard VAT (21%)" },
+  { id: "reduced", label: "Reduced food VAT (9%)" },
+  { id: "zero", label: "Zero VAT (0%)" }
 ];
+export const PRODUCT_ALLERGENS = [
+  { id: "gluten", label: "Gluten-containing cereals" },
+  { id: "egg", label: "Egg" },
+  { id: "fish", label: "Fish" },
+  { id: "peanut", label: "Peanut" },
+  { id: "tree-nuts", label: "Tree nuts" },
+  { id: "soy", label: "Soy" },
+  { id: "milk", label: "Milk / lactose" },
+  { id: "crustaceans", label: "Crustaceans" },
+  { id: "molluscs", label: "Molluscs" },
+  { id: "celery", label: "Celery" },
+  { id: "mustard", label: "Mustard" },
+  { id: "sesame", label: "Sesame" },
+  { id: "sulphites", label: "Sulphites" },
+  { id: "lupin", label: "Lupin" }
+];
+export const PRECAUTIONARY_ALLERGEN_STATUSES = ["none", "may_contain", "ask_staff"];
 export const AVAILABILITY_OPTIONS = [
   { id: "dineIn", label: "Dine-in" },
   { id: "qrOrdering", label: "QR ordering" },
@@ -324,11 +360,12 @@ export const DATA_MODEL = [
   { name: "recipes", fields: "sellable product, ingredient, quantity, unit, waste %, preparation station, notes, fulfillment rule" },
   { name: "customers", fields: "name, phone, email, address history, notes, favorite items, previous orders" },
   { name: "orders", fields: "channel, customer, payment status/method/reference, staff member, fulfillment, requested time, address, line items, assigned driver, delivery status/proof" },
+  { name: "payments", fields: "kind, provider, status, amount, currency, order/reservation link, method, provider reference, checkout session/payment intent, terminal reader, paid/failed/refunded timestamps" },
   { name: "kitchen_tickets", fields: "order, product, station, status, priority, issue note, SLA times" },
   { name: "driver_deliveries", fields: "driver, order, pickup status, delivery status, ETA, location, notes, proof photo, cash collection" },
   { name: "staff_shifts", fields: "staff, date, role/station, planned start/end, notification, clock-in/out, breaks, planned vs actual metrics" },
   { name: "table_qr_codes", fields: "token, table, area, active/disabled status, customer order URL" },
-  { name: "reservations", fields: "date, time, guest, contact, table, notes, source, status" },
+  { name: "reservations", fields: "date, time, guest, contact, table, notes, source, status, optional deposit/payment status" },
   { name: "reservation_blocks", fields: "date, start/end time, reason, active unavailable windows" },
   { name: "reservation_capacity_rules", fields: "date or daily rule, start/end time, max guests, max reservations" },
   { name: "procedures", fields: "title, department, language, steps, required tools/products, media, frequency, assigned role" },

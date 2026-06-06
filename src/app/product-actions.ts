@@ -6,6 +6,11 @@ import {
   VAT_OPTIONS
 } from "../shared/constants.js";
 import {
+  normalizePrecautionaryAllergenStatus,
+  normalizeProductAllergens,
+  normalizeVatSetting
+} from "../domain/commerce.js";
+import {
   normalizeKitchenStation,
   normalizeMarginPercent,
   normalizeRecipeAppliesTo,
@@ -104,7 +109,10 @@ export function createProductActionsRuntime(deps) {
     const category = String(formData.get("category") || "Other");
     const station = normalizeKitchenStation(formData.get("station") || "Main kitchen");
     const price = Math.max(0, Number(formData.get("price")) || 0);
-    const vatSetting = String(formData.get("vatSetting") || "standard");
+    const vatSetting = normalizeVatSetting(formData.get("vatSetting"), "reduced");
+    const allergens = normalizeProductAllergens(formData.getAll("allergens"));
+    const precautionaryAllergenStatus = normalizePrecautionaryAllergenStatus(formData.get("precautionaryAllergenStatus"));
+    const precautionaryAllergenNote = String(formData.get("precautionaryAllergenNote") || "").trim();
     const active = formData.get("active") === "true";
     const targetMargin = normalizeMarginPercent(formData.get("targetMargin"), DEFAULT_MARGIN_TARGET);
     const minMargin = Math.min(targetMargin, normalizeMarginPercent(formData.get("minMargin"), DEFAULT_MARGIN_MINIMUM));
@@ -143,7 +151,10 @@ export function createProductActionsRuntime(deps) {
       category: PRODUCT_CATEGORIES.includes(category) ? category : "Other",
       station,
       price,
-      vatSetting: VAT_OPTIONS.some((option) => option.id === vatSetting) ? vatSetting : "standard",
+      vatSetting: VAT_OPTIONS.some((option) => option.id === vatSetting) ? vatSetting : "reduced",
+      allergens,
+      precautionaryAllergenStatus,
+      precautionaryAllergenNote,
       active,
       availability,
       targetMargin,

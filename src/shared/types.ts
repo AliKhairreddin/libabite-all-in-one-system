@@ -17,6 +17,10 @@ export interface Product {
   availability?: Record<string, boolean>;
   targetMargin?: number;
   minMargin?: number;
+  vatSetting?: string;
+  allergens?: string[];
+  precautionaryAllergenStatus?: string;
+  precautionaryAllergenNote?: string;
 }
 
 export interface Ingredient {
@@ -54,6 +58,13 @@ export interface Reservation {
   email?: string;
   notes?: string;
   source?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  paymentProcessor?: string;
+  paymentReference?: string;
+  depositAmount?: number;
+  paidAt?: string;
+  paidAtMs?: number | string;
 }
 
 export interface ReservationBlock {

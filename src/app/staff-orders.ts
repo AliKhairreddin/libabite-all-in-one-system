@@ -5,11 +5,19 @@ import {
 } from "../shared/constants.js";
 import { normalizeKitchenStation, normalizeLineModifiers } from "../data/normalize.js";
 import { advanceStatus, setTicketStatus } from "../domain/kitchen.js";
-import { normalizeOrderFulfillment, normalizeOrderType, orderTypeDefinition, productCanBeOrderedForOrderContext } from "../domain/orders.js";
+import {
+  normalizeFulfillmentStatus,
+  normalizeOrderFulfillment,
+  normalizeOrderOperationalStatus,
+  normalizeOrderType,
+  orderTypeDefinition,
+  productCanBeOrderedForOrderContext
+} from "../domain/orders.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
 import { isReservationTime } from "../domain/reservations.js";
 import { timeNow } from "../shared/dates.js";
 import { saveState, state } from "./state.js";
+import { applyPaidPaymentToOrder } from "./payment-ledger.js";
 
 export function createStaffOrderRuntime(deps) {
   const {
@@ -223,6 +231,8 @@ export function createStaffOrderRuntime(deps) {
 
     order.sentAt = order.sentAt || timeNow();
     order.status = "Sent to kitchen";
+    order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+    order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
     const tickets = createKitchenTicketsForOrder(order);
     const stations = [...new Set(tickets.map((ticket) => ticket.station))];
     const stockChanges = order.inventoryDeducted ? [] : deductInventoryForItems(order.items, validation.orderContext);
@@ -305,6 +315,8 @@ export function createStaffOrderRuntime(deps) {
       paymentMethod,
       fulfillment,
       status: "New",
+      operationalStatus: "New",
+      fulfillmentStatus: "Not started",
       createdAt,
       createdAtMs,
       sentAt: "",
@@ -374,6 +386,8 @@ export function createStaffOrderRuntime(deps) {
     else if (tickets.some((ticket) => ticket.status === "Delayed")) order.status = "Delayed";
     else if (tickets.some((ticket) => ["Accepted", "Preparing"].includes(ticket.status))) order.status = "Preparing";
     else order.status = "Sent to kitchen";
+    order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+    order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
   }
 
   function advanceTicket(ticketId) {
@@ -483,6 +497,8 @@ export function createStaffOrderRuntime(deps) {
       .filter((ticket) => ticket.orderId === orderId)
       .forEach((ticket) => setTicketStatus(ticket, "Done"));
     order.status = isOrderPaid(order) ? "Paid" : "Served";
+    order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+    order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
     saveState();
     render();
     showToast(`Order #${order.number} marked served.`);
@@ -498,13 +514,18 @@ export function createStaffOrderRuntime(deps) {
     if (!order || order.status === "Cancelled") return;
     const method = normalizePaymentMethod(paymentMethod);
     const staff = currentUser();
-    order.paymentStatus = "Paid";
-    order.paymentMethod = isPaidPaymentMethod(method) ? method : DEFAULT_PAID_PAYMENT_METHOD;
+    const paidMethod = isPaidPaymentMethod(method) ? method : DEFAULT_PAID_PAYMENT_METHOD;
+    applyPaidPaymentToOrder(order, {
+      provider: paidMethod === "Cash" ? "cash" : "manual",
+      paymentMethod: paidMethod,
+      paymentProcessor: paidMethod === "Cash" ? "Cash" : "Manual in-person payment",
+      paidByUserId: staff?.id || order.paidByUserId || "",
+      paidByName: staff?.name || order.paidByName || "",
+      captureMode: paidMethod === "Cash" ? "staff_recorded" : "terminal"
+    });
     if (order.status === "Served") order.status = "Paid";
-    order.paidAt = order.paidAt || timeNow();
-    order.paidAtMs = order.paidAtMs || Date.now();
-    order.paidByUserId = staff?.id || order.paidByUserId || "";
-    order.paidByName = staff?.name || order.paidByName || "";
+    order.operationalStatus = normalizeOrderOperationalStatus(order.status);
+    order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
     state.receiptOrderId = order.id;
     saveState();
     render();

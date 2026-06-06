@@ -3,6 +3,7 @@ import {
   EXTERNAL_DELIVERY_PLATFORM_STATUSES,
   EXTERNAL_DELIVERY_PLATFORMS
 } from "../shared/constants.js";
+import { productAllergenSummary } from "./commerce.js";
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -209,6 +210,10 @@ export function buildExternalMenuPayload(platform, mappings = [], productById, o
         internalRecipe: `${product.name} recipe`,
         kitchenStation: product.station,
         price: Number(product.price) || 0,
+        vatSetting: product.vatSetting || "reduced",
+        allergens: Array.isArray(product.allergens) ? product.allergens : [],
+        allergenSummary: productAllergenSummary(product),
+        availability: product.availability || {},
         commissionRate: normalizeExternalCommissionRate(mapping.commissionRate, platform?.commissionRate)
       };
     })

@@ -288,7 +288,10 @@ export const seedState = {
             category: "Kefta",
             station: "Grill station",
             price: 14.5,
-            vatSetting: "standard",
+            vatSetting: "reduced",
+            allergens: [],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Ask staff for the current allergen matrix before ordering with allergies.",
             active: true,
             availability: {
                 dineIn: true,
@@ -312,6 +315,9 @@ export const seedState = {
             station: "Main kitchen",
             price: 0,
             vatSetting: "zero",
+            allergens: [],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Internal preparation batch; ask staff for recipe allergen details.",
             active: false,
             availability: {
                 dineIn: false,
@@ -342,7 +348,10 @@ export const seedState = {
             category: "Sandwiches",
             station: "Grill station",
             price: 9.5,
-            vatSetting: "standard",
+            vatSetting: "reduced",
+            allergens: ["gluten", "sesame"],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Ask staff for current sauce and bread allergen details.",
             active: true,
             availability: {
                 dineIn: true,
@@ -366,7 +375,10 @@ export const seedState = {
             category: "Burgers",
             station: "Burger station",
             price: 12.5,
-            vatSetting: "standard",
+            vatSetting: "reduced",
+            allergens: ["gluten", "egg", "sesame"],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Ask staff for current bun, sauce, and patty allergen details.",
             active: true,
             availability: {
                 dineIn: true,
@@ -390,7 +402,10 @@ export const seedState = {
             category: "Cold Mezza",
             station: "Cold mezza station",
             price: 8.75,
-            vatSetting: "standard",
+            vatSetting: "reduced",
+            allergens: ["sesame"],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Ask staff for current cold mezza allergen details.",
             active: true,
             availability: {
                 dineIn: true,
@@ -413,7 +428,10 @@ export const seedState = {
             category: "Sweets",
             station: "Sweets station",
             price: 6,
-            vatSetting: "standard",
+            vatSetting: "reduced",
+            allergens: ["gluten", "tree-nuts", "milk"],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Ask staff for current dessert allergen details.",
             active: true,
             availability: {
                 dineIn: true,
@@ -436,7 +454,10 @@ export const seedState = {
             category: "Drinks",
             station: "Drinks station",
             price: 4.5,
-            vatSetting: "standard",
+            vatSetting: "reduced",
+            allergens: [],
+            precautionaryAllergenStatus: "ask_staff",
+            precautionaryAllergenNote: "Ask staff for current drink allergen details.",
             active: true,
             availability: {
                 dineIn: true,
@@ -460,6 +481,9 @@ export const seedState = {
             station: "Packaging station",
             price: 0.5,
             vatSetting: "standard",
+            allergens: [],
+            precautionaryAllergenStatus: "none",
+            precautionaryAllergenNote: "",
             active: true,
             availability: {
                 dineIn: false,
@@ -638,6 +662,7 @@ export const seedState = {
             barcode: ""
         }
     ],
+    payments: [],
     orders: [],
     tickets: [],
     procedures: [

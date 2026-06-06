@@ -255,6 +255,34 @@ async function mirrorOrders(ctx: any, appStateKey: string, state: any, now: numb
   }
 }
 
+async function mirrorPayments(ctx: any, appStateKey: string, state: any, now: number) {
+  for (const payment of asArray(state?.payments)) {
+    const externalId = cleanText(payment.externalId || payment.id || payment.providerPaymentId || payment.checkoutSessionId);
+    if (!externalId) continue;
+    await upsertOperational(ctx, "payments", appStateKey, externalId, {
+      name: optionalText(payment.name || `${payment.providerLabel || payment.provider || "Payment"} ${payment.orderId || payment.reservationId || externalId}`),
+      status: optionalText(payment.status),
+      kind: optionalText(payment.kind || "order"),
+      provider: optionalText(payment.providerLabel || payment.provider),
+      currency: cleanText(payment.currency || "eur"),
+      amountCents: Math.max(0, Math.round(Number(payment.amountCents) || (Number(payment.amount) || 0) * 100)),
+      orderId: optionalText(payment.orderId),
+      reservationId: optionalText(payment.reservationId),
+      paymentMethod: optionalText(payment.paymentMethod),
+      providerPaymentId: optionalText(payment.providerPaymentId),
+      checkoutSessionId: optionalText(payment.checkoutSessionId),
+      paymentIntentId: optionalText(payment.paymentIntentId),
+      terminalReaderId: optionalText(payment.terminalReaderId),
+      customerName: optionalText(payment.customerName),
+      customerEmail: optionalText(payment.customerEmail),
+      paidAtMs: optionalTimestamp(payment.paidAtMs),
+      failedAtMs: optionalTimestamp(payment.failedAtMs),
+      raw: payment,
+      updatedAt: optionalTimestamp(payment.updatedAtMs) || now
+    });
+  }
+}
+
 async function mirrorProducts(ctx: any, appStateKey: string, state: any, now: number) {
   for (const product of asArray(state?.products)) {
     await upsertOperational(ctx, "products", appStateKey, product.id, {
@@ -493,5 +521,6 @@ export async function mirrorOperationalTables(ctx: any, appStateKey: string, sta
   await mirrorRoles(ctx, appStateKey, now);
   await mirrorProducts(ctx, appStateKey, state, now);
   await mirrorOrders(ctx, appStateKey, state, now);
+  await mirrorPayments(ctx, appStateKey, state, now);
   await mirrorSimpleCollections(ctx, appStateKey, state, now);
 }

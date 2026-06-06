@@ -3,16 +3,18 @@ import { getConvexStateKey, getSharedConvexClient, isConvexEnabled } from "./con
 import { saveState, state } from "./state.js";
 import { timeNow } from "../shared/dates.js";
 import { WEBSITE_PAYMENT_PROCESSOR } from "../shared/constants.js";
+import { applyPaidPaymentToOrder } from "./payment-ledger.js";
 
-function paymentReturnUrl(orderId: string, result: "success" | "cancelled") {
+function paymentReturnUrl(orderId: string, result: "success" | "cancelled", provider = "stripe") {
   const url = new URL(window.location.href);
   url.searchParams.set("order", "website");
   url.searchParams.set("payment", result);
   url.searchParams.set("orderId", orderId);
+  url.searchParams.set("provider", provider);
   return url.toString();
 }
 
-export async function createWebsiteCheckoutSession(order: any, amountCents: number) {
+export async function createWebsiteCheckoutSession(order: any, amountCents: number, provider = "stripe") {
   if (!isConvexEnabled()) {
     return {
       ok: false,
@@ -28,19 +30,20 @@ export async function createWebsiteCheckoutSession(order: any, amountCents: numb
     };
   }
 
-  return await client.action(anyApi.payments.createStripeCheckoutSession as any, {
+  return await client.action(anyApi.payments.createOnlineCheckoutSession as any, {
+    provider,
     appStateKey: getConvexStateKey(),
     order,
     amountCents,
     currency: "eur",
-    successUrl: paymentReturnUrl(order.id, "success"),
-    cancelUrl: paymentReturnUrl(order.id, "cancelled")
+    successUrl: paymentReturnUrl(order.id, "success", provider),
+    cancelUrl: paymentReturnUrl(order.id, "cancelled", provider)
   });
 }
 
 function removePaymentReturnParams() {
   const url = new URL(window.location.href);
-  ["payment", "orderId", "session_id", "sessionId"].forEach((key) => url.searchParams.delete(key));
+  ["payment", "orderId", "provider", "session_id", "sessionId"].forEach((key) => url.searchParams.delete(key));
   window.history.replaceState({}, "", url.toString());
 }
 
@@ -63,17 +66,21 @@ export async function handleWebsitePaymentReturn(deps: {
     return true;
   }
 
-  const checkoutSessionId = String(params.get("session_id") || params.get("sessionId") || "").trim();
+  const provider = String(params.get("provider") || "stripe").trim().toLowerCase();
+  const order = state.orders.find((item) => item.id === orderId);
+  const checkoutSessionId = String(params.get("session_id") || params.get("sessionId") || order?.stripeCheckoutSessionId || order?.paymentReference || "").trim();
   if (paymentResult !== "success" || !checkoutSessionId || !orderId) return false;
 
-  const order = state.orders.find((item) => item.id === orderId);
   const client = getSharedConvexClient();
   if (!isConvexEnabled() || !client) {
     deps.showToast("Convex must be connected before payment can be confirmed.");
     return false;
   }
 
-  const confirmation = await client.action(anyApi.payments.confirmStripeCheckoutSession as any, {
+  const confirmationAction = provider === "mollie"
+    ? anyApi.payments.confirmMollieCheckoutPayment
+    : anyApi.payments.confirmStripeCheckoutSession;
+  const confirmation = await client.action(confirmationAction as any, {
     appStateKey: getConvexStateKey(),
     checkoutSessionId,
     orderId,
@@ -86,16 +93,20 @@ export async function handleWebsitePaymentReturn(deps: {
   }
 
   if (order) {
-    order.paymentStatus = "Paid";
-    order.paymentMethod = "Online payment";
-    order.paymentReference = confirmation.checkoutSessionId || checkoutSessionId;
-    order.paymentProcessor = WEBSITE_PAYMENT_PROCESSOR;
-    order.stripeCheckoutSessionId = confirmation.checkoutSessionId || checkoutSessionId;
-    if (confirmation.paymentIntentId) order.stripePaymentIntentId = confirmation.paymentIntentId;
-    order.paidAt = order.paidAt || timeNow();
-    order.paidAtMs = order.paidAtMs || Date.now();
-    order.paidByUserId = "";
-    order.paidByName = "Stripe checkout";
+    const paidAtMs = Date.now();
+    applyPaidPaymentToOrder(order, {
+      provider: provider === "mollie" ? "mollie" : "stripe",
+      paymentMethod: "Online payment",
+      paymentReference: confirmation.checkoutSessionId || checkoutSessionId,
+      paymentProcessor: provider === "mollie" ? "Mollie" : WEBSITE_PAYMENT_PROCESSOR,
+      checkoutSessionId: confirmation.checkoutSessionId || checkoutSessionId,
+      paymentIntentId: confirmation.paymentIntentId,
+      paidAt: order.paidAt || timeNow(),
+      paidAtMs,
+      paidByUserId: "",
+      paidByName: "Stripe checkout",
+      captureMode: "online_checkout"
+    });
     state.websiteLastOrderId = order.id;
     state.receiptOrderId = order.id;
 

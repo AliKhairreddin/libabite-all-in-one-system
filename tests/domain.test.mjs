@@ -11,6 +11,7 @@ import {
 import { getProductAvailability, getStockRequirementsForItems, getStockShortages, planStockDeduction } from "../dist/domain/inventory.js";
 import { advanceStatus, getOrderProgressSummary, setTicketStatus } from "../dist/domain/kitchen.js";
 import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderItems } from "../dist/domain/orders.js";
+import { normalizeProductAllergens, productAllergenSummary, vatRateForSetting } from "../dist/domain/commerce.js";
 import {
   buildExternalMenuPayload,
   calculateExternalCommission,
@@ -19,7 +20,8 @@ import {
   matchExternalOrderItems,
   parseExternalOrderLines
 } from "../dist/domain/external-delivery.js";
-import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../dist/domain/payments.js";
+import { externalPlatformRequiredSecrets, getExternalPlatformReadiness } from "../dist/domain/external-platform-adapters.js";
+import { buildPaymentLedgerRecord, getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus } from "../dist/domain/payments.js";
 import {
   getProductionExecutionDraft,
   getProductionFieldName,
@@ -60,7 +62,27 @@ test("payment methods normalize into paid and pay-later states", () => {
   assert.equal(isPaidPaymentMethod("Card"), true);
   assert.equal(isPaidPaymentMethod("Unpaid / pay later"), false);
   assert.equal(getPaymentStatusForMethod("Online payment"), "Paid");
+  assert.equal(getPaymentStatusForMethod("Online payment", "Unpaid"), "Unpaid");
+  assert.equal(getPaymentStatusForMethod("Online payment", "Pending"), "Pending");
   assert.equal(getPaymentStatusForMethod("Unpaid / pay later", "Paid"), "Pay later");
+  assert.equal(normalizePaymentStatus("partially_refunded"), "Partially refunded");
+  assert.equal(buildPaymentLedgerRecord({
+    orderId: "ORD-1",
+    amountCents: 1450,
+    provider: "stripe",
+    paymentMethod: "Online payment",
+    status: "Paid",
+    checkoutSessionId: "cs_test_123"
+  }, { nowMs: 1000 }).externalId, "cs_test_123");
+});
+
+test("commerce helpers normalize Netherlands VAT and allergen metadata", () => {
+  assert.equal(vatRateForSetting("reduced"), 0.09);
+  assert.deepEqual(normalizeProductAllergens(["sesame", "unknown", "milk", "sesame"]), ["sesame", "milk"]);
+  assert.equal(
+    productAllergenSummary({ allergens: ["sesame"], precautionaryAllergenStatus: "may_contain" }),
+    "Contains Sesame. May contain traces of other allergens"
+  );
 });
 
 test("user role helpers resolve active users and permissions", () => {
@@ -171,6 +193,8 @@ test("external delivery helpers parse, map, and prepare platform payloads", () =
   ]);
   assert.equal(calculateExternalCommission(19, 30), 5.7);
   assert.equal(mapInternalOrderStatusToExternalStatus({ status: "Ready" }), "ready");
+  assert.deepEqual(externalPlatformRequiredSecrets("Uber Eats"), ["UBER_EATS_CLIENT_ID", "UBER_EATS_CLIENT_SECRET", "UBER_EATS_STORE_ID"]);
+  assert.equal(getExternalPlatformReadiness({ id: "thuisbezorgd", status: "Approval pending", integrationMethod: "api" }).apiReady, false);
 });
 
 test("scan helpers resolve product barcodes, URL QR codes, and table tokens", () => {

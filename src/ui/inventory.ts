@@ -7,7 +7,9 @@ import {
   DEFAULT_RECIPE_ORDER_CONTEXT,
   INVENTORY_ACTIONS,
   KITCHEN_STATIONS,
+  PRECAUTIONARY_ALLERGEN_STATUSES,
   PRODUCT_CATEGORIES,
+  PRODUCT_ALLERGENS,
   RECIPE_APPLIES_OPTIONS,
   SUPPLIER_INTEGRATION_METHODS,
   TAKEAWAY_DELIVERY_RECIPE_CONTEXT,
@@ -145,6 +147,8 @@ export function createInventoryUi(deps) {
     const categorySelect = document.querySelector("#sellableCategory");
     const stationSelect = document.querySelector("#sellableStation");
     const vatSelect = document.querySelector("#sellableVat");
+    const allergenChecks = document.querySelector("#sellableAllergenChecks");
+    const precautionaryAllergenStatusSelect: any = document.querySelector("#sellablePrecautionaryAllergenStatus");
     const availabilityChecks = document.querySelector("#sellableAvailabilityChecks");
     const ingredientSelect = document.querySelector("#sellableRecipeIngredient");
     const measureSelect = document.querySelector("#sellableRecipeMeasure");
@@ -153,7 +157,7 @@ export function createInventoryUi(deps) {
     const draftPanel = document.querySelector("#sellableRecipeDraft");
     const addRecipeButton = document.querySelector("#addRecipeLineBtn");
     const createButton = document.querySelector("#createSellableProductBtn");
-    if (!form || !categorySelect || !stationSelect || !vatSelect || !availabilityChecks || !ingredientSelect || !measureSelect || !recipeStationSelect || !appliesSelect || !draftPanel || !addRecipeButton || !createButton) return;
+    if (!form || !categorySelect || !stationSelect || !vatSelect || !allergenChecks || !availabilityChecks || !ingredientSelect || !measureSelect || !recipeStationSelect || !appliesSelect || !draftPanel || !addRecipeButton || !createButton) return;
     const editable = can("canManageProducts");
   
     const selectedCategory = categorySelect.value || PRODUCT_CATEGORIES[0];
@@ -175,11 +179,30 @@ export function createInventoryUi(deps) {
       .join("");
     recipeStationSelect.value = stations.includes(selectedRecipeStation) ? selectedRecipeStation : stationSelect.value || stations[0];
   
-    const selectedVat = vatSelect.value || VAT_OPTIONS[0].id;
+    const selectedVat = vatSelect.value || "reduced";
     vatSelect.innerHTML = VAT_OPTIONS
       .map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`)
       .join("");
-    vatSelect.value = VAT_OPTIONS.some((option) => option.id === selectedVat) ? selectedVat : VAT_OPTIONS[0].id;
+    vatSelect.value = VAT_OPTIONS.some((option) => option.id === selectedVat) ? selectedVat : "reduced";
+
+    const previousAllergens = [...allergenChecks.querySelectorAll("input[name='allergens']:checked")].map((input) => input.value);
+    const selectedAllergens = new Set(previousAllergens);
+    allergenChecks.innerHTML = PRODUCT_ALLERGENS
+      .map((allergen) => `
+        <label class="check-row">
+          <input name="allergens" type="checkbox" value="${escapeHtml(allergen.id)}" ${selectedAllergens.has(allergen.id) ? "checked" : ""}>
+          <span>${escapeHtml(allergen.label)}</span>
+        </label>
+      `)
+      .join("");
+
+    if (precautionaryAllergenStatusSelect) {
+      const selectedStatus = precautionaryAllergenStatusSelect.value || "ask_staff";
+      precautionaryAllergenStatusSelect.innerHTML = PRECAUTIONARY_ALLERGEN_STATUSES
+        .map((status) => `<option value="${escapeHtml(status)}">${escapeHtml(status === "none" ? "None" : status === "may_contain" ? "May contain traces" : "Ask staff")}</option>`)
+        .join("");
+      precautionaryAllergenStatusSelect.value = PRECAUTIONARY_ALLERGEN_STATUSES.includes(selectedStatus) ? selectedStatus : "ask_staff";
+    }
   
     const previousChecks = [...availabilityChecks.querySelectorAll("input[name='availability']:checked")].map((input) => input.value);
     const selectedAvailability = new Set(previousChecks.length ? previousChecks : AVAILABILITY_OPTIONS

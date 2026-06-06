@@ -5,8 +5,10 @@ import {
   normalizeReservationStatus
 } from "../domain/reservations.js";
 import { RESERVATION_SOURCES } from "../shared/constants.js";
+import { normalizePaymentMethod, normalizePaymentStatus } from "../domain/payments.js";
 import { timeNow } from "../shared/dates.js";
 import { saveState, state } from "./state.js";
+import { recordReservationPayment } from "./payment-ledger.js";
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -40,6 +42,12 @@ export function createReservationActionsRuntime(deps) {
 
   function reservationFromForm(formData, fallback: any = {}) {
     const source = normalizeReservationSource(formData.get("source") || fallback.source);
+    const paymentProcessor = cleanText(formData.get("paymentProcessor") || fallback.paymentProcessor);
+    const paymentStatus = normalizePaymentStatus(formData.get("paymentStatus") || fallback.paymentStatus);
+    const paymentMethod = normalizePaymentMethod(
+      fallback.paymentMethod || (paymentProcessor === "Cash" ? "Cash" : paymentProcessor ? "Online payment" : "Unpaid / pay later"),
+      paymentStatus
+    );
     return {
       id: cleanText(formData.get("reservationId") || fallback.id),
       date: isReservationDate(formData.get("date")) ? String(formData.get("date")) : fallback.date || toDateInputString(),
@@ -51,8 +59,30 @@ export function createReservationActionsRuntime(deps) {
       email: cleanText(formData.get("email") || fallback.email),
       notes: cleanNotes(formData.get("notes") || fallback.notes),
       source,
-      status: normalizeReservationStatus(formData.get("status") || fallback.status, source === "Website" ? "Pending" : "Confirmed")
+      status: normalizeReservationStatus(formData.get("status") || fallback.status, source === "Website" ? "Pending" : "Confirmed"),
+      paymentStatus,
+      paymentMethod,
+      paymentProcessor,
+      paymentReference: cleanText(formData.get("paymentReference") || fallback.paymentReference),
+      depositAmount: Math.max(0, Number(formData.get("depositAmount") || fallback.depositAmount) || 0),
+      paidAt: paymentStatus === "Paid" ? fallback.paidAt || timeNow() : cleanText(fallback.paidAt),
+      paidAtMs: paymentStatus === "Paid" ? fallback.paidAtMs || Date.now() : fallback.paidAtMs || ""
     };
+  }
+
+  function recordReservationDepositIfNeeded(reservation) {
+    if (!reservation) return;
+    if (!reservation.depositAmount && reservation.paymentStatus === "Unpaid" && !reservation.paymentReference) return;
+    recordReservationPayment(reservation, {
+      provider: reservation.paymentProcessor,
+      paymentMethod: reservation.paymentMethod,
+      paymentReference: reservation.paymentReference,
+      status: reservation.paymentStatus,
+      amountCents: Math.round((Number(reservation.depositAmount) || 0) * 100),
+      paidAt: reservation.paidAt,
+      paidAtMs: reservation.paidAtMs,
+      captureMode: reservation.source === "Website" ? "online_checkout" : "staff_recorded"
+    });
   }
 
   function addReservation(formData) {
@@ -85,6 +115,7 @@ export function createReservationActionsRuntime(deps) {
         createdAt: existingReservation.createdAt || timeNow(),
         updatedAt: timeNow()
       });
+      recordReservationDepositIfNeeded(existingReservation);
       state.reservationEditingId = "";
       saveState();
       render();
@@ -99,6 +130,7 @@ export function createReservationActionsRuntime(deps) {
       updatedAt: ""
     };
     state.reservations.push(newReservation);
+    recordReservationDepositIfNeeded(newReservation);
     state.reservationEditingId = "";
     saveState();
     render();

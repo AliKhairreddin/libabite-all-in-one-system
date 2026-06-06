@@ -18,6 +18,7 @@ import {
 import { timeNow } from "../shared/dates.js";
 import { slugify, uniqueRecordId } from "../shared/ids.js";
 import { saveState, state } from "./state.js";
+import { recordOrderPayment } from "./payment-ledger.js";
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -244,6 +245,8 @@ export function createExternalDeliveryRuntime(deps) {
       paymentProcessor: platform.name,
       fulfillment: "Delivery",
       status: "New",
+      operationalStatus: "New",
+      fulfillmentStatus: "Scheduled",
       createdAt,
       createdAtMs,
       sentAt: "",
@@ -301,6 +304,15 @@ export function createExternalDeliveryRuntime(deps) {
     if (customerRecord) order.customerId = customerRecord.id;
 
     state.orders.push(order);
+    recordOrderPayment(order, {
+      provider: platform.id,
+      paymentMethod: "External delivery app payment",
+      paymentProcessor: platform.name,
+      paymentReference: externalOrderId,
+      amountCents: Math.round(getOrderTotal(order) * 100),
+      captureMode: "external_platform",
+      sourceChannel: EXTERNAL_DELIVERY_ORDER_CHANNEL
+    });
     state.nextOrderNumber += 1;
     state.receiptOrderId = order.id;
     state.externalOrderImports.push({

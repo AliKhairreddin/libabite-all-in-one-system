@@ -9,6 +9,7 @@ import { getPaymentStatusForMethod } from "../domain/payments.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext } from "../domain/orders.js";
 import { isReservationTime } from "../domain/reservations.js";
 import { flushRemoteState, saveState, state } from "./state.js";
+import { recordPendingOnlinePayment } from "./payment-ledger.js";
 import { timeNow } from "../shared/dates.js";
 
 export function createCustomerOrderingRuntime(deps) {
@@ -152,9 +153,9 @@ export function createCustomerOrderingRuntime(deps) {
       return;
     }
 
-    const paymentOption = String(formData.get("paymentOption") || "online");
-    const paymentMethod = paymentOption === "later" ? UNPAID_PAYMENT_METHOD : "Online payment";
-    const paymentStatus = getPaymentStatusForMethod(paymentMethod);
+    const paymentOption = String(formData.get("paymentOption") || "later");
+    const paymentMethod = UNPAID_PAYMENT_METHOD;
+    const paymentStatus = getPaymentStatusForMethod(paymentMethod, paymentOption === "later" ? "Pay later" : "Unpaid");
     const number = state.nextOrderNumber;
     const orderId = `ORD-${number}`;
     const createdAt = timeNow();
@@ -170,6 +171,8 @@ export function createCustomerOrderingRuntime(deps) {
       paymentMethod,
       fulfillment: "Kitchen",
       status: "New",
+      operationalStatus: "New",
+      fulfillmentStatus: "Not started",
       createdAt,
       createdAtMs,
       sentAt: "",
@@ -178,7 +181,7 @@ export function createCustomerOrderingRuntime(deps) {
       staffId: "",
       staffName: "QR guest",
       paidByUserId: "",
-      paidByName: paymentStatus === "Paid" ? "QR online checkout" : "",
+      paidByName: "",
       inventoryDeducted: false,
       notes: String(formData.get("notes") || "").trim(),
       qrCodeId: session.code?.id || "",
@@ -216,6 +219,7 @@ export function createCustomerOrderingRuntime(deps) {
     const customerPhone = String(formData.get("customerPhone") || "").trim();
     const customerEmail = String(formData.get("customerEmail") || "").trim();
     const requestedTime = String(formData.get("requestedTime") || "").trim();
+    const paymentProvider = String(formData.get("paymentProvider") || "stripe").trim().toLowerCase() === "mollie" ? "mollie" : "stripe";
     const deliveryAddress = fulfillment === "Delivery" ? String(formData.get("deliveryAddress") || "").trim() : "";
 
     if (!customerName || !customerPhone) {
@@ -255,9 +259,11 @@ export function createCustomerOrderingRuntime(deps) {
       paymentStatus: "Unpaid",
       paymentMethod: "Online payment",
       paymentReference: "",
-      paymentProcessor: WEBSITE_PAYMENT_PROCESSOR,
+      paymentProcessor: paymentProvider === "mollie" ? "Mollie" : WEBSITE_PAYMENT_PROCESSOR,
       fulfillment,
       status: "New",
+      operationalStatus: "New",
+      fulfillmentStatus: "Not started",
       createdAt,
       createdAtMs,
       sentAt: "",
@@ -313,11 +319,24 @@ export function createCustomerOrderingRuntime(deps) {
     saveState();
     await flushRemoteState();
 
-    const checkout = await createWebsiteCheckoutSession(order, Math.round(total * 100));
+    const checkout = await createWebsiteCheckoutSession(order, Math.round(total * 100), paymentProvider);
     if (!checkout?.ok || !checkout.checkoutUrl) {
       showToast(checkout?.message || "Online checkout is not ready yet.");
       return;
     }
+
+    recordPendingOnlinePayment(order, {
+      provider: paymentProvider,
+      paymentMethod: "Online payment",
+      paymentProcessor: paymentProvider === "mollie" ? "Mollie" : WEBSITE_PAYMENT_PROCESSOR,
+      paymentReference: checkout.checkoutSessionId,
+      checkoutSessionId: checkout.checkoutSessionId,
+      paymentIntentId: checkout.paymentIntentId,
+      amountCents: Math.round(total * 100),
+      captureMode: "online_checkout"
+    });
+    saveState();
+    await flushRemoteState();
 
     window.location.assign(checkout.checkoutUrl);
   }

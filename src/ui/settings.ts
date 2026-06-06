@@ -189,6 +189,10 @@ export function createSettingsUi(deps) {
       form.elements.email.value = editingReservation.email || "";
       form.elements.source.value = editingReservation.source || "Website";
       form.elements.status.value = editingReservation.status || "Pending";
+      form.elements.depositAmount.value = editingReservation.depositAmount || 0;
+      form.elements.paymentStatus.value = editingReservation.paymentStatus || "Unpaid";
+      form.elements.paymentProcessor.value = editingReservation.paymentProcessor || "";
+      form.elements.paymentReference.value = editingReservation.paymentReference || "";
       form.elements.notes.value = editingReservation.notes || "";
     } else if (!editingReservation && form.elements.reservationId.value) {
       form.reset();
@@ -198,6 +202,10 @@ export function createSettingsUi(deps) {
       form.elements.time.value = "19:30";
       form.elements.status.value = "Confirmed";
       form.elements.source.value = "Website";
+      form.elements.depositAmount.value = 0;
+      form.elements.paymentStatus.value = "Unpaid";
+      form.elements.paymentProcessor.value = "";
+      form.elements.paymentReference.value = "";
     }
 
     if (!form.elements.date.value) form.elements.date.value = today;
@@ -325,12 +333,15 @@ export function createSettingsUi(deps) {
         const statusClass = issues.length ? "danger" : reservationStatusClass(reservation.status);
         const statusText = issues.length ? "Review" : reservation.status;
         const contact = [reservation.phone, reservation.email].filter(Boolean).join(" | ") || "No contact";
+        const depositText = Number(reservation.depositAmount || 0) > 0
+          ? ` | Deposit ${reservation.paymentStatus || "Unpaid"} EUR ${Number(reservation.depositAmount || 0).toFixed(2)}${reservation.paymentReference ? ` ${reservation.paymentReference}` : ""}`
+          : "";
         return `
           <article class="reservation-card ${issues.length ? "is-conflict" : ""}">
             <header>
               <div>
                 <strong>${escapeHtml(getReservationDateLabel(reservation.date))} ${escapeHtml(reservation.time)} ${escapeHtml(reservation.name)}</strong>
-                <p>${reservation.guests} guests | ${escapeHtml(table ? table.name : "Unassigned")} | ${escapeHtml(reservation.source)} | ${escapeHtml(contact)}</p>
+                <p>${reservation.guests} guests | ${escapeHtml(table ? table.name : "Unassigned")} | ${escapeHtml(reservation.source)} | ${escapeHtml(contact)}${escapeHtml(depositText)}</p>
               </div>
               <span class="pill ${statusClass}">${escapeHtml(statusText)}</span>
             </header>

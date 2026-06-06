@@ -3,6 +3,7 @@ import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTI
 import { getReservationDateLabel } from "../domain/reservations.js";
 import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
+import { productAllergenSummary } from "../domain/commerce.js";
 import { toDateInputString } from "../domain/scheduling.js";
 
 export function createPublicOrderingUi(deps) {
@@ -43,12 +44,14 @@ export function createPublicOrderingUi(deps) {
         ? `${cartQuantity} in cart`
         : `${availability.maxQuantity} available`;
     const stockClass = disabled ? "danger" : cartQuantity ? "info" : "ok";
+    const allergenSummary = productAllergenSummary(product);
     return `
       <article class="customer-product-card">
         <div>
           <span class="customer-product-kicker">${escapeHtml(product.category)}</span>
           <strong>${escapeHtml(product.name)}</strong>
           <p>${escapeHtml(product.station)} · ${escapeHtml(money(product.price))}</p>
+          ${allergenSummary ? `<p>${escapeHtml(allergenSummary)}</p>` : ""}
         </div>
         <div class="customer-product-actions">
           <span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>
@@ -145,19 +148,19 @@ export function createPublicOrderingUi(deps) {
           <legend>Online payment</legend>
           <div class="check-row">
             <input name="paymentProvider" type="radio" value="stripe" checked>
-            <span>Secure checkout</span>
+            <span>Stripe checkout</span>
+          </div>
+          <div class="check-row">
+            <input name="paymentProvider" type="radio" value="mollie">
+            <span>Mollie checkout</span>
           </div>
         </fieldset>
     ` : `
         <fieldset class="customer-payment-options">
           <legend>Payment</legend>
           <label class="check-row">
-            <input name="paymentOption" type="radio" value="online" checked>
-            <span>Pay online now</span>
-          </label>
-          <label class="check-row">
-            <input name="paymentOption" type="radio" value="later">
-            <span>Order now, pay later</span>
+            <input name="paymentOption" type="radio" value="later" checked>
+            <span>Order now, pay at the table</span>
           </label>
         </fieldset>
     `;
