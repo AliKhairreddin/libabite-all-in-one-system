@@ -3691,7 +3691,7 @@ body.is-driver-app .driver-app-panel .panel-header h2 {
 }
 
 .driver-route-steps li.is-done > span {
-  background: var(--success-tone);
+  background: #2f7d52;
   color: #ffffff;
 }
 
