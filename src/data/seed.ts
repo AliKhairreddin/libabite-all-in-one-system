@@ -7620,7 +7620,7 @@ export const seedState = {
     }
   ],
   drivers: [
-    { id: "samir", name: "Samir", status: "On the way", eta: "10 min", orderId: "ORD-101", location: "Route to Markt 12" },
+    { id: "samir", name: "Samir", status: "Available", eta: "-", orderId: null, location: "Restaurant" },
     { id: "omar", name: "Omar", status: "Available", eta: "-", orderId: null, location: "Restaurant" }
   ],
   reservations: [
@@ -7635,7 +7635,7 @@ export const seedState = {
     { id: "RC-1", date: "", startTime: "18:00", endTime: "21:00", maxGuests: 22, maxReservations: 8, note: "Dinner rush cap", active: true }
   ],
   productionLog: [
-    { id: "LOG-1", text: "Kefta Plate recipe ready: 200g Kefta per plate from Fridge stock.", time: "09:35" }
+    { id: "LOG-1", text: "Live Eatcard delivery menu imported: 115 products, 109 active for online ordering.", time: "09:35" }
   ],
   productionBatches: []
 };

@@ -1,5 +1,4 @@
 import { state } from "../app/state.js";
-import { DEFAULT_RECIPE_ORDER_CONTEXT } from "../shared/constants.js";
 import { escapeHtml } from "../shared/html.js";
 
 export function createDashboardUi(deps) {
@@ -8,25 +7,17 @@ export function createDashboardUi(deps) {
     emptyState,
     formatStockAmount,
     formatDateTime,
-    getIngredientStatus,
     getKitchenSlaSummary,
     getLowStockIngredients,
     getManagementDashboardData,
     getOpenTickets,
     getOrderTotal,
-    getProductCost,
-    getProductMarginProfile,
-    getRecipeUsageLabel,
     getSlaSummaryLabel,
     getStationNames,
-    getStockRequirementsForItems,
-    ingredientById,
     isActiveDelivery,
     money,
     normalizeOrderItems,
-    normalizeStockQuantity,
-    orderCard,
-    productById
+    orderCard
   } = deps;
 
   function percentLabel(value) {
@@ -504,71 +495,51 @@ export function createDashboardUi(deps) {
     const container = document.querySelector("#keftaLoopProof");
     if (!container) return;
   
-    const ingredient = ingredientById("kefta");
-    const product = productById("kefta-plate");
-    if (!ingredient || !product) {
-      container.innerHTML = emptyState("Kefta loop is waiting for setup.");
+    const importedProducts = state.products.filter((product) => product.externalSource === "eatcard");
+    const activeImportedProducts = importedProducts.filter((product) => product.active && product.availability?.websiteOrdering);
+    const product = activeImportedProducts[0] || importedProducts[0] || state.products.find((item) => item.active);
+    if (!product) {
+      container.innerHTML = emptyState("Live menu import is waiting for setup.");
       return;
     }
+    const soldOutCount = importedProducts.filter((item) => item.soldOut).length;
+    const productMappings = state.externalProductMappings.filter((mapping) => mapping.productId === product.id && mapping.active !== false);
+    const mappedPlatformCount = new Set(productMappings.map((mapping) => mapping.platformId)).size;
+    const proofText = `${activeImportedProducts.length} imported items are active for website ordering. ${soldOutCount} sold-out live menu items stay inactive.`;
   
-    const demoQuantity = 10;
-    const orderContext = DEFAULT_RECIPE_ORDER_CONTEXT;
-    const demoUsage = normalizeStockQuantity(getStockRequirementsForItems([{ productId: product.id, quantity: demoQuantity }], orderContext).get(ingredient.id) || 0);
-    const latestOrder = getLatestOrderForProduct(product.id);
-    const latestQuantity = latestOrder ? getOrderQuantityForProduct(latestOrder, product.id) : 0;
-    const latestUsage = latestOrder
-      ? normalizeStockQuantity(getStockRequirementsForItems(latestOrder.items, {
-        channel: latestOrder.channel,
-        fulfillment: latestOrder.fulfillment
-      }).get(ingredient.id) || 0)
-      : 0;
-    const previousStock = latestOrder ? normalizeStockQuantity(ingredient.stock + latestUsage) : ingredient.stock;
-    const projectedStock = normalizeStockQuantity(ingredient.stock - demoUsage);
-    const recipeLine = product.recipe.find((line) => line.ingredientId === ingredient.id);
-    const marginProfile = getProductMarginProfile(product);
-    const stockStatus = getIngredientStatus(ingredient);
-    const stockClass = stockStatus === "danger" ? "danger" : stockStatus === "warning" ? "warning" : "ok";
-    const stockLabel = stockStatus === "danger" ? "Low stock" : stockStatus === "warning" ? "Watch" : "Healthy";
-    const proofText = latestOrder
-      ? `Order #${latestOrder.number}: ${latestQuantity} Kefta Plates used ${formatStockAmount(latestUsage, ingredient.unit)}.`
-      : `${demoQuantity} Kefta Plates use ${formatStockAmount(demoUsage, ingredient.unit)}.`;
-    const stockTrail = latestOrder
-      ? `${formatStockAmount(previousStock, ingredient.unit)} -> ${formatStockAmount(ingredient.stock, ingredient.unit)}`
-      : `${formatStockAmount(ingredient.stock, ingredient.unit)} -> ${formatStockAmount(projectedStock, ingredient.unit)}`;
-  
-    container.className = `phase-loop-card ${stockClass === "danger" ? "danger" : ""}`;
+    container.className = "phase-loop-card";
     container.innerHTML = `
       <header>
         <div>
-          <p class="eyebrow">Phase 5 test product</p>
-          <h3>Kefta Plate loop</h3>
+          <p class="eyebrow">Live catalog</p>
+          <h3>Eatcard menu import</h3>
         </div>
         <div class="ticket-pills">
-          <span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>
-          <span class="pill ${marginProfile.className}">${marginProfile.margin.toFixed(1)}% margin</span>
+          <span class="pill ok">${activeImportedProducts.length} online</span>
+          <span class="pill ${soldOutCount ? "warning" : "ok"}">${soldOutCount} sold out</span>
         </div>
       </header>
       <p>${escapeHtml(proofText)}</p>
       <div class="phase-loop-grid">
         <div class="phase-loop-metric">
-          <span>Purchased product</span>
-          <strong>${escapeHtml(ingredient.name)}</strong>
-          <small>${escapeHtml(formatStockAmount(ingredient.stock, ingredient.unit))} in ${escapeHtml(ingredient.location)}</small>
+          <span>First menu item</span>
+          <strong>${escapeHtml(product.name)}</strong>
+          <small>${escapeHtml(product.description || product.category)}</small>
         </div>
         <div class="phase-loop-metric">
-          <span>Recipe</span>
-          <strong>${escapeHtml(recipeLine ? getRecipeUsageLabel(recipeLine) : "No recipe")}</strong>
-          <small>per Kefta Plate</small>
+          <span>Category</span>
+          <strong>${escapeHtml(product.category)}</strong>
+          <small>${escapeHtml(product.station)}</small>
         </div>
         <div class="phase-loop-metric">
-          <span>10-plate stock move</span>
-          <strong>${escapeHtml(formatStockAmount(demoUsage, ingredient.unit))}</strong>
-          <small>${escapeHtml(stockTrail)}</small>
+          <span>Website price</span>
+          <strong>${escapeHtml(money(product.price))}</strong>
+          <small>${product.availability?.websiteOrdering ? "Pickup and delivery enabled" : "Not listed online"}</small>
         </div>
         <div class="phase-loop-metric">
-          <span>Cost and margin</span>
-          <strong>${escapeHtml(money(getProductCost(product, orderContext)))}</strong>
-          <small>${marginProfile.baseMargin.toFixed(1)}% at ${escapeHtml(money(product.price))}</small>
+          <span>External mappings</span>
+          <strong>${mappedPlatformCount}</strong>
+          <small>${escapeHtml(product.externalCode || "Ready for platform codes")}</small>
         </div>
       </div>
     `;
