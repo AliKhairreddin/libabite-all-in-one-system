@@ -194,8 +194,16 @@ button {
   color: var(--muted);
 }
 
-.customer-confirmation-code {
+.customer-confirmation-note {
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #cfe4d7;
+  border-radius: 999px;
+  background: #eef8f2;
+  color: #315c47;
   font-weight: 800;
+  line-height: 1.35;
 }
 
 .customer-home-shell {

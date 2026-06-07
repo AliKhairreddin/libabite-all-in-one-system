@@ -63,6 +63,18 @@ export function createPublicOrderingUi(deps) {
     `;
   }
 
+  function websiteOrderConfirmationNoteHtml(order) {
+    const paymentSummary = getOrderPaymentSummary(order);
+    const message = paymentSummary.paid
+      ? "Payment received. We are preparing your order."
+      : paymentSummary.statusLabel === "Pending"
+        ? "Payment is being confirmed. We will update your order shortly."
+        : paymentSummary.statusLabel === "Pay later"
+          ? "Order received. You can pay when you collect or receive it."
+          : "Order received. We will confirm payment with you soon.";
+    return `<p class="customer-confirmation-note">${escapeHtml(message)}</p>`;
+  }
+
   function customerAnchorId(value) {
     return `menu-${String(value || "category")
       .toLowerCase()
@@ -612,7 +624,7 @@ export function createPublicOrderingUi(deps) {
           <p class="eyebrow">Confirmed</p>
           <h2>Order #${escapeHtml(lastOrder.number)} received</h2>
           <p>${escapeHtml(fulfillmentLabel(lastOrder))} ${escapeHtml(lastOrder.requestedTime || "as soon as possible")} · ${escapeHtml(getOrderPaymentSummary(lastOrder).statusLabel)} · ${escapeHtml(money(getOrderTotal(lastOrder)))}</p>
-          ${lastOrder.paymentReference ? `<p class="customer-confirmation-code">Payment ${escapeHtml(lastOrder.paymentReference)}</p>` : ""}
+          ${websiteOrderConfirmationNoteHtml(lastOrder)}
         </div>
         <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>
       </section>
