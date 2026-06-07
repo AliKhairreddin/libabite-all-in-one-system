@@ -322,6 +322,7 @@ const {
 const {
   addCustomerCartItem,
   adjustCustomerCartItem,
+  closeCustomerUpsell,
   getCustomerCartItems,
   getCustomerCartTotal,
   getCustomerOrderContext,
@@ -874,6 +875,7 @@ export function createAppRuntime() {
       createStaffShift,
       createStaffUser,
       createTableQrCode,
+      closeCustomerUpsell,
       deleteReservationBlock,
       deleteReservationCapacityRule,
       findCustomerBySearchValue,

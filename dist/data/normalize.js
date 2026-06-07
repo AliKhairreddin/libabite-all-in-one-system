@@ -1352,6 +1352,9 @@ export function normalizeState(candidate) {
             .filter(Boolean)
         : [];
     next.customerCartOpen = Boolean(candidate?.customerCartOpen);
+    next.customerUpsellProductId = productIds.has(candidate?.customerUpsellProductId)
+        ? candidate.customerUpsellProductId
+        : "";
     next.websiteCart = Array.isArray(candidate?.websiteCart)
         ? candidate.websiteCart
             .map((item) => normalizeOrderLineItem(item, productIds))

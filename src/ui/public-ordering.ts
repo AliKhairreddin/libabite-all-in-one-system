@@ -32,6 +32,15 @@ export function createPublicOrderingUi(deps) {
     orderLocationLabel,
     productById
   } = deps;
+  const INLINE_UPSELL_CATEGORIES = ["Frisdrank", "Extra voor erbij", "Sauzen", "LibaSweets"];
+  const INLINE_UPSELL_CATEGORY_LIMITS = {
+    Frisdrank: 4,
+    "Extra voor erbij": 2,
+    Sauzen: 1,
+    LibaSweets: 1
+  };
+  const INLINE_UPSELL_LIMIT = 8;
+  const CART_DRINK_UPSELL_LIMIT = 6;
 
   function customerAnchorId(value) {
     return `menu-${String(value || "category")
@@ -56,6 +65,65 @@ export function createPublicOrderingUi(deps) {
     `;
   }
 
+  function upsellThumbHtml(product) {
+    return product.imageUrl
+      ? `<img src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">`
+      : `<span class="customer-upsell-thumb placeholder" aria-hidden="true">+</span>`;
+  }
+
+  function upsellItemsHtml(products) {
+    return products.map((product) => `
+      <button class="customer-upsell-item" type="button" data-customer-add="${escapeHtml(product.id)}">
+        ${upsellThumbHtml(product)}
+        <span>
+          <strong>${escapeHtml(product.name)}</strong>
+          <small>${escapeHtml(product.category)} · ${escapeHtml(money(product.price))}</small>
+        </span>
+        <b>+</b>
+      </button>
+    `).join("");
+  }
+
+  function getUpsellProducts(cartItems, orderContext, sourceProductId, categories = INLINE_UPSELL_CATEGORIES, limit = INLINE_UPSELL_LIMIT) {
+    const cartProductIds = new Set(cartItems.map((item) => item.productId));
+    const candidates = getOrderableProductsForContext(orderContext)
+      .filter((product) => categories.includes(product.category))
+      .filter((product) => product.id !== sourceProductId && !cartProductIds.has(product.id))
+      .sort((first, second) => categories.indexOf(first.category) - categories.indexOf(second.category));
+    const selected = [];
+    categories.forEach((category) => {
+      const categoryLimit = Math.min(limit - selected.length, INLINE_UPSELL_CATEGORY_LIMITS[category] || limit);
+      if (categoryLimit < 1) return;
+      selected.push(...candidates
+        .filter((product) => product.category === category && !selected.some((item) => item.id === product.id))
+        .slice(0, categoryLimit));
+    });
+    if (selected.length < limit) {
+      selected.push(...candidates
+        .filter((product) => !selected.some((item) => item.id === product.id))
+        .slice(0, limit - selected.length));
+    }
+    return selected.slice(0, limit);
+  }
+
+  function instantUpsellHtml(product, cartItems, orderContext) {
+    if (state.customerUpsellProductId !== product.id) return "";
+    const upsellProducts = getUpsellProducts(cartItems, orderContext, product.id);
+    if (!upsellProducts.length) return "";
+    return `
+      <section class="customer-inline-upsell" aria-label="Add-ons for ${escapeHtml(product.name)}">
+        <div class="customer-upsell-header">
+          <span class="customer-product-kicker">Added to cart</span>
+          <strong>Add a drink or extra?</strong>
+          <button class="icon-btn customer-upsell-close" type="button" data-customer-upsell-close aria-label="Hide suggestions">×</button>
+        </div>
+        <div class="customer-upsell-list compact">
+          ${upsellItemsHtml(upsellProducts)}
+        </div>
+      </section>
+    `;
+  }
+
   function customerProductCard(product, cartItems, orderContext = CUSTOMER_QR_ORDER_CONTEXT) {
     const availability = getProductAvailability(product, cartItems, orderContext);
     const cartQuantity = cartItems
@@ -69,8 +137,9 @@ export function createPublicOrderingUi(deps) {
         : "";
     const stockClass = disabled ? "danger" : cartQuantity ? "info" : "ok";
     const allergenSummary = Array.isArray(product.allergens) && product.allergens.length ? productAllergenSummary(product) : "";
+    const hasInlineUpsell = state.customerUpsellProductId === product.id;
     return `
-      <article class="customer-product-card">
+      <article class="customer-product-card ${hasInlineUpsell ? "is-upsell-open" : ""}">
         ${product.imageUrl ? `<img class="customer-product-image" src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">` : `<div class="customer-product-image placeholder" aria-hidden="true">L</div>`}
         <div class="customer-product-content">
           <span class="customer-product-kicker">${escapeHtml(product.category)}${product.isNew ? " · New" : ""}</span>
@@ -83,6 +152,7 @@ export function createPublicOrderingUi(deps) {
           ${stockLabel ? `<span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>` : ""}
           <button class="icon-btn customer-add-btn" type="button" data-customer-add="${escapeHtml(product.id)}" aria-label="Add ${escapeHtml(product.name)}" ${disabled ? "disabled" : ""}>+</button>
         </div>
+        ${instantUpsellHtml(product, cartItems, orderContext)}
       </article>
     `;
   }
@@ -107,10 +177,7 @@ export function createPublicOrderingUi(deps) {
 
   function drinkUpsellHtml(cartItems, orderContext) {
     if (!cartItems.length) return "";
-    const cartProductIds = new Set(cartItems.map((item) => item.productId));
-    const drinks = getOrderableProductsForContext(orderContext)
-      .filter((product) => product.category === "Frisdrank" && !cartProductIds.has(product.id))
-      .slice(0, 6);
+    const drinks = getUpsellProducts(cartItems, orderContext, "", ["Frisdrank"], CART_DRINK_UPSELL_LIMIT);
     if (!drinks.length) return "";
     return `
       <section class="customer-upsell-panel" aria-label="Drinks with your order">
@@ -119,16 +186,7 @@ export function createPublicOrderingUi(deps) {
           <strong>Complete your order</strong>
         </div>
         <div class="customer-upsell-list">
-          ${drinks.map((drink) => `
-            <button class="customer-upsell-item" type="button" data-customer-add="${escapeHtml(drink.id)}">
-              ${drink.imageUrl ? `<img src="${escapeHtml(drink.imageUrl)}" alt="" loading="lazy">` : ""}
-              <span>
-                <strong>${escapeHtml(drink.name)}</strong>
-                <small>${escapeHtml(money(drink.price))}</small>
-              </span>
-              <b>+</b>
-            </button>
-          `).join("")}
+          ${upsellItemsHtml(drinks)}
         </div>
       </section>
     `;

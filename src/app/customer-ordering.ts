@@ -65,7 +65,11 @@ export function createCustomerOrderingRuntime(deps) {
     return getItemsTotal(getCustomerCartItems(orderContext));
   }
 
-  function addCustomerCartItem(productId) {
+  function shouldOpenCustomerUpsell(product) {
+    return product && !["Frisdrank", "Extra voor erbij", "Sauzen"].includes(product.category);
+  }
+
+  function addCustomerCartItem(productId, options: any = {}) {
     const session = getCustomerOrderingSession();
     if (!session || session.error) return;
     const orderContext = getCustomerOrderContext(session.mode);
@@ -84,6 +88,7 @@ export function createCustomerOrderingRuntime(deps) {
     }
 
     state[getCustomerCartStateKey(session.mode)] = normalizeOrderItems([...cartItems, { productId: product.id, quantity: 1, note: "", modifiers: [] }]);
+    state.customerUpsellProductId = options.keepUpsellOpen ? state.customerUpsellProductId : shouldOpenCustomerUpsell(product) ? product.id : "";
     state[getCustomerLastOrderStateKey(session.mode)] = "";
     saveState();
     render();
@@ -127,7 +132,14 @@ export function createCustomerOrderingRuntime(deps) {
     const mode = session?.mode || "qr";
     state[getCustomerCartStateKey(mode)] = [];
     state.customerCartOpen = false;
+    state.customerUpsellProductId = "";
     state[getCustomerLastOrderStateKey(mode)] = "";
+    saveState();
+    render();
+  }
+
+  function closeCustomerUpsell() {
+    state.customerUpsellProductId = "";
     saveState();
     render();
   }
@@ -142,6 +154,7 @@ export function createCustomerOrderingRuntime(deps) {
     state.websiteFulfillment = normalizeWebsiteFulfillment(value);
     state.websiteCart = getCustomerCartItems(getCustomerOrderContext("website"));
     state.websiteLastOrderId = "";
+    state.customerUpsellProductId = "";
     saveState();
     render();
   }
@@ -351,6 +364,7 @@ export function createCustomerOrderingRuntime(deps) {
   return {
     addCustomerCartItem,
     adjustCustomerCartItem,
+    closeCustomerUpsell,
     getCustomerCartItems,
     getCustomerCartTotal,
     getCustomerOrderContext,

@@ -33,6 +33,7 @@ export function bindAppEvents(handlers) {
     createStaffShift,
     createStaffUser,
     createTableQrCode,
+    closeCustomerUpsell,
     deleteReservationBlock,
     deleteReservationCapacityRule,
     findCustomerBySearchValue,
@@ -327,7 +328,14 @@ export function bindAppEvents(handlers) {
     if (deleteCapacityRuleButton) deleteReservationCapacityRule(deleteCapacityRuleButton.dataset.deleteCapacityRule);
 
     const customerAdd = event.target.closest("[data-customer-add]");
-    if (customerAdd) addCustomerCartItem(customerAdd.dataset.customerAdd);
+    if (customerAdd) {
+      addCustomerCartItem(customerAdd.dataset.customerAdd, {
+        keepUpsellOpen: Boolean(customerAdd.closest(".customer-inline-upsell"))
+      });
+    }
+
+    const customerUpsellClose = event.target.closest("[data-customer-upsell-close]");
+    if (customerUpsellClose) closeCustomerUpsell();
 
     const customerCartOpen = event.target.closest("[data-customer-cart-open]");
     if (customerCartOpen) setCustomerCartOpen(true);

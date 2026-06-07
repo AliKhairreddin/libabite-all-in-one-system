@@ -37,6 +37,7 @@ const LOCAL_ONLY_STATE_KEYS = new Set([
   "receiptOrderId",
   "customerCart",
   "customerCartOpen",
+  "customerUpsellProductId",
   "customerLastOrderId",
   "websiteCart",
   "websiteLastOrderId",
