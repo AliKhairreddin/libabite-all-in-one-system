@@ -87,6 +87,7 @@ export const seedState = {
     { id: "qr-table-6", tableId: "table-6", area: "Family corner", token: "libabite-table-6", status: "Active", createdAt: "09:00", regeneratedAt: "" }
   ],
   customerCart: [],
+  customerCartOpen: false,
   customerLastOrderId: "",
   websiteCart: [],
   websiteLastOrderId: "",

@@ -1491,6 +1491,7 @@ export function normalizeState(candidate) {
       .map((item) => normalizeOrderLineItem(item, productIds))
       .filter(Boolean)
     : [];
+  next.customerCartOpen = Boolean(candidate?.customerCartOpen);
   next.websiteCart = Array.isArray(candidate?.websiteCart)
     ? candidate.websiteCart
       .map((item) => normalizeOrderLineItem(item, productIds))

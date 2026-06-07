@@ -84,6 +84,7 @@ export function bindAppEvents(handlers) {
     selectStaffShiftForEdit,
     selectReservationForEdit,
     selectSupplierForEdit,
+    setCustomerCartOpen,
     setProcedureStepProgress,
     setView,
     setWebsiteFulfillment,
@@ -327,6 +328,12 @@ export function bindAppEvents(handlers) {
 
     const customerAdd = event.target.closest("[data-customer-add]");
     if (customerAdd) addCustomerCartItem(customerAdd.dataset.customerAdd);
+
+    const customerCartOpen = event.target.closest("[data-customer-cart-open]");
+    if (customerCartOpen) setCustomerCartOpen(true);
+
+    const customerCartClose = event.target.closest("[data-customer-cart-close]");
+    if (customerCartClose) setCustomerCartOpen(false);
 
     const customerIncrease = event.target.closest("[data-customer-increase]");
     if (customerIncrease) adjustCustomerCartItem(customerIncrease.dataset.customerIncrease, 1);

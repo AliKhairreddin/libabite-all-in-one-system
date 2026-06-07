@@ -78,7 +78,7 @@ export function createCustomerOrderingRuntime(deps) {
     const cartItems = getCustomerCartItems(orderContext);
     const availability = getProductAvailability(product, cartItems, orderContext);
     if (availability.maxQuantity < 1) {
-      showToast(`${product.name} is not available with current stock.`);
+      showToast(`${product.name} is not available right now.`);
       render();
       return;
     }
@@ -103,7 +103,7 @@ export function createCustomerOrderingRuntime(deps) {
       const otherItems = cartItems.filter((_, itemIndex) => itemIndex !== Number(index));
       const availability = getProductAvailability(product, otherItems, orderContext);
       if (item.quantity + 1 > availability.maxQuantity) {
-        showToast(`Only ${availability.maxQuantity} ${product.name} can be ordered with current stock.`);
+        showToast("That quantity is not available right now.");
         return;
       }
     }
@@ -126,7 +126,14 @@ export function createCustomerOrderingRuntime(deps) {
     const session = getCustomerOrderingSession();
     const mode = session?.mode || "qr";
     state[getCustomerCartStateKey(mode)] = [];
+    state.customerCartOpen = false;
     state[getCustomerLastOrderStateKey(mode)] = "";
+    saveState();
+    render();
+  }
+
+  function setCustomerCartOpen(open = true) {
+    state.customerCartOpen = Boolean(open);
     saveState();
     render();
   }
@@ -348,6 +355,7 @@ export function createCustomerOrderingRuntime(deps) {
     getCustomerCartTotal,
     getCustomerOrderContext,
     removeCustomerCartItem,
+    setCustomerCartOpen,
     setWebsiteFulfillment,
     startNewCustomerOrder,
     submitCustomerQrOrder,

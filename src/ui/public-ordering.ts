@@ -11,7 +11,6 @@ export function createPublicOrderingUi(deps) {
   const {
     emptyState,
     fulfillmentLabel,
-    formatStockAmount,
     getCustomerCartItems,
     getCustomerOrderContext,
     getItemCount,
@@ -35,6 +34,29 @@ export function createPublicOrderingUi(deps) {
     productById
   } = deps;
 
+  function customerAnchorId(value) {
+    return `menu-${String(value || "category")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "category"}`;
+  }
+
+  function categoryRailHtml(productsByCategory) {
+    return `
+      <nav class="customer-category-rail" aria-label="Menu categories">
+        ${productsByCategory.map((group) => {
+          const product = group.products[0] || {};
+          return `
+            <a href="#${escapeHtml(customerAnchorId(group.category))}">
+              ${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">` : ""}
+              <span>${escapeHtml(group.category)}</span>
+            </a>
+          `;
+        }).join("")}
+      </nav>
+    `;
+  }
+
   function customerProductCard(product, cartItems, orderContext = CUSTOMER_QR_ORDER_CONTEXT) {
     const availability = getProductAvailability(product, cartItems, orderContext);
     const cartQuantity = cartItems
@@ -45,12 +67,13 @@ export function createPublicOrderingUi(deps) {
       ? "Unavailable"
       : cartQuantity
         ? `${cartQuantity} in cart`
-        : `${availability.maxQuantity} available`;
+        : "";
     const stockClass = disabled ? "danger" : cartQuantity ? "info" : "ok";
     const allergenSummary = Array.isArray(product.allergens) && product.allergens.length ? productAllergenSummary(product) : "";
     return `
       <article class="customer-product-card">
-        <div>
+        ${product.imageUrl ? `<img class="customer-product-image" src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">` : `<div class="customer-product-image placeholder" aria-hidden="true">L</div>`}
+        <div class="customer-product-content">
           <span class="customer-product-kicker">${escapeHtml(product.category)}${product.isNew ? " · New" : ""}</span>
           <strong>${escapeHtml(product.name)}</strong>
           ${product.description ? `<p class="customer-product-description">${escapeHtml(product.description)}</p>` : ""}
@@ -58,7 +81,7 @@ export function createPublicOrderingUi(deps) {
           ${allergenSummary ? `<p>${escapeHtml(allergenSummary)}</p>` : ""}
         </div>
         <div class="customer-product-actions">
-          <span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>
+          ${stockLabel ? `<span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>` : ""}
           <button class="icon-btn customer-add-btn" type="button" data-customer-add="${escapeHtml(product.id)}" aria-label="Add ${escapeHtml(product.name)}" ${disabled ? "disabled" : ""}>+</button>
         </div>
       </article>
@@ -80,6 +103,35 @@ export function createPublicOrderingUi(deps) {
           <button class="mini-btn danger-action" type="button" data-customer-remove="${index}">Remove</button>
         </div>
       </div>
+    `;
+  }
+
+  function drinkUpsellHtml(cartItems, orderContext) {
+    if (!cartItems.length) return "";
+    const cartProductIds = new Set(cartItems.map((item) => item.productId));
+    const drinks = getOrderableProductsForContext(orderContext)
+      .filter((product) => product.category === "Frisdrank" && !cartProductIds.has(product.id))
+      .slice(0, 6);
+    if (!drinks.length) return "";
+    return `
+      <section class="customer-upsell-panel" aria-label="Drinks with your order">
+        <div class="customer-upsell-header">
+          <span class="customer-product-kicker">Drinks</span>
+          <strong>Complete your order</strong>
+        </div>
+        <div class="customer-upsell-list">
+          ${drinks.map((drink) => `
+            <button class="customer-upsell-item" type="button" data-customer-add="${escapeHtml(drink.id)}">
+              ${drink.imageUrl ? `<img src="${escapeHtml(drink.imageUrl)}" alt="" loading="lazy">` : ""}
+              <span>
+                <strong>${escapeHtml(drink.name)}</strong>
+                <small>${escapeHtml(money(drink.price))}</small>
+              </span>
+              <b>+</b>
+            </button>
+          `).join("")}
+        </div>
+      </section>
     `;
   }
   
@@ -119,7 +171,7 @@ export function createPublicOrderingUi(deps) {
     const shortages = getStockShortages(cartItems, orderContext);
     const blocked = !cartItems.length || shortages.length > 0;
     const shortageText = shortages.length
-      ? `<p class="customer-cart-note">Missing ${escapeHtml(shortages.map((item) => `${formatStockAmount(item.shortage, item.ingredient.unit)} ${item.ingredient.name}`).join(", "))}.</p>`
+      ? `<p class="customer-cart-note">Some items in your cart are unavailable right now.</p>`
       : "";
     const fulfillment = normalizeWebsiteFulfillment(state.websiteFulfillment);
     const deliverySelected = fulfillment === "Delivery";
@@ -170,16 +222,18 @@ export function createPublicOrderingUi(deps) {
     `;
   
     return `
-      <form id="customerOrderForm" class="customer-cart-panel" data-customer-mode="${escapeHtml(mode)}">
+      <form id="customerOrderForm" class="customer-cart-panel ${state.customerCartOpen ? "is-open" : ""}" data-customer-mode="${escapeHtml(mode)}">
         <div class="panel-header compact">
           <div>
             <p class="eyebrow">Cart</p>
             <h2>${itemCount ? `${itemCount} item${itemCount === 1 ? "" : "s"}` : "Your order"}</h2>
           </div>
+          <button class="icon-btn customer-cart-close" type="button" data-customer-cart-close aria-label="Close cart">×</button>
         </div>
         <div class="customer-cart-lines">
           ${cartItems.length ? cartItems.map(customerCartLine).join("") : emptyState("Choose items from the menu.")}
         </div>
+        ${drinkUpsellHtml(cartItems, orderContext)}
         ${shortageText}
         <label>
           Notes
@@ -192,6 +246,24 @@ export function createPublicOrderingUi(deps) {
         </div>
         <button class="primary-btn" type="submit" ${blocked ? "disabled" : ""}>${mode === "website" ? "Continue to payment" : "Place Order"} · ${escapeHtml(money(total))}</button>
       </form>
+    `;
+  }
+
+  function customerCartMobileControlsHtml(cartItems, mode = "website") {
+    const total = getItemsTotal(cartItems);
+    const itemCount = getItemCount(cartItems);
+    const isOpen = Boolean(state.customerCartOpen);
+    return `
+      <button class="customer-cart-backdrop ${isOpen ? "is-open" : ""}" type="button" data-customer-cart-close aria-label="Close cart"></button>
+      ${itemCount ? `
+        <div class="customer-cart-mobile-bar ${isOpen ? "is-hidden" : ""}">
+          <button class="customer-cart-mobile-button" type="button" data-customer-cart-open aria-label="Open cart">
+            <span>${itemCount} item${itemCount === 1 ? "" : "s"}</span>
+            <strong>${escapeHtml(money(total))}</strong>
+          </button>
+          <button class="primary-btn" type="button" data-customer-cart-open>${mode === "website" ? "Checkout" : "View cart"}</button>
+        </div>
+      ` : ""}
     `;
   }
   
@@ -266,8 +338,9 @@ export function createPublicOrderingUi(deps) {
             </div>
           </div>
           <div class="customer-menu-groups">
+            ${categoryRailHtml(productsByCategory)}
             ${productsByCategory.length ? productsByCategory.map((group) => `
-              <section class="customer-menu-group">
+              <section class="customer-menu-group" id="${escapeHtml(customerAnchorId(group.category))}">
                 <h2>${escapeHtml(group.category)}</h2>
                 <div class="customer-product-grid">
                   ${group.products.map((product) => customerProductCard(product, cartItems, CUSTOMER_QR_ORDER_CONTEXT)).join("")}
@@ -278,6 +351,7 @@ export function createPublicOrderingUi(deps) {
         </section>
         ${customerCartHtml(cartItems, { mode: "qr", orderContext: CUSTOMER_QR_ORDER_CONTEXT })}
       </main>
+      ${customerCartMobileControlsHtml(cartItems, "qr")}
     `;
   }
   
@@ -337,8 +411,9 @@ export function createPublicOrderingUi(deps) {
             ${websiteFulfillmentControlsHtml()}
           </div>
           <div class="customer-menu-groups">
+            ${categoryRailHtml(productsByCategory)}
             ${productsByCategory.length ? productsByCategory.map((group) => `
-              <section class="customer-menu-group">
+              <section class="customer-menu-group" id="${escapeHtml(customerAnchorId(group.category))}">
                 <h2>${escapeHtml(group.category)}</h2>
                 <div class="customer-product-grid">
                   ${group.products.map((product) => customerProductCard(product, cartItems, orderContext)).join("")}
@@ -349,6 +424,7 @@ export function createPublicOrderingUi(deps) {
         </section>
         ${customerCartHtml(cartItems, { mode: "website", orderContext })}
       </main>
+      ${customerCartMobileControlsHtml(cartItems, "website")}
     `;
   }
 
@@ -390,7 +466,8 @@ export function createPublicOrderingUi(deps) {
           <div class="customer-home-menu">
             ${orderableProducts.length ? orderableProducts.map((product) => `
               <article class="customer-product-card">
-                <div>
+                ${product.imageUrl ? `<img class="customer-product-image" src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">` : `<div class="customer-product-image placeholder" aria-hidden="true">L</div>`}
+                <div class="customer-product-content">
                   <span class="customer-product-kicker">${escapeHtml(product.category)}${product.isNew ? " · New" : ""}</span>
                   <strong>${escapeHtml(product.name)}</strong>
                   ${product.description ? `<p class="customer-product-description">${escapeHtml(product.description)}</p>` : ""}
