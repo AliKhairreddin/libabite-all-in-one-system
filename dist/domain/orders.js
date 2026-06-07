@@ -75,6 +75,8 @@ export function normalizeOrderFulfillment(channel, value) {
     const normalizedChannel = normalizeOrderType(channel);
     if (isPhoneMessageOrder(normalizedChannel))
         return normalizePhoneMessageFulfillment(value);
+    if (normalizedChannel === WEBSITE_ORDER_CHANNEL)
+        return normalizeWebsiteFulfillment(value);
     return orderTypeDefinition(normalizedChannel).fulfillment;
 }
 export function normalizeOrderType(value) {

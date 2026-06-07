@@ -10,7 +10,7 @@ import {
 } from "../dist/domain/customers.js";
 import { getProductAvailability, getStockRequirementsForItems, getStockShortages, planStockDeduction } from "../dist/domain/inventory.js";
 import { advanceStatus, getOrderProgressSummary, setTicketStatus } from "../dist/domain/kitchen.js";
-import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderItems } from "../dist/domain/orders.js";
+import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderFulfillment, normalizeOrderItems } from "../dist/domain/orders.js";
 import { normalizeProductAllergens, productAllergenSummary, vatRateForSetting } from "../dist/domain/commerce.js";
 import {
   buildExternalMenuPayload,
@@ -159,6 +159,12 @@ test("order totals ignore missing products and multiply quantities", () => {
   ], productById);
   assert.deepEqual(normalized, [{ productId: "kefta-plate", quantity: 3, note: "hot", modifiers: ["Extra sauce"] }]);
   assert.equal(countOrderItems(normalized), 3);
+});
+
+test("website order fulfillment preserves delivery checkout choice", () => {
+  assert.equal(normalizeOrderFulfillment("Website order", "Delivery"), "Delivery");
+  assert.equal(normalizeOrderFulfillment("Website order", "Pickup"), "Pickup");
+  assert.equal(normalizeOrderFulfillment("Website order", "Unknown"), "Pickup");
 });
 
 test("external delivery helpers parse, map, and prepare platform payloads", () => {
