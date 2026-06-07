@@ -142,14 +142,28 @@ export function createReservationActionsRuntime(deps) {
     reservation.source = "Website";
     reservation.status = "Pending";
 
-    const validation = getReservationRequestValidation(reservation);
+    const validation = getReservationRequestValidation({ ...reservation, tableId: "" });
     if (!validation.ok) {
       showToast(validation.detail);
       renderWebsiteReservationScreen();
       return;
     }
 
-    const table = validation.table || getAvailableReservationTable(reservation);
+    const selectedTable = tableById(reservation.tableId);
+    if (selectedTable) {
+      const tableValidation = getReservationValidation({
+        ...reservation,
+        tableId: selectedTable.id,
+        status: "Pending"
+      });
+      if (!tableValidation.ok) {
+        showToast(tableValidation.detail);
+        renderWebsiteReservationScreen();
+        return;
+      }
+    }
+
+    const table = selectedTable || validation.table || getAvailableReservationTable(reservation);
     if (!table) {
       showToast("No table is available for that party size and time.");
       renderWebsiteReservationScreen();

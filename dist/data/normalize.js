@@ -1270,6 +1270,13 @@ export function normalizeState(candidate) {
         if (!Array.isArray(next[key]))
             next[key] = structuredClone(seedState[key]);
     });
+    if (Array.isArray(candidate?.orders) && candidate.orders.length === 0 && !candidate?.websiteLastOrderId && seedState.orders?.length) {
+        next.orders = structuredClone(seedState.orders);
+        next.tickets = structuredClone(seedState.tickets);
+        next.websiteLastOrderId = seedState.websiteLastOrderId;
+        next.receiptOrderId = seedState.websiteLastOrderId;
+        next.nextOrderNumber = Math.max(Number(next.nextOrderNumber) || 0, Number(seedState.nextOrderNumber) || 0);
+    }
     next.restaurantSettings = normalizeRestaurantSettings(source.restaurantSettings);
     next.users = normalizeUsers(next.users);
     if (!next.users.some((user) => user.id === next.currentUserId))

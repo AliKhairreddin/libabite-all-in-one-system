@@ -4,6 +4,7 @@ import { getReservationDateLabel, reservationStatusClass } from "../domain/reser
 import { toDateInputString } from "../domain/scheduling.js";
 import { escapeHtml } from "../shared/html.js";
 import { qrCodeSvg } from "../shared/qr.js";
+import { reservationTableMapHtml } from "./table-map.js";
 
 export function createSettingsUi(deps) {
   const document: any = window.document;
@@ -168,6 +169,7 @@ export function createSettingsUi(deps) {
   function renderReservationPlanner() {
     const form = document.querySelector("#reservationForm");
     const tableSelect = document.querySelector("#reservationTable");
+    const tableMap = document.querySelector("#reservationTableMap");
     const availabilityPanel = document.querySelector("#reservationAvailability");
     const submitButton = document.querySelector("#bookReservationBtn");
     const title = document.querySelector("#reservationFormTitle");
@@ -234,6 +236,21 @@ export function createSettingsUi(deps) {
     tableSelect.value = preferredTable?.id || "";
   
     const validation = getReservationValidation({ id: editingReservation?.id, date, guests, time, tableId: tableSelect.value });
+    if (tableMap) {
+      tableMap.innerHTML = reservationTableMapHtml({
+        tables: state.tables,
+        selectedTableId: tableSelect.value,
+        title: "Select dining table",
+        getTableValidation: (table) => getReservationValidation({
+          id: editingReservation?.id,
+          date,
+          guests,
+          time,
+          tableId: table.id,
+          status: form.elements.status.value || editingReservation?.status || "Confirmed"
+        })
+      });
+    }
     availabilityPanel.className = `availability-card ${validation.className}`.trim();
     availabilityPanel.innerHTML = `
       <header>

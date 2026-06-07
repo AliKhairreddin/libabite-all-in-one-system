@@ -5,6 +5,7 @@ import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
 import { productAllergenSummary } from "../domain/commerce.js";
 import { toDateInputString } from "../domain/scheduling.js";
+import { reservationTableMapHtml } from "./table-map.js";
 
 export function createPublicOrderingUi(deps) {
   const {
@@ -15,10 +16,12 @@ export function createPublicOrderingUi(deps) {
     getCustomerOrderContext,
     getItemCount,
     getItemsTotal,
+    getAvailableReservationTable,
     getOrderPaymentSummary,
     getOrderTotal,
     getOrderableProductsForContext,
     getProductAvailability,
+    getReservationValidation,
     getStaffUrl,
     getWebsiteOrderingUrl,
     getStockShortages,
@@ -418,6 +421,14 @@ export function createPublicOrderingUi(deps) {
     const session = getWebsiteReservationSession();
     if (!screen || !session) return;
 
+    const reservationDate = toDateInputString();
+    const reservationTime = getDefaultReservationTime();
+    const reservationGuests = 2;
+    const suggestedTable = getAvailableReservationTable({
+      date: reservationDate,
+      guests: reservationGuests,
+      time: reservationTime
+    }) || state.tables[0];
     const lastReservation = state.reservations.find((reservation) => reservation.id === state.websiteLastReservationId);
     const confirmation = lastReservation ? `
       <section class="customer-confirmation">
@@ -457,14 +468,15 @@ export function createPublicOrderingUi(deps) {
             </div>
           </div>
           <form id="customerReservationForm" class="stacked-form">
+            <input name="tableId" id="customerReservationTable" type="hidden" value="${escapeHtml(suggestedTable?.id || "")}">
             <div class="customer-checkout-grid">
               <label>
                 Date
-                <input name="date" type="date" min="${escapeHtml(toDateInputString())}" value="${escapeHtml(toDateInputString())}" required>
+                <input name="date" type="date" min="${escapeHtml(reservationDate)}" value="${escapeHtml(reservationDate)}" required>
               </label>
               <label>
                 Time
-                <input name="time" type="time" value="${escapeHtml(getDefaultReservationTime())}" required>
+                <input name="time" type="time" value="${escapeHtml(reservationTime)}" required>
               </label>
               <label>
                 Guests
@@ -483,6 +495,18 @@ export function createPublicOrderingUi(deps) {
                 <input name="email" type="email" autocomplete="email">
               </label>
             </div>
+            ${reservationTableMapHtml({
+              tables: state.tables,
+              selectedTableId: suggestedTable?.id || "",
+              title: "Pick your table",
+              getTableValidation: (table) => getReservationValidation({
+                date: reservationDate,
+                guests: reservationGuests,
+                time: reservationTime,
+                tableId: table.id,
+                status: "Pending"
+              })
+            })}
             <label>
               Notes
               <textarea name="notes" rows="4" placeholder="Occasion, high chair, accessibility, allergies"></textarea>

@@ -3,9 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#203427">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Libabite Driver">
     <title>Libabite Ops</title>
-    <script type="module" crossorigin src="/assets/app-DsCsk3rp.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/app-CHwzogbG.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    <script type="module" crossorigin src="/assets/app-CKONtgRI.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/app-CkaBorGQ.css">
   </head>
   <body>
     <section class="customer-qr-screen" id="customerQrScreen" aria-label="Customer ordering" hidden></section>
@@ -1512,6 +1518,7 @@ Switch off signs and lock the restaurant.</textarea>
                     </select>
                   </label>
                 </div>
+                <div id="reservationTableMap"></div>
                 <label>
                   Status
                   <select name="status">
@@ -1656,5 +1663,12 @@ Switch off signs and lock the restaurant.</textarea>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

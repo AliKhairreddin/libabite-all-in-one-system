@@ -23,6 +23,9 @@ import {
   normalizePickupStatus
 } from "../domain/delivery.js";
 
+const DRIVER_ROUTE_ORIGIN = "Libabite, Roermond, Netherlands";
+const ROERMOND_MAP_EMBED_URL = "https://www.openstreetmap.org/export/embed.html?bbox=5.9705%2C51.1805%2C6.0155%2C51.2055&layer=mapnik&marker=51.1949%2C5.9878";
+
 export function createTeamUi(deps) {
   const document: any = window.document;
   const {
@@ -100,10 +103,18 @@ export function createTeamUi(deps) {
       "On the way": ["Delivered", "Failed delivery"],
       "Failed delivery": ["Returned"]
     }[status] || [];
+    const labels = {
+      "At restaurant": "At restaurant",
+      "Picked up": "Picked up",
+      "On the way": "Start route",
+      Delivered: "Mark delivered",
+      "Failed delivery": "Could not deliver",
+      Returned: "Returned"
+    };
   
     return nextStatuses.map((nextStatus) => `
       <button class="mini-btn ${nextStatus === "Failed delivery" || nextStatus === "Returned" ? "danger-action" : ""}" type="button" data-delivery-status="${escapeHtml(nextStatus)}" data-delivery-order="${escapeHtml(order.id)}">
-        ${escapeHtml(nextStatus === "Delivered" ? "Mark delivered" : nextStatus)}
+        ${escapeHtml(labels[nextStatus] || nextStatus)}
       </button>
     `).join("");
   }
@@ -126,6 +137,185 @@ export function createTeamUi(deps) {
           <strong>${escapeHtml(cash)}</strong>
         </div>
       </div>
+    `;
+  }
+
+  function deliveryDestination(order) {
+    return String(order.deliveryAddress || `${order.customerName || order.customer || "Customer"}, Roermond, Netherlands`).replace(/\s+/g, " ").trim();
+  }
+
+  function shortDeliveryAddress(order) {
+    return deliveryDestination(order).split(",")[0] || "Customer";
+  }
+
+  function mapsQuery(value) {
+    return encodeURIComponent(String(value || "").trim());
+  }
+
+  function googleDirectionsUrl(order) {
+    return `https://www.google.com/maps/dir/?api=1&origin=${mapsQuery(DRIVER_ROUTE_ORIGIN)}&destination=${mapsQuery(deliveryDestination(order))}&travelmode=driving`;
+  }
+
+  function appleDirectionsUrl(order) {
+    return `https://maps.apple.com/?saddr=${mapsQuery(DRIVER_ROUTE_ORIGIN)}&daddr=${mapsQuery(deliveryDestination(order))}&dirflg=d`;
+  }
+
+  function openStreetMapSearchUrl(order) {
+    return `https://www.openstreetmap.org/search?query=${mapsQuery(deliveryDestination(order))}`;
+  }
+
+  function phoneHref(order) {
+    const phone = String(order.customerPhone || "").replace(/[^\d+]/g, "");
+    return phone ? `tel:${encodeURIComponent(phone)}` : "";
+  }
+
+  function driverNavigationActionsHtml(order) {
+    const phone = phoneHref(order);
+    return `
+      <div class="driver-nav-actions">
+        <a class="primary-btn" href="${escapeHtml(googleDirectionsUrl(order))}" target="_blank" rel="noopener">Google Maps</a>
+        <a class="ghost-btn" href="${escapeHtml(appleDirectionsUrl(order))}" target="_blank" rel="noopener">Apple Maps</a>
+        <a class="ghost-btn" href="${escapeHtml(openStreetMapSearchUrl(order))}" target="_blank" rel="noopener">OSM</a>
+        ${phone ? `<a class="ghost-btn" href="${escapeHtml(phone)}">Call</a>` : ""}
+      </div>
+    `;
+  }
+
+  function driverRouteStepsHtml(order) {
+    const status = getDeliveryStatus(order) || "Assigned";
+    const pickedUp = ["Picked up", "On the way", "Delivered"].includes(status);
+    const onRoute = status === "On the way";
+    const completed = status === "Delivered";
+    const steps = [
+      {
+        marker: "1",
+        label: "Pickup",
+        title: "Restaurant",
+        detail: "Order bag and receipt",
+        done: pickedUp || completed,
+        active: status === "Assigned" || status === "At restaurant"
+      },
+      {
+        marker: "2",
+        label: "Route",
+        title: shortDeliveryAddress(order),
+        detail: formatDeliveryEta(order),
+        done: completed,
+        active: pickedUp && !completed
+      },
+      {
+        marker: "3",
+        label: "Dropoff",
+        title: order.customerName || order.customer || "Customer",
+        detail: order.requestedTime ? `Requested ${order.requestedTime}` : "Customer handoff",
+        done: completed,
+        active: onRoute
+      }
+    ];
+
+    return `
+      <ol class="driver-route-steps">
+        ${steps.map((step) => `
+          <li class="${step.done ? "is-done" : step.active ? "is-active" : ""}">
+            <span>${escapeHtml(step.marker)}</span>
+            <div>
+              <small>${escapeHtml(step.label)}</small>
+              <strong>${escapeHtml(step.title)}</strong>
+              <p>${escapeHtml(step.detail)}</p>
+            </div>
+          </li>
+        `).join("")}
+      </ol>
+    `;
+  }
+
+  function driverRouteMapHtml(order) {
+    return `
+      <div class="driver-route-map">
+        <iframe title="Roermond delivery map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="${escapeHtml(ROERMOND_MAP_EMBED_URL)}"></iframe>
+        <div class="driver-route-line" aria-hidden="true">
+          <span class="route-point restaurant">R</span>
+          <span class="route-road"></span>
+          <span class="route-point customer">C</span>
+        </div>
+        <div class="driver-map-overlay">
+          <span>${escapeHtml(formatDeliveryEta(order))}</span>
+          <strong>${escapeHtml(shortDeliveryAddress(order))}</strong>
+          <small>${escapeHtml(deliveryDestination(order))}</small>
+        </div>
+      </div>
+    `;
+  }
+
+  function driverRouteCard(order) {
+    const paymentSummary = getOrderPaymentSummary(order);
+    const status = getDeliveryStatus(order) || "Assigned";
+    const pickupStatus = order.pickupStatus || normalizePickupStatus("", status);
+    const late = deliveryIsLate(order);
+    const items = deliveryOrderItemsText(order);
+    return `
+      <article class="driver-route-card ${late ? "is-late" : ""}">
+        <header class="driver-route-header">
+          <div>
+            <span class="delivery-kicker">Order #${escapeHtml(order.number)} | ${escapeHtml(status)}</span>
+            <strong>${escapeHtml(order.customerName || order.customer || "Customer")}</strong>
+            <p>${escapeHtml(deliveryDestination(order))}</p>
+          </div>
+          <div class="ticket-pills">
+            <span class="pill ${deliveryStatusClass(status)}">${escapeHtml(status)}</span>
+            <span class="pill ${paymentSummary.className}">${escapeHtml(paymentSummary.statusLabel)}</span>
+            ${late ? `<span class="pill danger">Late</span>` : ""}
+          </div>
+        </header>
+
+        ${driverRouteMapHtml(order)}
+
+        <div class="driver-route-body">
+          ${driverNavigationActionsHtml(order)}
+          ${driverRouteStepsHtml(order)}
+
+          <div class="driver-stop-grid">
+            <div>
+              <span>Phone</span>
+              <strong>${escapeHtml(order.customerPhone || "No phone")}</strong>
+            </div>
+            <div>
+              <span>Pickup</span>
+              <strong>${escapeHtml(pickupStatus || "Assigned")}</strong>
+            </div>
+            <div>
+              <span>Items</span>
+              <strong>${escapeHtml(items || "No items")}</strong>
+            </div>
+            <div>
+              <span>Payment</span>
+              <strong>${escapeHtml(`${paymentSummary.statusLabel} | ${paymentSummary.method}`)}</strong>
+            </div>
+          </div>
+
+          <div class="driver-status-panel">
+            <div class="mini-actions">${deliveryStatusActionsHtml(order)}</div>
+            ${!paymentSummary.paid ? `<button class="mini-btn" type="button" data-delivery-cash="${escapeHtml(order.id)}">Mark cash collected</button>` : ""}
+          </div>
+
+          <div class="delivery-notes driver-notes">
+            <span>Notes</span>
+            ${deliveryNotesHtml(order)}
+          </div>
+          ${deliveryProofSummaryHtml(order)}
+
+          <div class="delivery-actions driver-proof-actions">
+            <div class="delivery-action-row">
+              <input type="text" data-delivery-note-input="${escapeHtml(order.id)}" placeholder="Add delivery note" aria-label="Delivery note for order #${escapeHtml(order.number)}">
+              <button class="mini-btn" type="button" data-add-delivery-note="${escapeHtml(order.id)}">Add note</button>
+            </div>
+            <div class="delivery-action-row">
+              <input type="file" accept="image/*" data-delivery-proof-input="${escapeHtml(order.id)}" aria-label="Proof photo for order #${escapeHtml(order.number)}">
+              <button class="mini-btn" type="button" data-upload-delivery-proof="${escapeHtml(order.id)}">Upload photo</button>
+            </div>
+          </div>
+        </div>
+      </article>
     `;
   }
   
@@ -231,7 +421,7 @@ export function createTeamUi(deps) {
     `).join("");
   
     list.innerHTML = activeOrders.length
-      ? activeOrders.map((order) => deliveryOrderCard(order, { includeActions: true })).join("")
+      ? activeOrders.map((order) => driverRouteCard(order)).join("")
       : emptyState(driver ? "No assigned delivery orders right now." : "No driver profile found for this account.");
   }
   
@@ -661,11 +851,15 @@ export function createTeamUi(deps) {
     const staffRoleSelect = document.querySelector("#staffRoleSelect");
     const userList = document.querySelector("#userList");
     const driversPanel = document.querySelector("#driversPanel");
+    const timeClockPanel = document.querySelector("#timeClockPanel");
     const showDriverDirectory = canManageDeliveryOperations();
+    const isDriverRole = currentRoleKey() === "driver";
   
     document.querySelectorAll(".admin-only").forEach((panel) => {
       panel.hidden = !can("canCreateUsers");
     });
+
+    if (timeClockPanel) timeClockPanel.hidden = isDriverRole;
   
     if (driversPanel) {
       driversPanel.hidden = !showDriverDirectory;
@@ -721,7 +915,7 @@ export function createTeamUi(deps) {
       }
     }
   
-    renderTimeClock();
+    if (!isDriverRole) renderTimeClock();
     renderScheduleManagement();
     renderDriverApp();
     renderDeliveryManager();

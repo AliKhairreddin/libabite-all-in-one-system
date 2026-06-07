@@ -136,6 +136,7 @@ export function createAppRenderer(deps) {
     if (publicReservationLink) publicReservationLink.href = getWebsiteReservationUrl();
     document.body.classList.toggle("is-authenticated", Boolean(user) && !customerSession);
     document.body.classList.toggle("is-customer-ordering", Boolean(customerSession));
+    document.body.classList.toggle("is-driver-app", Boolean(user) && user?.role === "driver" && !customerSession);
     customerScreen.hidden = !customerSession;
     loginScreen.classList.toggle("is-hidden", Boolean(user) || Boolean(customerSession));
     appShell.classList.toggle("is-hidden", !user || Boolean(customerSession));

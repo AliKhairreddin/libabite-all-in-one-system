@@ -3,9 +3,19 @@ import { addDays, getWeekStartDate, toDateInputString } from "../domain/scheduli
 
 const seedToday = toDateInputString();
 const seedWeekStart = getWeekStartDate(seedToday);
+const seedNowMs = Date.now();
+const seedOnlineOrderCreatedAtMs = seedNowMs - (22 * MINUTE_MS);
+const seedOnlineOrderSentAtMs = seedNowMs - (18 * MINUTE_MS);
+const seedOnlineOrderAssignedAtMs = seedNowMs - (11 * MINUTE_MS);
+const seedOnlineOrderUpdatedAtMs = seedNowMs - (4 * MINUTE_MS);
 
 function seedShiftTimestamp(date, time) {
   return new Date(`${date}T${time}:00`).getTime();
+}
+
+function seedClockTime(timestampMs) {
+  const date = new Date(timestampMs);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 export const seedState = {
@@ -79,7 +89,7 @@ export const seedState = {
   customerCart: [],
   customerLastOrderId: "",
   websiteCart: [],
-  websiteLastOrderId: "",
+  websiteLastOrderId: "ORD-101",
   websiteLastReservationId: "",
   websiteFulfillment: WEBSITE_DEFAULT_FULFILLMENT,
   reservationEditingId: "",
@@ -282,7 +292,7 @@ export const seedState = {
   ],
   wasteRecords: [],
   productRecipeDraft: [],
-  nextOrderNumber: 101,
+  nextOrderNumber: 102,
   products: [
     {
       id: "kefta-plate",
@@ -666,8 +676,112 @@ export const seedState = {
     }
   ],
   payments: [],
-  orders: [],
-  tickets: [],
+  orders: [
+    {
+      id: "ORD-101",
+      number: 101,
+      channel: "Website order",
+      orderType: "Website order",
+      tableId: "",
+      customerId: "customer-van-dijk",
+      customer: "Van Dijk",
+      customerName: "Van Dijk",
+      customerPhone: "+31 6 8765 1102",
+      customerEmail: "vandijk@example.com",
+      deliveryAddress: "Markt 12, 6041 EM Roermond, Netherlands",
+      requestedTime: seedClockTime(seedNowMs + (18 * MINUTE_MS)),
+      paymentStatus: "Paid",
+      paymentMethod: "Online payment",
+      paymentReference: "demo-online-paid-101",
+      paymentProcessor: "Stripe",
+      fulfillment: "Delivery",
+      status: "Ready",
+      operationalStatus: "Preparing",
+      fulfillmentStatus: "On the way",
+      createdAt: seedClockTime(seedOnlineOrderCreatedAtMs),
+      createdAtMs: seedOnlineOrderCreatedAtMs,
+      sentAt: seedClockTime(seedOnlineOrderSentAtMs),
+      sentAtMs: seedOnlineOrderSentAtMs,
+      paidAt: seedClockTime(seedOnlineOrderCreatedAtMs),
+      paidAtMs: seedOnlineOrderCreatedAtMs,
+      staffId: "",
+      staffName: "Website checkout",
+      paidByUserId: "",
+      paidByName: "Stripe checkout",
+      inventoryDeducted: true,
+      assignedDriver: "samir",
+      pickupStatus: "Picked up",
+      deliveryStatus: "On the way",
+      deliveryAssignedAtMs: seedOnlineOrderAssignedAtMs,
+      deliveryStatusUpdatedAtMs: seedOnlineOrderUpdatedAtMs,
+      deliveredAt: "",
+      deliveredAtMs: "",
+      failedAt: "",
+      failedAtMs: "",
+      returnedAt: "",
+      returnedAtMs: "",
+      deliveryWasLate: false,
+      deliveryNotes: [
+        {
+          id: "DLV-NOTE-101",
+          text: "Online delivery paid by checkout. Customer asked for extra garlic sauce.",
+          authorId: "manager-demo",
+          authorName: "Mila Manager",
+          at: seedClockTime(seedOnlineOrderAssignedAtMs),
+          atMs: seedOnlineOrderAssignedAtMs
+        }
+      ],
+      deliveryProofPhotoName: "",
+      deliveryProofAtMs: "",
+      deliveryProofByName: "",
+      cashCollected: false,
+      cashCollectedAt: "",
+      cashCollectedAtMs: "",
+      cashCollectedByName: "",
+      customerNotes: "Usually asks for extra garlic sauce.",
+      notes: "Ring the bell twice.",
+      items: [
+        { productId: "kefta-sandwich", quantity: 2, note: "", modifiers: ["Extra sauce"] },
+        { productId: "mint-lemonade", quantity: 2, note: "", modifiers: [] }
+      ]
+    }
+  ],
+  tickets: [
+    {
+      id: "TCK-101-1",
+      orderId: "ORD-101",
+      productId: "kefta-sandwich",
+      quantity: 2,
+      station: "Grill station",
+      status: "Done",
+      createdAt: seedClockTime(seedOnlineOrderSentAtMs),
+      createdAtMs: seedOnlineOrderSentAtMs,
+      acceptedAtMs: seedOnlineOrderSentAtMs + (2 * MINUTE_MS),
+      startedAtMs: seedOnlineOrderSentAtMs + (4 * MINUTE_MS),
+      delayedAtMs: "",
+      readyAtMs: seedOnlineOrderSentAtMs + (12 * MINUTE_MS),
+      completedAtMs: seedOnlineOrderSentAtMs + (13 * MINUTE_MS),
+      notes: "Delivery 18:00 | Phone: +31 6 8765 1102 | Address: Markt 12, 6041 EM Roermond, Netherlands | Driver: Samir",
+      issueNote: ""
+    },
+    {
+      id: "TCK-101-2",
+      orderId: "ORD-101",
+      productId: "mint-lemonade",
+      quantity: 2,
+      station: "Drinks station",
+      status: "Done",
+      createdAt: seedClockTime(seedOnlineOrderSentAtMs),
+      createdAtMs: seedOnlineOrderSentAtMs,
+      acceptedAtMs: seedOnlineOrderSentAtMs + MINUTE_MS,
+      startedAtMs: seedOnlineOrderSentAtMs + (2 * MINUTE_MS),
+      delayedAtMs: "",
+      readyAtMs: seedOnlineOrderSentAtMs + (6 * MINUTE_MS),
+      completedAtMs: seedOnlineOrderSentAtMs + (7 * MINUTE_MS),
+      notes: "Delivery 18:00 | Phone: +31 6 8765 1102 | Address: Markt 12, 6041 EM Roermond, Netherlands | Driver: Samir",
+      issueNote: ""
+    }
+  ],
   procedures: [
     {
       id: "closing-procedure",
@@ -958,7 +1072,7 @@ export const seedState = {
     }
   ],
   drivers: [
-    { id: "samir", name: "Samir", status: "Available", eta: "-", orderId: null, location: "Restaurant" },
+    { id: "samir", name: "Samir", status: "On the way", eta: "10 min", orderId: "ORD-101", location: "Route to Markt 12" },
     { id: "omar", name: "Omar", status: "Available", eta: "-", orderId: null, location: "Restaurant" }
   ],
   reservations: [

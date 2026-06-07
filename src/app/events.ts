@@ -288,6 +288,37 @@ export function bindAppEvents(handlers) {
     const cancelReservation = event.target.closest("[data-cancel-reservation-edit]");
     if (cancelReservation) cancelReservationEdit();
 
+    const reservationMapView = event.target.closest("[data-reservation-map-view]");
+    if (reservationMapView) {
+      const map = reservationMapView.closest(".reservation-table-map");
+      if (map) {
+        map.dataset.viewMode = reservationMapView.dataset.reservationMapView;
+        map.querySelectorAll("[data-reservation-map-view]").forEach((button: any) => {
+          button.classList.toggle("is-selected", button === reservationMapView);
+        });
+      }
+      return;
+    }
+
+    const reservationMapTable = event.target.closest("[data-reservation-map-table]");
+    if (reservationMapTable) {
+      const tableId = reservationMapTable.dataset.reservationMapTable;
+      const reservationForm = reservationMapTable.closest("#reservationForm");
+      const customerReservationForm = reservationMapTable.closest("#customerReservationForm");
+      const tableControl: any = reservationForm?.querySelector("#reservationTable") || customerReservationForm?.querySelector("#customerReservationTable");
+      if (tableControl) tableControl.value = tableId;
+
+      const map = reservationMapTable.closest(".reservation-table-map");
+      map?.querySelectorAll("[data-reservation-map-table]").forEach((button: any) => {
+        const selected = button.dataset.reservationMapTable === tableId;
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-pressed", selected ? "true" : "false");
+      });
+
+      if (reservationForm) renderReservationPlanner();
+      return;
+    }
+
     const deleteReservationBlockButton = event.target.closest("[data-delete-reservation-block]");
     if (deleteReservationBlockButton) deleteReservationBlock(deleteReservationBlockButton.dataset.deleteReservationBlock);
 

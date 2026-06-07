@@ -1,0 +1,19 @@
+{
+  "name": "Libabite Driver",
+  "short_name": "Libabite",
+  "description": "Driver delivery route app for Libabite Roermond.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f0",
+  "theme_color": "#203427",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

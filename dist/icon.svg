@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Libabite">
+  <rect width="512" height="512" rx="96" fill="#203427"/>
+  <path d="M120 360V112h74v184h122v64H120Z" fill="#f0eadf"/>
+  <path d="M318 164c42 0 76 34 76 76s-34 76-76 76-76-34-76-76 34-76 76-76Zm0 55a21 21 0 1 0 0 42 21 21 0 0 0 0-42Z" fill="#d8b16d"/>
+  <path d="M384 366c-64 46-148 46-212 0" fill="none" stroke="#f0eadf" stroke-width="28" stroke-linecap="round"/>
+</svg>
