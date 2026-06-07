@@ -25,6 +25,7 @@ export function createCustomerOrderingRuntime(deps) {
     productById,
     render,
     renderCustomerQrScreen,
+    renderCustomerOrderingSurfaces,
     renderWebsiteOrderScreen,
     sendOrderToKitchen,
     showToast,
@@ -69,6 +70,10 @@ export function createCustomerOrderingRuntime(deps) {
     return product && !["Frisdrank", "Extra voor erbij", "Sauzen"].includes(product.category);
   }
 
+  function renderCustomerOrderingUpdate() {
+    if (!renderCustomerOrderingSurfaces?.()) render();
+  }
+
   function addCustomerCartItem(productId, options: any = {}) {
     const session = getCustomerOrderingSession();
     if (!session || session.error) return;
@@ -83,7 +88,7 @@ export function createCustomerOrderingRuntime(deps) {
     const availability = getProductAvailability(product, cartItems, orderContext);
     if (availability.maxQuantity < 1) {
       showToast(`${product.name} is not available right now.`);
-      render();
+      renderCustomerOrderingUpdate();
       return;
     }
 
@@ -91,7 +96,7 @@ export function createCustomerOrderingRuntime(deps) {
     state.customerUpsellProductId = options.keepUpsellOpen ? state.customerUpsellProductId : shouldOpenCustomerUpsell(product) ? product.id : "";
     state[getCustomerLastOrderStateKey(session.mode)] = "";
     saveState();
-    render();
+    renderCustomerOrderingUpdate();
     showToast(`${product.name} added.`);
   }
 
@@ -116,7 +121,7 @@ export function createCustomerOrderingRuntime(deps) {
     item.quantity += delta;
     state[getCustomerCartStateKey(getCustomerModeFromContext(orderContext))] = normalizeOrderItems(cartItems.filter((line) => line.quantity > 0));
     saveState();
-    render();
+    renderCustomerOrderingUpdate();
   }
 
   function removeCustomerCartItem(index) {
@@ -124,7 +129,7 @@ export function createCustomerOrderingRuntime(deps) {
     const orderContext = getCustomerOrderContext(session?.mode || "qr");
     state[getCustomerCartStateKey(getCustomerModeFromContext(orderContext))] = getCustomerCartItems(orderContext).filter((_, itemIndex) => itemIndex !== Number(index));
     saveState();
-    render();
+    renderCustomerOrderingUpdate();
   }
 
   function startNewCustomerOrder() {
@@ -141,13 +146,13 @@ export function createCustomerOrderingRuntime(deps) {
   function closeCustomerUpsell() {
     state.customerUpsellProductId = "";
     saveState();
-    render();
+    renderCustomerOrderingUpdate();
   }
 
   function setCustomerCartOpen(open = true) {
     state.customerCartOpen = Boolean(open);
     saveState();
-    render();
+    renderCustomerOrderingUpdate();
   }
 
   function setWebsiteFulfillment(value) {
@@ -156,7 +161,7 @@ export function createCustomerOrderingRuntime(deps) {
     state.websiteLastOrderId = "";
     state.customerUpsellProductId = "";
     saveState();
-    render();
+    renderCustomerOrderingUpdate();
   }
 
   function submitCustomerQrOrder(formData) {

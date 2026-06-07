@@ -437,7 +437,6 @@ button {
 }
 
 .customer-inline-upsell {
-  grid-column: 1 / -1;
   min-width: 0;
   display: grid;
   gap: 10px;
@@ -445,6 +444,11 @@ button {
   border: 1px solid #e2d3a8;
   border-radius: 8px;
   background: #fffaf0;
+}
+
+.customer-inline-upsell-slot {
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .customer-inline-upsell .customer-upsell-header {
@@ -511,6 +515,11 @@ button {
   text-align: left;
 }
 
+.customer-upsell-item.is-in-cart {
+  border-color: #d7bd76;
+  background: #fffdf7;
+}
+
 .customer-upsell-list.compact .customer-upsell-item {
   min-width: min(220px, 82vw);
 }
@@ -549,7 +558,12 @@ button {
   font-weight: 800;
 }
 
-.customer-upsell-item b {
+.customer-upsell-action {
+  display: grid;
+  place-items: center;
+}
+
+.customer-upsell-add {
   width: 28px;
   height: 28px;
   display: grid;
@@ -557,6 +571,41 @@ button {
   border-radius: 999px;
   background: var(--brand);
   color: #ffffff;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.customer-upsell-quantity {
+  min-width: 86px;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 28px minmax(22px, 1fr) 28px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.customer-upsell-quantity .mini-btn {
+  min-width: 0;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--brand);
+  font-weight: 900;
+}
+
+.customer-upsell-quantity span {
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .customer-service-toggle {

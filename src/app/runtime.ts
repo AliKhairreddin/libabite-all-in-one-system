@@ -319,6 +319,8 @@ const {
   upsertCustomerFromOrderDetails
 });
 
+let renderCustomerOrderingSurfaces = () => false;
+
 const {
   addCustomerCartItem,
   adjustCustomerCartItem,
@@ -344,6 +346,7 @@ const {
   productById,
   render: () => render(),
   renderCustomerQrScreen: () => renderCustomerQrScreen(),
+  renderCustomerOrderingSurfaces: () => renderCustomerOrderingSurfaces(),
   renderWebsiteOrderScreen: () => renderWebsiteOrderScreen(),
   sendOrderToKitchen,
   showToast,
@@ -371,7 +374,7 @@ const {
   validateOrderForKitchen
 });
 
-const { renderCustomerQrScreen, renderPublicHomeScreen, renderWebsiteOrderScreen, renderWebsiteReservationScreen } = createPublicOrderingUi({
+const publicOrderingUi = createPublicOrderingUi({
   emptyState,
   fulfillmentLabel,
   formatStockAmount,
@@ -397,6 +400,8 @@ const { renderCustomerQrScreen, renderPublicHomeScreen, renderWebsiteOrderScreen
   orderLocationLabel,
   productById
 });
+const { renderCustomerQrScreen, renderPublicHomeScreen, renderWebsiteOrderScreen, renderWebsiteReservationScreen } = publicOrderingUi;
+renderCustomerOrderingSurfaces = publicOrderingUi.renderCustomerOrderingSurfaces;
 
 const {
   alertCard,

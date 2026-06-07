@@ -1,5 +1,5 @@
 import { state } from "../app/state.js";
-import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS } from "../shared/constants.js";
+import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS, WEBSITE_ORDER_CHANNEL } from "../shared/constants.js";
 import { getReservationDateLabel } from "../domain/reservations.js";
 import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
@@ -71,24 +71,55 @@ export function createPublicOrderingUi(deps) {
       : `<span class="customer-upsell-thumb placeholder" aria-hidden="true">+</span>`;
   }
 
-  function upsellItemsHtml(products) {
+  function customerCartProductQuantity(cartItems, productId) {
+    return cartItems
+      .filter((item) => item.productId === productId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  function customerCartProductEntry(cartItems, productId) {
+    const index = cartItems.findIndex((item) => item.productId === productId);
+    return {
+      index,
+      quantity: customerCartProductQuantity(cartItems, productId)
+    };
+  }
+
+  function upsellActionHtml(product, cartItems) {
+    const entry = customerCartProductEntry(cartItems, product.id);
+    if (entry.quantity > 0 && entry.index > -1) {
+      return `
+        <div class="customer-upsell-quantity" aria-label="${escapeHtml(product.name)} quantity">
+          <button class="mini-btn" type="button" data-customer-decrease="${entry.index}" aria-label="Decrease ${escapeHtml(product.name)}">-</button>
+          <span>${escapeHtml(entry.quantity)}</span>
+          <button class="mini-btn" type="button" data-customer-increase="${entry.index}" aria-label="Increase ${escapeHtml(product.name)}">+</button>
+        </div>
+      `;
+    }
+    return `
+      <button class="customer-upsell-add" type="button" data-customer-add="${escapeHtml(product.id)}" aria-label="Add ${escapeHtml(product.name)}">+</button>
+    `;
+  }
+
+  function upsellItemsHtml(products, cartItems = []) {
     return products.map((product) => `
-      <button class="customer-upsell-item" type="button" data-customer-add="${escapeHtml(product.id)}">
+      <div class="customer-upsell-item ${customerCartProductQuantity(cartItems, product.id) ? "is-in-cart" : ""}" data-customer-upsell-product="${escapeHtml(product.id)}">
         ${upsellThumbHtml(product)}
         <span>
           <strong>${escapeHtml(product.name)}</strong>
           <small>${escapeHtml(product.category)} · ${escapeHtml(money(product.price))}</small>
         </span>
-        <b>+</b>
-      </button>
+        <div class="customer-upsell-action" data-customer-upsell-action="${escapeHtml(product.id)}">
+          ${upsellActionHtml(product, cartItems)}
+        </div>
+      </div>
     `).join("");
   }
 
   function getUpsellProducts(cartItems, orderContext, sourceProductId, categories = INLINE_UPSELL_CATEGORIES, limit = INLINE_UPSELL_LIMIT) {
-    const cartProductIds = new Set(cartItems.map((item) => item.productId));
     const candidates = getOrderableProductsForContext(orderContext)
       .filter((product) => categories.includes(product.category))
-      .filter((product) => product.id !== sourceProductId && !cartProductIds.has(product.id))
+      .filter((product) => product.id !== sourceProductId)
       .sort((first, second) => categories.indexOf(first.category) - categories.indexOf(second.category));
     const selected = [];
     categories.forEach((category) => {
@@ -106,6 +137,141 @@ export function createPublicOrderingUi(deps) {
     return selected.slice(0, limit);
   }
 
+  function customerProductCardElement(productId) {
+    return [...document.querySelectorAll("[data-customer-product-card]")]
+      .find((element: any) => element.dataset.customerProductCard === productId);
+  }
+
+  function customerUpsellSlotElement(productId) {
+    return [...document.querySelectorAll("[data-customer-upsell-slot]")]
+      .find((element: any) => element.dataset.customerUpsellSlot === productId);
+  }
+
+  function updateUpsellActionSurfaces(root, cartItems) {
+    root.querySelectorAll("[data-customer-upsell-action]").forEach((action: any) => {
+      const product = productById(action.dataset.customerUpsellAction);
+      if (!product) return;
+      const entry = customerCartProductEntry(cartItems, product.id);
+      action.innerHTML = upsellActionHtml(product, cartItems);
+      action.closest(".customer-upsell-item")?.classList.toggle("is-in-cart", entry.quantity > 0);
+    });
+  }
+
+  function activeCustomerOrderingSurface() {
+    const form: any = document.querySelector("#customerOrderForm");
+    const mode = form?.dataset.customerMode || (getWebsiteOrderSession() ? "website" : getCustomerQrSession() ? "qr" : "");
+    if (!["website", "qr"].includes(mode)) return null;
+    const orderContext = mode === "website" ? getCustomerOrderContext("website") : CUSTOMER_QR_ORDER_CONTEXT;
+    const cartItems = getCustomerCartItems(orderContext);
+    return { mode, orderContext, cartItems };
+  }
+
+  function hasPatchableCustomerMenu(orderContext) {
+    const expectedProductIds = getOrderableProductsForContext(orderContext).map((product) => product.id);
+    const renderedProductIds = [...document.querySelectorAll("[data-customer-product-card]")]
+      .map((element: any) => element.dataset.customerProductCard)
+      .filter(Boolean);
+    return renderedProductIds.length > 0
+      && renderedProductIds.length === expectedProductIds.length
+      && expectedProductIds.every((productId, index) => renderedProductIds[index] === productId);
+  }
+
+  function snapshotCustomerFormValues(form) {
+    const values = {};
+    form.querySelectorAll("[name]").forEach((control: any) => {
+      if (control.type === "hidden") return;
+      if (control.type === "radio" || control.type === "checkbox") {
+        values[`${control.name}:${control.value}`] = control.checked;
+        return;
+      }
+      values[control.name] = control.value;
+    });
+    return values;
+  }
+
+  function restoreCustomerFormValues(form, values) {
+    form.querySelectorAll("[name]").forEach((control: any) => {
+      if (control.type === "hidden") return;
+      if (control.type === "radio" || control.type === "checkbox") {
+        const key = `${control.name}:${control.value}`;
+        if (Object.prototype.hasOwnProperty.call(values, key)) control.checked = values[key];
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(values, control.name)) control.value = values[control.name];
+    });
+  }
+
+  function updateWebsiteFulfillmentSurfaces(orderContext) {
+    if (orderContext.channel !== WEBSITE_ORDER_CHANNEL) return;
+    const fulfillmentOption = websiteFulfillmentOption(orderContext.fulfillment);
+    document.querySelectorAll("[data-customer-fulfillment-label]").forEach((element) => {
+      element.textContent = fulfillmentOption.label;
+    });
+    document.querySelectorAll("[data-website-fulfillment]").forEach((button: any) => {
+      button.classList.toggle("is-selected", button.dataset.websiteFulfillment === state.websiteFulfillment);
+    });
+  }
+
+  function updateCustomerProductSurfaces(cartItems, orderContext) {
+    getOrderableProductsForContext(orderContext).forEach((product) => {
+      const card: any = customerProductCardElement(product.id);
+      const slot: any = customerUpsellSlotElement(product.id);
+      if (!card || !slot) return;
+      const availability = getProductAvailability(product, cartItems, orderContext);
+      const disabled = availability.maxQuantity < 1 || !productCanBeOrderedForOrderContext(product, orderContext);
+      const addButton: any = card.querySelector(".customer-add-btn");
+      const status = card.querySelector("[data-customer-product-status]");
+      const isUpsellOpen = state.customerUpsellProductId === product.id;
+
+      card.classList.toggle("is-upsell-open", isUpsellOpen);
+      if (status) status.innerHTML = customerProductStatusHtml(product, cartItems, orderContext);
+      if (addButton) addButton.disabled = disabled;
+
+      if (!isUpsellOpen) {
+        slot.innerHTML = "";
+        return;
+      }
+
+      if (!slot.querySelector(".customer-inline-upsell")) {
+        slot.innerHTML = instantUpsellHtml(product, cartItems, orderContext);
+        return;
+      }
+
+      updateUpsellActionSurfaces(slot, cartItems);
+    });
+  }
+
+  function renderCustomerCartPanelSurface(cartItems, mode, orderContext) {
+    const form: any = document.querySelector("#customerOrderForm");
+    if (!form) return false;
+    const values = snapshotCustomerFormValues(form);
+    form.outerHTML = customerCartHtml(cartItems, { mode, orderContext });
+    const nextForm = document.querySelector("#customerOrderForm");
+    if (nextForm) restoreCustomerFormValues(nextForm, values);
+    return true;
+  }
+
+  function renderCustomerMobileControlsSurface(cartItems, mode) {
+    const controls = document.querySelector("#customerCartMobileControls");
+    if (!controls) return false;
+    controls.innerHTML = customerCartMobileControlsHtml(cartItems, mode);
+    return true;
+  }
+
+  function renderCustomerOrderingSurfaces() {
+    const surface = activeCustomerOrderingSurface();
+    if (!surface || !hasPatchableCustomerMenu(surface.orderContext)) return false;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    updateWebsiteFulfillmentSurfaces(surface.orderContext);
+    updateCustomerProductSurfaces(surface.cartItems, surface.orderContext);
+    const cartRendered = renderCustomerCartPanelSurface(surface.cartItems, surface.mode, surface.orderContext);
+    const mobileRendered = renderCustomerMobileControlsSurface(surface.cartItems, surface.mode);
+    document.body.classList.toggle("is-customer-ordering", true);
+    window.scrollTo(scrollX, scrollY);
+    return cartRendered && mobileRendered;
+  }
+
   function instantUpsellHtml(product, cartItems, orderContext) {
     if (state.customerUpsellProductId !== product.id) return "";
     const upsellProducts = getUpsellProducts(cartItems, orderContext, product.id);
@@ -118,17 +284,15 @@ export function createPublicOrderingUi(deps) {
           <button class="icon-btn customer-upsell-close" type="button" data-customer-upsell-close aria-label="Hide suggestions">×</button>
         </div>
         <div class="customer-upsell-list compact">
-          ${upsellItemsHtml(upsellProducts)}
+          ${upsellItemsHtml(upsellProducts, cartItems)}
         </div>
       </section>
     `;
   }
 
-  function customerProductCard(product, cartItems, orderContext = CUSTOMER_QR_ORDER_CONTEXT) {
+  function customerProductStatusHtml(product, cartItems, orderContext = CUSTOMER_QR_ORDER_CONTEXT) {
     const availability = getProductAvailability(product, cartItems, orderContext);
-    const cartQuantity = cartItems
-      .filter((item) => item.productId === product.id)
-      .reduce((sum, item) => sum + item.quantity, 0);
+    const cartQuantity = customerCartProductQuantity(cartItems, product.id);
     const disabled = availability.maxQuantity < 1 || !productCanBeOrderedForOrderContext(product, orderContext);
     const stockLabel = disabled
       ? "Unavailable"
@@ -136,10 +300,16 @@ export function createPublicOrderingUi(deps) {
         ? `${cartQuantity} in cart`
         : "";
     const stockClass = disabled ? "danger" : cartQuantity ? "info" : "ok";
+    return stockLabel ? `<span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>` : "";
+  }
+
+  function customerProductCard(product, cartItems, orderContext = CUSTOMER_QR_ORDER_CONTEXT) {
+    const availability = getProductAvailability(product, cartItems, orderContext);
+    const disabled = availability.maxQuantity < 1 || !productCanBeOrderedForOrderContext(product, orderContext);
     const allergenSummary = Array.isArray(product.allergens) && product.allergens.length ? productAllergenSummary(product) : "";
     const hasInlineUpsell = state.customerUpsellProductId === product.id;
     return `
-      <article class="customer-product-card ${hasInlineUpsell ? "is-upsell-open" : ""}">
+      <article class="customer-product-card ${hasInlineUpsell ? "is-upsell-open" : ""}" data-customer-product-card="${escapeHtml(product.id)}">
         ${product.imageUrl ? `<img class="customer-product-image" src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">` : `<div class="customer-product-image placeholder" aria-hidden="true">L</div>`}
         <div class="customer-product-content">
           <span class="customer-product-kicker">${escapeHtml(product.category)}${product.isNew ? " · New" : ""}</span>
@@ -149,10 +319,12 @@ export function createPublicOrderingUi(deps) {
           ${allergenSummary ? `<p>${escapeHtml(allergenSummary)}</p>` : ""}
         </div>
         <div class="customer-product-actions">
-          ${stockLabel ? `<span class="pill ${stockClass}">${escapeHtml(stockLabel)}</span>` : ""}
+          <span class="customer-product-status" data-customer-product-status="${escapeHtml(product.id)}">${customerProductStatusHtml(product, cartItems, orderContext)}</span>
           <button class="icon-btn customer-add-btn" type="button" data-customer-add="${escapeHtml(product.id)}" aria-label="Add ${escapeHtml(product.name)}" ${disabled ? "disabled" : ""}>+</button>
         </div>
-        ${instantUpsellHtml(product, cartItems, orderContext)}
+        <div class="customer-inline-upsell-slot" data-customer-upsell-slot="${escapeHtml(product.id)}">
+          ${instantUpsellHtml(product, cartItems, orderContext)}
+        </div>
       </article>
     `;
   }
@@ -186,7 +358,7 @@ export function createPublicOrderingUi(deps) {
           <strong>Complete your order</strong>
         </div>
         <div class="customer-upsell-list">
-          ${upsellItemsHtml(drinks)}
+          ${upsellItemsHtml(drinks, cartItems)}
         </div>
       </section>
     `;
@@ -407,7 +579,9 @@ export function createPublicOrderingUi(deps) {
         </section>
         ${customerCartHtml(cartItems, { mode: "qr", orderContext: CUSTOMER_QR_ORDER_CONTEXT })}
       </main>
-      ${customerCartMobileControlsHtml(cartItems, "qr")}
+      <div id="customerCartMobileControls">
+        ${customerCartMobileControlsHtml(cartItems, "qr")}
+      </div>
     `;
   }
   
@@ -451,7 +625,7 @@ export function createPublicOrderingUi(deps) {
         <div class="customer-topbar-actions">
           <div class="customer-table-badge">
             <span>Online order</span>
-            <strong>${escapeHtml(fulfillmentOption.label)}</strong>
+            <strong data-customer-fulfillment-label>${escapeHtml(fulfillmentOption.label)}</strong>
           </div>
         </div>
       </header>
@@ -479,7 +653,9 @@ export function createPublicOrderingUi(deps) {
         </section>
         ${customerCartHtml(cartItems, { mode: "website", orderContext })}
       </main>
-      ${customerCartMobileControlsHtml(cartItems, "website")}
+      <div id="customerCartMobileControls">
+        ${customerCartMobileControlsHtml(cartItems, "website")}
+      </div>
     `;
   }
 
@@ -663,6 +839,7 @@ export function createPublicOrderingUi(deps) {
   
   return {
     renderCustomerQrScreen,
+    renderCustomerOrderingSurfaces,
     renderPublicHomeScreen,
     renderWebsiteOrderScreen,
     renderWebsiteReservationScreen
