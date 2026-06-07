@@ -96,7 +96,22 @@ export const KITCHEN_STATION_ALIASES = {
   "main kitchen": "Main kitchen",
   "main kitchen station": "Main kitchen"
 };
-export const PRODUCT_CATEGORIES = ["Kefta", "Sandwiches", "Burgers", "Cold Mezza", "Sweets", "Drinks", "Packaging", "Other"];
+export const PRODUCT_CATEGORIES = [
+  "LibaGrill TOGO",
+  "LibaWraps - TOGO",
+  "LibaPizza - TOGO",
+  "LibaSoup",
+  "Cold Mezze",
+  "Hot Mezze",
+  "Salades",
+  "Liba Fried Chicken",
+  "LibaSweets",
+  "Liba Shared Dining - TOGO",
+  "Extra voor erbij",
+  "Sauzen",
+  "Frisdrank",
+  "Other"
+];
 export const VAT_OPTIONS = [
   { id: "standard", label: "Standard VAT (21%)" },
   { id: "reduced", label: "Reduced food VAT (9%)" },

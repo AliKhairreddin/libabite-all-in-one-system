@@ -455,6 +455,7 @@ test("inventory availability accounts for reserved basket stock", () => {
 
   assert.equal(getStockRequirementsForItems([{ productId: "kefta", quantity: 2 }], deps, {}).get("beef"), 4);
   assert.equal(getProductAvailability(products.get("kefta"), [{ productId: "kefta", quantity: 1 }], deps, {}).maxQuantity, 1);
+  assert.equal(getProductAvailability({ id: "imported-menu-item", active: true, recipe: [] }, [], deps, {}).maxQuantity, 99);
   assert.equal(getStockShortages([{ productId: "kefta", quantity: 3 }], deps, {})[0].shortage, 1);
 });
 

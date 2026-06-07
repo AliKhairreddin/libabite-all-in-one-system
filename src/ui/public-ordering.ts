@@ -47,13 +47,14 @@ export function createPublicOrderingUi(deps) {
         ? `${cartQuantity} in cart`
         : `${availability.maxQuantity} available`;
     const stockClass = disabled ? "danger" : cartQuantity ? "info" : "ok";
-    const allergenSummary = productAllergenSummary(product);
+    const allergenSummary = Array.isArray(product.allergens) && product.allergens.length ? productAllergenSummary(product) : "";
     return `
       <article class="customer-product-card">
         <div>
-          <span class="customer-product-kicker">${escapeHtml(product.category)}</span>
+          <span class="customer-product-kicker">${escapeHtml(product.category)}${product.isNew ? " · New" : ""}</span>
           <strong>${escapeHtml(product.name)}</strong>
-          <p>${escapeHtml(product.station)} · ${escapeHtml(money(product.price))}</p>
+          ${product.description ? `<p class="customer-product-description">${escapeHtml(product.description)}</p>` : ""}
+          <p>${escapeHtml(money(product.price))}</p>
           ${allergenSummary ? `<p>${escapeHtml(allergenSummary)}</p>` : ""}
         </div>
         <div class="customer-product-actions">
@@ -390,9 +391,10 @@ export function createPublicOrderingUi(deps) {
             ${orderableProducts.length ? orderableProducts.map((product) => `
               <article class="customer-product-card">
                 <div>
-                  <span class="customer-product-kicker">${escapeHtml(product.category)}</span>
+                  <span class="customer-product-kicker">${escapeHtml(product.category)}${product.isNew ? " · New" : ""}</span>
                   <strong>${escapeHtml(product.name)}</strong>
-                  <p>${escapeHtml(product.station)} · ${escapeHtml(money(product.price))}</p>
+                  ${product.description ? `<p class="customer-product-description">${escapeHtml(product.description)}</p>` : ""}
+                  <p>${escapeHtml(money(product.price))}</p>
                 </div>
               </article>
             `).join("") : emptyState("Online ordering opens soon.")}

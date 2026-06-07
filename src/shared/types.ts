@@ -11,8 +11,14 @@ export interface OrderItem {
 export interface Product {
   id: Id;
   name?: string;
+  description?: string;
   price?: number;
   active?: boolean;
+  soldOut?: boolean;
+  isNew?: boolean;
+  imageUrl?: string;
+  externalSource?: string;
+  externalCode?: string;
   recipe?: RecipeLine[];
   availability?: Record<string, boolean>;
   targetMargin?: number;

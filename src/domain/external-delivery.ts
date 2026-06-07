@@ -207,6 +207,7 @@ export function buildExternalMenuPayload(platform, mappings = [], productById, o
         internalProductId: product.id,
         internalProductName: product.name,
         internalProductCode: product.code,
+        description: cleanText(product.description),
         internalRecipe: `${product.name} recipe`,
         kitchenStation: product.station,
         price: Number(product.price) || 0,

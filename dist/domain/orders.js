@@ -90,13 +90,13 @@ export function getChannelAvailabilityKey(channel) {
     return orderTypeDefinition(channel).availabilityKey;
 }
 export function productCanBeOrdered(product, channel) {
-    if (!product || !product.active)
+    if (!product || !product.active || product.soldOut)
         return false;
     const availabilityKey = getChannelAvailabilityKey(channel);
     return Boolean(product.availability?.[availabilityKey]);
 }
 export function productCanBeOrderedForOrderContext(product, orderContext = DEFAULT_RECIPE_ORDER_CONTEXT) {
-    if (!product || !product.active)
+    if (!product || !product.active || product.soldOut)
         return false;
     if (isPhoneMessageOrder(orderContext.channel)) {
         return productCanBeOrdered(product, phoneMessageFulfillmentOption(orderContext.fulfillment).channel);

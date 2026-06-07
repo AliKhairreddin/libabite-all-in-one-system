@@ -65,6 +65,8 @@ export function getProductAvailability(product, reservedItems, deps, orderContex
         return { ingredient, remaining, maxQuantity };
     })
         .filter(Boolean);
+    if (!details.length)
+        return { maxQuantity: 99, limiting: null, details: [] };
     const maxQuantity = details.length ? Math.min(...details.map((detail) => detail.maxQuantity)) : 0;
     const limiting = details.slice().sort((a, b) => a.maxQuantity - b.maxQuantity)[0] || null;
     return { maxQuantity: Math.max(0, maxQuantity), limiting, details };

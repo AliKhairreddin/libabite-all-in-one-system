@@ -886,6 +886,7 @@ export function createInventoryUi(deps) {
             <div>
               <strong>${escapeHtml(product.name)}</strong>
               <p>${escapeHtml(product.category)} | SKU ${escapeHtml(product.code)} | ${escapeHtml(product.station)}</p>
+              ${product.description ? `<p class="line-detail">${escapeHtml(product.description)}</p>` : ""}
             </div>
             <div class="ticket-pills">
               <span class="pill ${product.active ? "ok" : "warning"}">${product.active ? "Active" : "Inactive"}</span>

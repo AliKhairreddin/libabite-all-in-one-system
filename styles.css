@@ -301,6 +301,11 @@ button {
   font-size: 0.82rem;
 }
 
+.customer-product-description {
+  margin: 0 0 7px;
+  line-height: 1.45;
+}
+
 .customer-product-kicker {
   font-weight: 900;
   text-transform: uppercase;
