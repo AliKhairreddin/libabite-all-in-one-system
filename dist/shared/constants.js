@@ -343,7 +343,7 @@ export const PROCEDURE_FREQUENCIES = ["Daily", "Weekly", "Monthly", "Per shift"]
 export const PROCEDURE_ASSIGNED_ROLES = ["All staff", "Owner/Admin", "Manager", "Kitchen", "Front", "Cashier", "Driver"];
 export const PROCEDURE_COMPLETION_STATUSES = ["Done", "Problem", "Skipped"];
 export const DEFAULT_RESTAURANT_SETTINGS = {
-    restaurantName: "Libabite",
+    restaurantName: "LibaBite",
     location: "Roermond, Netherlands",
     currency: "EUR",
     currencyLabel: "Euro",

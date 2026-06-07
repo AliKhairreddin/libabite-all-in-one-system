@@ -2,8 +2,7 @@ const CACHE_NAME = "libabite-driver-v1";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/manifest.webmanifest",
-  "/icon.svg"
+  "/manifest.webmanifest"
 ];
 
 self.addEventListener("install", (event) => {

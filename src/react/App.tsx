@@ -16,6 +16,7 @@ import { seedState } from "../data/seed.js";
 import { formatMoney } from "../shared/money.js";
 
 const restaurant = seedState as any;
+const LIBABITE_LOGO_URL = "https://inch-digital.com/libabiteimg/logo.webp";
 const activeProducts = restaurant.products.filter((product: any) => product.active);
 const activeIngredients = restaurant.ingredients.filter((ingredient: any) => ingredient.active);
 const orders = restaurant.orders.filter((order: any) => order.status !== "Cancelled");
@@ -99,11 +100,9 @@ export function App() {
         <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-                L
-              </span>
+              <img className="h-12 w-14 object-contain" src={LIBABITE_LOGO_URL} alt="" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Libabite</p>
+                <p className="text-sm font-medium text-muted-foreground">LibaBite</p>
                 <h1 className="text-2xl font-semibold tracking-normal">React operations console</h1>
               </div>
             </div>

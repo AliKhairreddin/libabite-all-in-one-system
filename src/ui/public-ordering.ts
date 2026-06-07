@@ -41,6 +41,27 @@ export function createPublicOrderingUi(deps) {
   };
   const INLINE_UPSELL_LIMIT = 8;
   const CART_DRINK_UPSELL_LIMIT = 6;
+  const LIBABITE_LOGO_URL = "https://inch-digital.com/libabiteimg/logo.webp";
+
+  function getRestaurantDisplayName() {
+    const name = String(state.restaurantSettings.restaurantName || "").trim();
+    return !name || name.toLowerCase() === "libabite" ? "LibaBite" : name;
+  }
+
+  function libabiteLogoHtml() {
+    return `<img class="brand-logo" src="${LIBABITE_LOGO_URL}" alt="" loading="lazy" decoding="async">`;
+  }
+
+  function publicBrandHtml() {
+    return `
+      <div class="brand customer-brand">
+        ${libabiteLogoHtml()}
+        <div>
+          <strong>${escapeHtml(getRestaurantDisplayName())}</strong>
+        </div>
+      </div>
+    `;
+  }
 
   function customerAnchorId(value) {
     return `menu-${String(value || "category")
@@ -203,10 +224,6 @@ export function createPublicOrderingUi(deps) {
 
   function updateWebsiteFulfillmentSurfaces(orderContext) {
     if (orderContext.channel !== WEBSITE_ORDER_CHANNEL) return;
-    const fulfillmentOption = websiteFulfillmentOption(orderContext.fulfillment);
-    document.querySelectorAll("[data-customer-fulfillment-label]").forEach((element) => {
-      element.textContent = fulfillmentOption.label;
-    });
     document.querySelectorAll("[data-website-fulfillment]").forEach((button: any) => {
       button.classList.toggle("is-selected", button.dataset.websiteFulfillment === state.websiteFulfillment);
     });
@@ -457,7 +474,7 @@ export function createPublicOrderingUi(deps) {
             <p class="eyebrow">Cart</p>
             <h2>${itemCount ? `${itemCount} item${itemCount === 1 ? "" : "s"}` : "Your order"}</h2>
           </div>
-          <button class="icon-btn customer-cart-close" type="button" data-customer-cart-close aria-label="Close cart">×</button>
+          <button class="icon-btn customer-cart-close" type="button" data-customer-cart-close aria-label="Minimize cart">-</button>
         </div>
         <div class="customer-cart-lines">
           ${cartItems.length ? cartItems.map(customerCartLine).join("") : emptyState("Choose items from the menu.")}
@@ -505,13 +522,7 @@ export function createPublicOrderingUi(deps) {
       screen.innerHTML = `
         <main class="customer-shell customer-error-shell">
           <section class="customer-error-card">
-            <div class="brand">
-              <span class="brand-mark" aria-hidden="true">L</span>
-              <div>
-                <strong>Libabite</strong>
-                <span>QR ordering</span>
-              </div>
-            </div>
+            ${publicBrandHtml()}
             <h1>QR ordering unavailable</h1>
             <p>${escapeHtml(session.error)}</p>
           </section>
@@ -544,13 +555,7 @@ export function createPublicOrderingUi(deps) {
   
     screen.innerHTML = `
       <header class="customer-topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">L</span>
-          <div>
-            <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
-            <span>${escapeHtml(state.restaurantSettings.location)}</span>
-          </div>
-        </div>
+        ${publicBrandHtml()}
         <div class="customer-table-badge">
           <span>${escapeHtml(code.area || table.zone)}</span>
           <strong>${escapeHtml(table.name)}</strong>
@@ -615,27 +620,15 @@ export function createPublicOrderingUi(deps) {
   
     screen.innerHTML = `
       <header class="customer-topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">L</span>
-          <div>
-            <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
-            <span>${escapeHtml(state.restaurantSettings.location)}</span>
-          </div>
-        </div>
-        <div class="customer-topbar-actions">
-          <div class="customer-table-badge">
-            <span>Online order</span>
-            <strong data-customer-fulfillment-label>${escapeHtml(fulfillmentOption.label)}</strong>
-          </div>
-        </div>
+        ${publicBrandHtml()}
       </header>
       <main class="customer-shell">
         ${confirmation}
         <section class="customer-menu-panel">
-          <div class="panel-header compact">
+          <div class="panel-header compact customer-order-header">
             <div>
-              <p class="eyebrow">Online menu</p>
-              <h1>Order Libabite</h1>
+              <p class="eyebrow">Online order</p>
+              <h1>Order ${escapeHtml(getRestaurantDisplayName())}</h1>
             </div>
             ${websiteFulfillmentControlsHtml()}
           </div>
@@ -672,18 +665,12 @@ export function createPublicOrderingUi(deps) {
 
     screen.innerHTML = `
       <header class="customer-topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">L</span>
-          <div>
-            <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
-            <span>${escapeHtml(state.restaurantSettings.location)}</span>
-          </div>
-        </div>
+        ${publicBrandHtml()}
       </header>
       <main class="customer-shell customer-home-shell">
         <section class="customer-menu-panel customer-home-panel">
           <div>
-            <p class="eyebrow">Libabite Roermond</p>
+            <p class="eyebrow">${escapeHtml(getRestaurantDisplayName())}</p>
             <h1>Order online or book a table</h1>
             <p>Fresh grill plates, sandwiches, sweets, and drinks for pickup, delivery, or dine-in planning.</p>
           </div>
@@ -749,13 +736,7 @@ export function createPublicOrderingUi(deps) {
 
     screen.innerHTML = `
       <header class="customer-topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">L</span>
-          <div>
-            <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
-            <span>${escapeHtml(state.restaurantSettings.location)}</span>
-          </div>
-        </div>
+        ${publicBrandHtml()}
         <div class="customer-topbar-actions">
           <div class="customer-table-badge">
             <span>Website</span>

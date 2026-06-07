@@ -681,6 +681,25 @@ button {
   min-height: 44px;
 }
 
+.brand-logo {
+  width: 54px;
+  height: 54px;
+  display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.customer-brand .brand-logo {
+  width: 68px;
+  height: 60px;
+}
+
+.login-brand .brand-logo,
+.sidebar .brand-logo {
+  width: 48px;
+  height: 48px;
+}
+
 .brand-mark {
   width: 42px;
   height: 42px;
@@ -5379,8 +5398,25 @@ textarea:focus {
     transform: translateY(0);
   }
 
+  form.customer-cart-panel .panel-header.compact {
+    min-height: 58px;
+    padding-right: 56px;
+    position: relative;
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
   .customer-cart-close {
+    width: 44px;
+    min-height: 44px;
+    height: 44px;
+    position: absolute;
+    top: 0;
+    right: 0;
     display: inline-grid;
+    color: var(--muted);
+    font-size: 1.35rem;
+    line-height: 1;
   }
 
   .customer-cart-backdrop.is-open {
