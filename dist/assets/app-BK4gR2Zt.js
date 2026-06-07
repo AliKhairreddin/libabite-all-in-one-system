@@ -134,23 +134,23 @@
         ${o?`<strong>${Y(`${o.name} · ${o.capacity} seats · ${o.zone}`)}</strong>`:``}
       </footer>
     </section>
-  `}function il(e){let{emptyState:t,fulfillmentLabel:n,getCustomerCartItems:r,getCustomerOrderContext:i,getItemCount:a,getItemsTotal:o,getAvailableReservationTable:s,getOrderPaymentSummary:c,getOrderTotal:l,getOrderableProductsForContext:u,getProductAvailability:d,getReservationValidation:f,getStaffUrl:p,getWebsiteOrderingUrl:m,getStockShortages:h,getCustomerQrSession:g,getWebsiteOrderSession:_,getWebsiteReservationSession:v,getWebsiteReservationUrl:y,money:b,orderById:x,orderLocationLabel:S,productById:C}=e;function T(e){return`menu-${String(e||`category`).toLowerCase().replace(/[^a-z0-9]+/g,`-`).replace(/^-+|-+$/g,``)||`category`}`}function E(e){return`
+  `}function il(e){let{emptyState:t,fulfillmentLabel:n,getCustomerCartItems:r,getCustomerOrderContext:i,getItemCount:a,getItemsTotal:o,getAvailableReservationTable:s,getOrderPaymentSummary:c,getOrderTotal:l,getOrderableProductsForContext:u,getProductAvailability:d,getReservationValidation:f,getWebsiteOrderingUrl:p,getStockShortages:m,getCustomerQrSession:h,getWebsiteOrderSession:g,getWebsiteReservationSession:_,getWebsiteReservationUrl:v,money:y,orderById:b,orderLocationLabel:x,productById:S}=e;function C(e){return`menu-${String(e||`category`).toLowerCase().replace(/[^a-z0-9]+/g,`-`).replace(/^-+|-+$/g,``)||`category`}`}function T(e){return`
       <nav class="customer-category-rail" aria-label="Menu categories">
         ${e.map(e=>{let t=e.products[0]||{};return`
-            <a href="#${Y(T(e.category))}">
+            <a href="#${Y(C(e.category))}">
               ${t.imageUrl?`<img src="${Y(t.imageUrl)}" alt="" loading="lazy">`:``}
               <span>${Y(e.category)}</span>
             </a>
           `}).join(``)}
       </nav>
-    `}function D(e,t,n=se){let r=d(e,t,n),i=t.filter(t=>t.productId===e.id).reduce((e,t)=>e+t.quantity,0),a=r.maxQuantity<1||!yn(e,n),o=a?`Unavailable`:i?`${i} in cart`:``,s=a?`danger`:i?`info`:`ok`,c=Array.isArray(e.allergens)&&e.allergens.length?bt(e):``;return`
+    `}function E(e,t,n=se){let r=d(e,t,n),i=t.filter(t=>t.productId===e.id).reduce((e,t)=>e+t.quantity,0),a=r.maxQuantity<1||!yn(e,n),o=a?`Unavailable`:i?`${i} in cart`:``,s=a?`danger`:i?`info`:`ok`,c=Array.isArray(e.allergens)&&e.allergens.length?bt(e):``;return`
       <article class="customer-product-card">
         ${e.imageUrl?`<img class="customer-product-image" src="${Y(e.imageUrl)}" alt="" loading="lazy">`:`<div class="customer-product-image placeholder" aria-hidden="true">L</div>`}
         <div class="customer-product-content">
           <span class="customer-product-kicker">${Y(e.category)}${e.isNew?` · New`:``}</span>
           <strong>${Y(e.name)}</strong>
           ${e.description?`<p class="customer-product-description">${Y(e.description)}</p>`:``}
-          <p>${Y(b(e.price))}</p>
+          <p>${Y(y(e.price))}</p>
           ${c?`<p>${Y(c)}</p>`:``}
         </div>
         <div class="customer-product-actions">
@@ -158,11 +158,11 @@
           <button class="icon-btn customer-add-btn" type="button" data-customer-add="${Y(e.id)}" aria-label="Add ${Y(e.name)}" ${a?`disabled`:``}>+</button>
         </div>
       </article>
-    `}function O(e,t){let n=C(e.productId);return n?`
+    `}function D(e,t){let n=S(e.productId);return n?`
       <div class="customer-cart-line">
         <div>
           <strong>${e.quantity}x ${Y(n.name)}</strong>
-          <span>${Y(b(n.price*e.quantity))}</span>
+          <span>${Y(y(n.price*e.quantity))}</span>
         </div>
         <div class="customer-quantity-controls">
           <button class="mini-btn" type="button" data-customer-decrease="${t}" aria-label="Decrease ${Y(n.name)}">-</button>
@@ -170,7 +170,7 @@
           <button class="mini-btn danger-action" type="button" data-customer-remove="${t}">Remove</button>
         </div>
       </div>
-    `:``}function k(e,t){if(!e.length)return``;let n=new Set(e.map(e=>e.productId)),r=u(t).filter(e=>e.category===`Frisdrank`&&!n.has(e.id)).slice(0,6);return r.length?`
+    `:``}function O(e,t){if(!e.length)return``;let n=new Set(e.map(e=>e.productId)),r=u(t).filter(e=>e.category===`Frisdrank`&&!n.has(e.id)).slice(0,6);return r.length?`
       <section class="customer-upsell-panel" aria-label="Drinks with your order">
         <div class="customer-upsell-header">
           <span class="customer-product-kicker">Drinks</span>
@@ -182,14 +182,14 @@
               ${e.imageUrl?`<img src="${Y(e.imageUrl)}" alt="" loading="lazy">`:``}
               <span>
                 <strong>${Y(e.name)}</strong>
-                <small>${Y(b(e.price))}</small>
+                <small>${Y(y(e.price))}</small>
               </span>
               <b>+</b>
             </button>
           `).join(``)}
         </div>
       </section>
-    `:``}function A(){let e=new Date;e.setMinutes(e.getMinutes()+30);let t=e.getMinutes();return e.setMinutes(Math.ceil(t/5)*5,0,0),`${String(e.getHours()).padStart(2,`0`)}:${String(e.getMinutes()).padStart(2,`0`)}`}function j(){let e=new Date;e.setMinutes(e.getMinutes()+120);let t=e.getMinutes();return e.setMinutes(Math.ceil(t/15)*15,0,0),`${String(e.getHours()).padStart(2,`0`)}:${String(e.getMinutes()).padStart(2,`0`)}`}function ee(){return`
+    `:``}function k(){let e=new Date;e.setMinutes(e.getMinutes()+30);let t=e.getMinutes();return e.setMinutes(Math.ceil(t/5)*5,0,0),`${String(e.getHours()).padStart(2,`0`)}:${String(e.getMinutes()).padStart(2,`0`)}`}function A(){let e=new Date;e.setMinutes(e.getMinutes()+120);let t=e.getMinutes();return e.setMinutes(Math.ceil(t/15)*15,0,0),`${String(e.getHours()).padStart(2,`0`)}:${String(e.getMinutes()).padStart(2,`0`)}`}function j(){return`
       <div class="customer-service-toggle" role="group" aria-label="Order type">
         ${de.map(e=>`
           <button class="${q.websiteFulfillment===e.value?`is-selected`:``}" type="button" data-website-fulfillment="${Y(e.value)}">
@@ -197,9 +197,9 @@
           </button>
         `).join(``)}
       </div>
-    `}function M(e,n={}){let r=n.mode||`qr`,s=n.orderContext||i(r),c=o(e),l=a(e),u=h(e,s),d=!e.length||u.length>0,f=u.length?`<p class="customer-cart-note">Some items in your cart are unavailable right now.</p>`:``,p=ln(q.websiteFulfillment),m=p===`Delivery`,g=r===`website`?`
+    `}function ee(e,n={}){let r=n.mode||`qr`,s=n.orderContext||i(r),c=o(e),l=a(e),u=m(e,s),d=!e.length||u.length>0,f=u.length?`<p class="customer-cart-note">Some items in your cart are unavailable right now.</p>`:``,p=ln(q.websiteFulfillment),h=p===`Delivery`,g=r===`website`?`
         <input name="fulfillment" type="hidden" value="${Y(p)}">
-        ${ee()}
+        ${j()}
         <div class="customer-checkout-grid">
           <label>
             Name
@@ -214,13 +214,13 @@
             <input name="customerEmail" type="email" autocomplete="email">
           </label>
           <label>
-            ${m?`Delivery time`:`Pickup time`}
-            <input name="requestedTime" type="time" value="${Y(A())}" required>
+            ${h?`Delivery time`:`Pickup time`}
+            <input name="requestedTime" type="time" value="${Y(k())}" required>
           </label>
         </div>
-        <label class="customer-delivery-address" ${m?``:`hidden`}>
+        <label class="customer-delivery-address" ${h?``:`hidden`}>
           Address
-          <textarea name="deliveryAddress" rows="3" autocomplete="street-address" ${m?`required`:``}></textarea>
+          <textarea name="deliveryAddress" rows="3" autocomplete="street-address" ${h?`required`:``}></textarea>
         </label>
         <fieldset class="customer-payment-options customer-payment-card">
           <legend>Online payment</legend>
@@ -251,9 +251,9 @@
           <button class="icon-btn customer-cart-close" type="button" data-customer-cart-close aria-label="Close cart">×</button>
         </div>
         <div class="customer-cart-lines">
-          ${e.length?e.map(O).join(``):t(`Choose items from the menu.`)}
+          ${e.length?e.map(D).join(``):t(`Choose items from the menu.`)}
         </div>
-        ${k(e,s)}
+        ${O(e,s)}
         ${f}
         <label>
           Notes
@@ -262,22 +262,22 @@
         ${g}
         <div class="customer-cart-total">
           <span>Total</span>
-          <strong>${Y(b(c))}</strong>
+          <strong>${Y(y(c))}</strong>
         </div>
-        <button class="primary-btn" type="submit" ${d?`disabled`:``}>${r===`website`?`Continue to payment`:`Place Order`} · ${Y(b(c))}</button>
+        <button class="primary-btn" type="submit" ${d?`disabled`:``}>${r===`website`?`Continue to payment`:`Place Order`} · ${Y(y(c))}</button>
       </form>
-    `}function N(e,t=`website`){let n=o(e),r=a(e),i=!!q.customerCartOpen;return`
+    `}function M(e,t=`website`){let n=o(e),r=a(e),i=!!q.customerCartOpen;return`
       <button class="customer-cart-backdrop ${i?`is-open`:``}" type="button" data-customer-cart-close aria-label="Close cart"></button>
       ${r?`
         <div class="customer-cart-mobile-bar ${i?`is-hidden`:``}">
           <button class="customer-cart-mobile-button" type="button" data-customer-cart-open aria-label="Open cart">
             <span>${r} item${r===1?``:`s`}</span>
-            <strong>${Y(b(n))}</strong>
+            <strong>${Y(y(n))}</strong>
           </button>
           <button class="primary-btn" type="button" data-customer-cart-open>${t===`website`?`Checkout`:`View cart`}</button>
         </div>
       `:``}
-    `}function P(){let e=document.querySelector(`#customerQrScreen`),n=g();if(!e||!n)return;if(n.error){e.innerHTML=`
+    `}function N(){let e=document.querySelector(`#customerQrScreen`),n=h();if(!e||!n)return;if(n.error){e.innerHTML=`
         <main class="customer-shell customer-error-shell">
           <section class="customer-error-card">
             <div class="brand">
@@ -289,15 +289,14 @@
             </div>
             <h1>QR ordering unavailable</h1>
             <p>${Y(n.error)}</p>
-            <a class="ghost-btn" href="${Y(p())}">Staff Login</a>
           </section>
         </main>
-      `;return}let i=n.table,a=n.code,o=r(se),s=u(se),d=w.map(e=>({category:e,products:s.filter(t=>t.category===e)})).filter(e=>e.products.length),f=x(q.customerLastOrderId),m=f?`
+      `;return}let i=n.table,a=n.code,o=r(se),s=u(se),d=w.map(e=>({category:e,products:s.filter(t=>t.category===e)})).filter(e=>e.products.length),f=b(q.customerLastOrderId),p=f?`
       <section class="customer-confirmation">
         <div>
           <p class="eyebrow">Sent to kitchen</p>
           <h2>Order #${Y(f.number)} received</h2>
-          <p>${Y(S(f))} · ${Y(c(f).statusLabel)} · ${Y(b(l(f)))}</p>
+          <p>${Y(x(f))} · ${Y(c(f).statusLabel)} · ${Y(y(l(f)))}</p>
         </div>
         <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>
       </section>
@@ -316,7 +315,7 @@
         </div>
       </header>
       <main class="customer-shell">
-        ${m}
+        ${p}
         <section class="customer-menu-panel">
           <div class="panel-header compact">
             <div>
@@ -325,27 +324,27 @@
             </div>
           </div>
           <div class="customer-menu-groups">
-            ${E(d)}
+            ${T(d)}
             ${d.length?d.map(e=>`
-              <section class="customer-menu-group" id="${Y(T(e.category))}">
+              <section class="customer-menu-group" id="${Y(C(e.category))}">
                 <h2>${Y(e.category)}</h2>
                 <div class="customer-product-grid">
-                  ${e.products.map(e=>D(e,o,se)).join(``)}
+                  ${e.products.map(e=>E(e,o,se)).join(``)}
                 </div>
               </section>
             `).join(``):t(`No QR menu items are active.`)}
           </div>
         </section>
-        ${M(o,{mode:`qr`,orderContext:se})}
+        ${ee(o,{mode:`qr`,orderContext:se})}
       </main>
-      ${N(o,`qr`)}
-    `}function F(){let e=document.querySelector(`#customerQrScreen`),a=_();if(!e||!a)return;let o=i(`website`),s=un(o.fulfillment),d=r(o),f=u(o),m=w.map(e=>({category:e,products:f.filter(t=>t.category===e)})).filter(e=>e.products.length),h=x(q.websiteLastOrderId),g=h?`
+      ${M(o,`qr`)}
+    `}function P(){let e=document.querySelector(`#customerQrScreen`),a=g();if(!e||!a)return;let o=i(`website`),s=un(o.fulfillment),d=r(o),f=u(o),p=w.map(e=>({category:e,products:f.filter(t=>t.category===e)})).filter(e=>e.products.length),m=b(q.websiteLastOrderId),h=m?`
       <section class="customer-confirmation">
         <div>
           <p class="eyebrow">Confirmed</p>
-          <h2>Order #${Y(h.number)} received</h2>
-          <p>${Y(n(h))} ${Y(h.requestedTime||`as soon as possible`)} · ${Y(c(h).statusLabel)} · ${Y(b(l(h)))}</p>
-          ${h.paymentReference?`<p class="customer-confirmation-code">Payment ${Y(h.paymentReference)}</p>`:``}
+          <h2>Order #${Y(m.number)} received</h2>
+          <p>${Y(n(m))} ${Y(m.requestedTime||`as soon as possible`)} · ${Y(c(m).statusLabel)} · ${Y(y(l(m)))}</p>
+          ${m.paymentReference?`<p class="customer-confirmation-code">Payment ${Y(m.paymentReference)}</p>`:``}
         </div>
         <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>
       </section>
@@ -363,35 +362,34 @@
             <span>Online order</span>
             <strong>${Y(s.label)}</strong>
           </div>
-          <a class="ghost-btn" href="${Y(p())}">Staff Login</a>
         </div>
       </header>
       <main class="customer-shell">
-        ${g}
+        ${h}
         <section class="customer-menu-panel">
           <div class="panel-header compact">
             <div>
               <p class="eyebrow">Online menu</p>
               <h1>Order Libabite</h1>
             </div>
-            ${ee()}
+            ${j()}
           </div>
           <div class="customer-menu-groups">
-            ${E(m)}
-            ${m.length?m.map(e=>`
-              <section class="customer-menu-group" id="${Y(T(e.category))}">
+            ${T(p)}
+            ${p.length?p.map(e=>`
+              <section class="customer-menu-group" id="${Y(C(e.category))}">
                 <h2>${Y(e.category)}</h2>
                 <div class="customer-product-grid">
-                  ${e.products.map(e=>D(e,d,o)).join(``)}
+                  ${e.products.map(e=>E(e,d,o)).join(``)}
                 </div>
               </section>
             `).join(``):t(`No ${s.label.toLowerCase()} menu items are active.`)}
           </div>
         </section>
-        ${M(d,{mode:`website`,orderContext:o})}
+        ${ee(d,{mode:`website`,orderContext:o})}
       </main>
-      ${N(d,`website`)}
-    `}function I(){let e=document.querySelector(`#customerQrScreen`);if(!e)return;let n=u(i(`website`)).slice(0,4),r=q.reservations.filter(e=>[`Pending`,`Confirmed`,`Arrived`].includes(e.status)).sort((e,t)=>`${e.date} ${e.time}`.localeCompare(`${t.date} ${t.time}`))[0];e.innerHTML=`
+      ${M(d,`website`)}
+    `}function F(){let e=document.querySelector(`#customerQrScreen`);if(!e)return;let n=u(i(`website`)).slice(0,4),r=q.reservations.filter(e=>[`Pending`,`Confirmed`,`Arrived`].includes(e.status)).sort((e,t)=>`${e.date} ${e.time}`.localeCompare(`${t.date} ${t.time}`))[0];e.innerHTML=`
       <header class="customer-topbar">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">L</span>
@@ -399,9 +397,6 @@
             <strong>${Y(q.restaurantSettings.restaurantName)}</strong>
             <span>${Y(q.restaurantSettings.location)}</span>
           </div>
-        </div>
-        <div class="customer-topbar-actions">
-          <a class="ghost-btn" href="${Y(p())}">Staff Login</a>
         </div>
       </header>
       <main class="customer-shell customer-home-shell">
@@ -412,8 +407,8 @@
             <p>Fresh grill plates, sandwiches, sweets, and drinks for pickup, delivery, or dine-in planning.</p>
           </div>
           <div class="customer-home-actions">
-            <a class="primary-btn" href="${Y(m())}">Order Online</a>
-            <a class="ghost-btn" href="${Y(y())}">Reserve Table</a>
+            <a class="primary-btn" href="${Y(p())}">Order Online</a>
+            <a class="ghost-btn" href="${Y(v())}">Reserve Table</a>
           </div>
           <div class="customer-home-menu">
             ${n.length?n.map(e=>`
@@ -423,7 +418,7 @@
                   <span class="customer-product-kicker">${Y(e.category)}${e.isNew?` · New`:``}</span>
                   <strong>${Y(e.name)}</strong>
                   ${e.description?`<p class="customer-product-description">${Y(e.description)}</p>`:``}
-                  <p>${Y(b(e.price))}</p>
+                  <p>${Y(y(e.price))}</p>
                 </div>
               </article>
             `).join(``):t(`Online ordering opens soon.`)}
@@ -444,14 +439,13 @@
           <p>${r?`Next table: ${Y(Un(r.date))} ${Y(r.time)}`:`Tables are open for website booking.`}</p>
         </aside>
       </main>
-    `}function L(){let e=document.querySelector(`#customerQrScreen`),t=v();if(!e||!t)return;let n=B(),r=j(),i=s({date:n,guests:2,time:r})||q.tables[0],a=q.reservations.find(e=>e.id===q.websiteLastReservationId),o=a?`
+    `}function I(){let e=document.querySelector(`#customerQrScreen`),t=_();if(!e||!t)return;let n=B(),r=A(),i=s({date:n,guests:2,time:r})||q.tables[0],a=q.reservations.find(e=>e.id===q.websiteLastReservationId),o=a?`
       <section class="customer-confirmation">
         <div>
           <p class="eyebrow">Reservation received</p>
           <h2>${Y(Un(a.date))} at ${Y(a.time)}</h2>
           <p>${Y(a.name)} · ${a.guests} guests · ${Y(a.status)}</p>
         </div>
-        <a class="ghost-btn" href="${Y(p())}">Staff Login</a>
       </section>
     `:``;e.innerHTML=`
       <header class="customer-topbar">
@@ -467,7 +461,6 @@
             <span>Website</span>
             <strong>Table reservation</strong>
           </div>
-          <a class="ghost-btn" href="${Y(p())}">Staff Login</a>
         </div>
       </header>
       <main class="customer-shell reservation-customer-shell">
@@ -530,7 +523,7 @@
           </div>
         </aside>
       </main>
-    `}return{renderCustomerQrScreen:P,renderPublicHomeScreen:I,renderWebsiteOrderScreen:F,renderWebsiteReservationScreen:L}}function al(e){return e===`Done`||e===`Completed`?`ok`:e===`Problem`?`danger`:e===`Skipped`||e===`Missed`?`warning`:`info`}function ol(e){return e===`Weekly`?10080*t:e===`Monthly`?744*60*t:e===`Per shift`?720*t:1440*t}function sl(e,t){let n=new Set([`All staff`]);if(!e)return n;let r=t(e.role);return n.add(r.operationalRole),n.add(r.label),e.role===`owner_admin`&&n.add(`Owner/Admin`),e.role===`manager`&&n.add(`Manager`),e.role===`waiter_cashier`&&(n.add(`Front`),n.add(`Cashier`)),e.role===`kitchen_staff`&&n.add(`Kitchen`),e.role===`driver`&&n.add(`Driver`),n}function cl(e,t,n){return t?n.canReviewProcedures?!0:sl(t,n.roleDefinition).has(e.assignedRole):!1}function ll(e){let t=window.document,{can:n,currentRole:r,currentUser:i,emptyState:a,formatActualUsageLabel:o,formatSignedAmount:s,formatStockAmount:c,getAllInventoryLocations:l,getDefaultProductionProductId:u,getLineCost:d,getProductMargin:f,getProductionExecutionDraft:p,getProductionFieldName:m,getProductionOutputDefault:h,getProductionOutputUnitType:g,getProductionProducts:_,getProductionReadiness:v,getRecipeLineQuantity:y,getRecipeLineWasteMultiplier:b,getRecipeMeasure:x,getRecipeUsageLabel:S,getWasteUnitOptionsForIngredient:C,ingredientById:w,money:T,productById:E,roleDefinition:D,unitTypeDefinition:O}=e;function k(e){return q.procedures.find(t=>t.id===e)}function A(e){return we.find(t=>t.id===e)?.label||`Language`}function j(e,t=Oe){return q.procedureCompletions.filter(n=>n.procedureId===e&&t.includes(n.status)).slice().sort((e,t)=>(t.completedAtMs||0)-(e.completedAtMs||0))}function ee(e,t=Oe){return j(e.id,t)[0]||null}function M(e){let t=Date.now()-ol(e.frequency),n=j(e.id,[`Done`]).find(e=>e.completedAtMs>=t);if(n)return{status:`Completed`,label:`Completed`,className:`ok`,detail:`${n.completedByName} at ${ut(n.completedAtMs,n.completedAt)}`};let r=j(e.id,[`Problem`,`Skipped`]).find(e=>e.completedAtMs>=t);return r?{status:r.status,label:r.status,className:al(r.status),detail:`${r.completedByName}: ${r.notes||`No note`}`}:{status:`Missed`,label:`Due now`,className:`warning`,detail:`${e.frequency} procedure has no completion in the current window.`}}function N(e){return new Date(e).toDateString()===new Date().toDateString()}function P(e,t=i()){return cl(e,t,{canReviewProcedures:n(`canReviewProcedures`),roleDefinition:D})}function F(){let e=i();return q.procedures.filter(t=>t.active&&P(t,e)).sort((e,t)=>{let n=M(e),r=M(t);return(n.status===`Completed`)-+(r.status===`Completed`)||e.department.localeCompare(t.department)||e.title.localeCompare(t.title)})}function I(e,t=i()?.id||``){return`${t}:${e}`}function L(e,t=i()?.id||``){let n=I(e,t);return new Set(q.procedureProgress?.[n]||[])}function te(e,t=i()?.id||``){if(!e.steps.length)return!0;let n=L(e.id,t);return e.steps.every((e,t)=>n.has(t))}function R(e,t=`None`){return e?.length?e.join(`, `):t}function ne(e,t){return`
+    `}return{renderCustomerQrScreen:N,renderPublicHomeScreen:F,renderWebsiteOrderScreen:P,renderWebsiteReservationScreen:I}}function al(e){return e===`Done`||e===`Completed`?`ok`:e===`Problem`?`danger`:e===`Skipped`||e===`Missed`?`warning`:`info`}function ol(e){return e===`Weekly`?10080*t:e===`Monthly`?744*60*t:e===`Per shift`?720*t:1440*t}function sl(e,t){let n=new Set([`All staff`]);if(!e)return n;let r=t(e.role);return n.add(r.operationalRole),n.add(r.label),e.role===`owner_admin`&&n.add(`Owner/Admin`),e.role===`manager`&&n.add(`Manager`),e.role===`waiter_cashier`&&(n.add(`Front`),n.add(`Cashier`)),e.role===`kitchen_staff`&&n.add(`Kitchen`),e.role===`driver`&&n.add(`Driver`),n}function cl(e,t,n){return t?n.canReviewProcedures?!0:sl(t,n.roleDefinition).has(e.assignedRole):!1}function ll(e){let t=window.document,{can:n,currentRole:r,currentUser:i,emptyState:a,formatActualUsageLabel:o,formatSignedAmount:s,formatStockAmount:c,getAllInventoryLocations:l,getDefaultProductionProductId:u,getLineCost:d,getProductMargin:f,getProductionExecutionDraft:p,getProductionFieldName:m,getProductionOutputDefault:h,getProductionOutputUnitType:g,getProductionProducts:_,getProductionReadiness:v,getRecipeLineQuantity:y,getRecipeLineWasteMultiplier:b,getRecipeMeasure:x,getRecipeUsageLabel:S,getWasteUnitOptionsForIngredient:C,ingredientById:w,money:T,productById:E,roleDefinition:D,unitTypeDefinition:O}=e;function k(e){return q.procedures.find(t=>t.id===e)}function A(e){return we.find(t=>t.id===e)?.label||`Language`}function j(e,t=Oe){return q.procedureCompletions.filter(n=>n.procedureId===e&&t.includes(n.status)).slice().sort((e,t)=>(t.completedAtMs||0)-(e.completedAtMs||0))}function ee(e,t=Oe){return j(e.id,t)[0]||null}function M(e){let t=Date.now()-ol(e.frequency),n=j(e.id,[`Done`]).find(e=>e.completedAtMs>=t);if(n)return{status:`Completed`,label:`Completed`,className:`ok`,detail:`${n.completedByName} at ${ut(n.completedAtMs,n.completedAt)}`};let r=j(e.id,[`Problem`,`Skipped`]).find(e=>e.completedAtMs>=t);return r?{status:r.status,label:r.status,className:al(r.status),detail:`${r.completedByName}: ${r.notes||`No note`}`}:{status:`Missed`,label:`Due now`,className:`warning`,detail:`${e.frequency} procedure has no completion in the current window.`}}function N(e){return new Date(e).toDateString()===new Date().toDateString()}function P(e,t=i()){return cl(e,t,{canReviewProcedures:n(`canReviewProcedures`),roleDefinition:D})}function F(){let e=i();return q.procedures.filter(t=>t.active&&P(t,e)).sort((e,t)=>{let n=M(e),r=M(t);return(n.status===`Completed`)-+(r.status===`Completed`)||e.department.localeCompare(t.department)||e.title.localeCompare(t.title)})}function I(e,t=i()?.id||``){return`${t}:${e}`}function L(e,t=i()?.id||``){let n=I(e,t);return new Set(q.procedureProgress?.[n]||[])}function te(e,t=i()?.id||``){if(!e.steps.length)return!0;let n=L(e.id,t);return e.steps.every((e,t)=>n.has(t))}function R(e,t=`None`){return e?.length?e.join(`, `):t}function ne(e,t){return`
       <div>
         <span>${Y(e)}</span>
         <strong>${Y(R(t))}</strong>

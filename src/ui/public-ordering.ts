@@ -21,7 +21,6 @@ export function createPublicOrderingUi(deps) {
     getOrderableProductsForContext,
     getProductAvailability,
     getReservationValidation,
-    getStaffUrl,
     getWebsiteOrderingUrl,
     getStockShortages,
     getCustomerQrSession,
@@ -285,7 +284,6 @@ export function createPublicOrderingUi(deps) {
             </div>
             <h1>QR ordering unavailable</h1>
             <p>${escapeHtml(session.error)}</p>
-            <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
           </section>
         </main>
       `;
@@ -397,7 +395,6 @@ export function createPublicOrderingUi(deps) {
             <span>Online order</span>
             <strong>${escapeHtml(fulfillmentOption.label)}</strong>
           </div>
-          <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
         </div>
       </header>
       <main class="customer-shell">
@@ -447,9 +444,6 @@ export function createPublicOrderingUi(deps) {
             <strong>${escapeHtml(state.restaurantSettings.restaurantName)}</strong>
             <span>${escapeHtml(state.restaurantSettings.location)}</span>
           </div>
-        </div>
-        <div class="customer-topbar-actions">
-          <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
         </div>
       </header>
       <main class="customer-shell customer-home-shell">
@@ -516,7 +510,6 @@ export function createPublicOrderingUi(deps) {
           <h2>${escapeHtml(getReservationDateLabel(lastReservation.date))} at ${escapeHtml(lastReservation.time)}</h2>
           <p>${escapeHtml(lastReservation.name)} · ${lastReservation.guests} guests · ${escapeHtml(lastReservation.status)}</p>
         </div>
-        <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
       </section>
     ` : "";
 
@@ -534,7 +527,6 @@ export function createPublicOrderingUi(deps) {
             <span>Website</span>
             <strong>Table reservation</strong>
           </div>
-          <a class="ghost-btn" href="${escapeHtml(getStaffUrl())}">Staff Login</a>
         </div>
       </header>
       <main class="customer-shell reservation-customer-shell">
