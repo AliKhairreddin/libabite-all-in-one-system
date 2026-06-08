@@ -20,6 +20,7 @@ import {
   matchExternalOrderItems,
   parseExternalOrderLines
 } from "../dist/domain/external-delivery.js";
+import { formatDeliveryDistance, getDeliveryRouteProgress, normalizeDeliveryLocationHistory } from "../dist/domain/delivery.js";
 import { externalPlatformRequiredSecrets, getExternalPlatformReadiness } from "../dist/domain/external-platform-adapters.js";
 import { buildPaymentLedgerRecord, getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus } from "../dist/domain/payments.js";
 import {
@@ -264,6 +265,21 @@ test("customer helpers find history, favorites, and upsert records", () => {
   assert.equal(customer.id, "cust-1");
   assert.equal(customer.name, "Nour Z");
   assert.deepEqual(customer.addresses, ["3 Rue C", "1 Rue A"]);
+});
+
+test("delivery route helpers normalize GPS samples and estimate route progress", () => {
+  const route = [
+    { lat: 51.1949, lng: 5.9878 },
+    { lat: 51.1949, lng: 5.9978 },
+    { lat: 51.1949, lng: 6.0078 }
+  ];
+  const progress = getDeliveryRouteProgress(route, { lat: 51.1949, lng: 5.9978 });
+
+  assert.equal(progress.percent, 50);
+  assert.ok(progress.distanceRemainingMeters > 650);
+  assert.ok(progress.distanceRemainingMeters < 750);
+  assert.equal(formatDeliveryDistance(42), "<50 m");
+  assert.equal(normalizeDeliveryLocationHistory([{ lat: "bad", lng: 5 }, { lat: 51.2, lng: 6, atMs: 1000 }]).length, 1);
 });
 
 test("kitchen status flow advances and stamps status milestones", () => {

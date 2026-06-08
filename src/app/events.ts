@@ -92,6 +92,7 @@ export function bindAppEvents(handlers) {
     showOrderReceipt,
     showToast,
     startNewCustomerOrder,
+    startDeliveryTrip,
     startShiftBreak,
     submitCustomerQrOrder,
     submitWebsiteReservation,
@@ -199,6 +200,9 @@ export function bindAppEvents(handlers) {
 
     const deliveryStatus = event.target.closest("[data-delivery-status][data-delivery-order]");
     if (deliveryStatus) updateDeliveryStatus(deliveryStatus.dataset.deliveryOrder, deliveryStatus.dataset.deliveryStatus);
+
+    const startTrip = event.target.closest("[data-start-delivery-trip]");
+    if (startTrip) startDeliveryTrip(startTrip.dataset.startDeliveryTrip);
 
     const deliveryCash = event.target.closest("[data-delivery-cash]");
     if (deliveryCash) markDeliveryCashCollected(deliveryCash.dataset.deliveryCash);

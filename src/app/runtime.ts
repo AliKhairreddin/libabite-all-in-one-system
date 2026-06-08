@@ -197,6 +197,7 @@ const {
   currentUserCanUpdateDelivery,
   driverById,
   markDeliveryCashCollected,
+  startDeliveryTrip,
   updateDeliveryStatus,
   uploadDeliveryProof
 } = createDeliveryRuntime({
@@ -939,6 +940,7 @@ export function createAppRuntime() {
       showOrderReceipt,
       showToast,
       startNewCustomerOrder,
+      startDeliveryTrip,
       startShiftBreak,
       submitCustomerQrOrder,
       submitWebsiteReservation,

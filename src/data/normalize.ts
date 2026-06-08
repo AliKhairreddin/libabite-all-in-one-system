@@ -36,7 +36,15 @@ import {
   normalizeProductAllergens,
   normalizeVatSetting
 } from "../domain/commerce.js";
-import { normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
+import {
+  normalizeDeliveryLocationHistory,
+  normalizeDeliveryLocationSample,
+  normalizeDeliveryRoute,
+  normalizeDriverDeliveryStatus,
+  normalizeDriverStatus,
+  normalizePickupStatus,
+  reconcileDeliveryAssignments
+} from "../domain/delivery.js";
 import {
   externalPlatformName,
   normalizeExternalCommissionRate,
@@ -833,7 +841,9 @@ export function normalizeDrivers(drivers, users = []) {
         status: normalizeDriverStatus(driver.status),
         eta: String(driver.eta || "-").trim() || "-",
         orderId: driver.orderId || null,
-        location: String(driver.location || "Restaurant").replace(/\s+/g, " ").trim() || "Restaurant"
+        location: String(driver.location || "Restaurant").replace(/\s+/g, " ").trim() || "Restaurant",
+        lastLocation: normalizeDeliveryLocationSample(driver.lastLocation),
+        locationUpdatedAtMs: normalizeOptionalTimestamp(driver.locationUpdatedAtMs)
       };
     })
     .filter(Boolean);
@@ -1650,6 +1660,18 @@ export function normalizeState(candidate) {
         deliveryStatus,
         deliveryAssignedAtMs,
         deliveryStatusUpdatedAtMs,
+        deliveryTripStartedAt: String(order.deliveryTripStartedAt || "").trim(),
+        deliveryTripStartedAtMs: normalizeOptionalTimestamp(order.deliveryTripStartedAtMs),
+        deliveryTripEndedAt: String(order.deliveryTripEndedAt || "").trim(),
+        deliveryTripEndedAtMs: normalizeOptionalTimestamp(order.deliveryTripEndedAtMs),
+        deliveryTrackingStatus: String(order.deliveryTrackingStatus || "").replace(/\s+/g, " ").trim(),
+        deliveryLastLocation: normalizeDeliveryLocationSample(order.deliveryLastLocation),
+        deliveryLocationHistory: normalizeDeliveryLocationHistory(order.deliveryLocationHistory),
+        deliveryRoute: normalizeDeliveryRoute(order.deliveryRoute),
+        deliveryRouteProgress: Math.max(0, Math.min(100, Math.round(Number(order.deliveryRouteProgress) || 0))),
+        deliveryDistanceTraveledMeters: Math.max(0, Math.round(Number(order.deliveryDistanceTraveledMeters) || 0)),
+        deliveryDistanceRemainingMeters: Math.max(0, Math.round(Number(order.deliveryDistanceRemainingMeters) || 0)),
+        deliveryEtaSeconds: Math.max(0, Math.round(Number(order.deliveryEtaSeconds) || 0)),
         deliveredAt: String(order.deliveredAt || "").trim(),
         deliveredAtMs: normalizeOptionalTimestamp(order.deliveredAtMs),
         failedAt: String(order.failedAt || "").trim(),

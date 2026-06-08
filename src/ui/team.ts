@@ -1,6 +1,9 @@
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
 import { state } from "../app/state.js";
 import { DRIVER_IDLE_STATUS, ROLE_ORDER, SCHEDULE_ROLES, SCHEDULE_STATIONS } from "../shared/constants.js";
-import { formatDateTime } from "../shared/dates.js";
+import { formatDateTime, formatDuration } from "../shared/dates.js";
 import { escapeHtml } from "../shared/html.js";
 import {
   formatShiftHours,
@@ -13,6 +16,7 @@ import {
 import {
   deliveryIsLate,
   deliveryStatusClass,
+  formatDeliveryDistance,
   formatDeliveryEta,
   getDeliveryLateMinutes,
   getDeliveryLocationForStatus,
@@ -20,11 +24,13 @@ import {
   isActiveDelivery,
   isDeliveryOrder,
   isDeliveryTerminal,
-  normalizePickupStatus
+  normalizePickupStatus,
+  RESTAURANT_COORDINATES
 } from "../domain/delivery.js";
 
 const DRIVER_ROUTE_ORIGIN = "Libabite, Roermond, Netherlands";
-const ROERMOND_MAP_EMBED_URL = "https://www.openstreetmap.org/export/embed.html?bbox=5.9705%2C51.1805%2C6.0155%2C51.2055&layer=mapnik&marker=51.1949%2C5.9878";
+const LIVE_MAP_MIN_ZOOM = 13;
+const LIVE_MAP_MAX_ZOOM = 18;
 
 export function createTeamUi(deps) {
   const document: any = window.document;
@@ -106,14 +112,14 @@ export function createTeamUi(deps) {
     const labels = {
       "At restaurant": "At restaurant",
       "Picked up": "Picked up",
-      "On the way": "Start route",
+      "On the way": "Start trip",
       Delivered: "Mark delivered",
       "Failed delivery": "Could not deliver",
       Returned: "Returned"
     };
   
     return nextStatuses.map((nextStatus) => `
-      <button class="mini-btn ${nextStatus === "Failed delivery" || nextStatus === "Returned" ? "danger-action" : ""}" type="button" data-delivery-status="${escapeHtml(nextStatus)}" data-delivery-order="${escapeHtml(order.id)}">
+      <button class="mini-btn ${nextStatus === "Failed delivery" || nextStatus === "Returned" ? "danger-action" : ""}" type="button" ${nextStatus === "On the way" ? `data-start-delivery-trip="${escapeHtml(order.id)}"` : `data-delivery-status="${escapeHtml(nextStatus)}" data-delivery-order="${escapeHtml(order.id)}"`}>
         ${escapeHtml(labels[nextStatus] || nextStatus)}
       </button>
     `).join("");
@@ -152,12 +158,24 @@ export function createTeamUi(deps) {
     return encodeURIComponent(String(value || "").trim());
   }
 
+  function currentDriverCoordinates(order) {
+    const location = order.deliveryLastLocation || driverById(order.assignedDriver)?.lastLocation;
+    return Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lng))
+      ? { lat: Number(location.lat), lng: Number(location.lng) }
+      : null;
+  }
+
+  function driverRouteOrigin(order) {
+    const coordinates = currentDriverCoordinates(order);
+    return coordinates ? `${coordinates.lat},${coordinates.lng}` : DRIVER_ROUTE_ORIGIN;
+  }
+
   function googleDirectionsUrl(order) {
-    return `https://www.google.com/maps/dir/?api=1&origin=${mapsQuery(DRIVER_ROUTE_ORIGIN)}&destination=${mapsQuery(deliveryDestination(order))}&travelmode=driving`;
+    return `https://www.google.com/maps/dir/?api=1&origin=${mapsQuery(driverRouteOrigin(order))}&destination=${mapsQuery(deliveryDestination(order))}&travelmode=driving`;
   }
 
   function appleDirectionsUrl(order) {
-    return `https://maps.apple.com/?saddr=${mapsQuery(DRIVER_ROUTE_ORIGIN)}&daddr=${mapsQuery(deliveryDestination(order))}&dirflg=d`;
+    return `https://maps.apple.com/?saddr=${mapsQuery(driverRouteOrigin(order))}&daddr=${mapsQuery(deliveryDestination(order))}&dirflg=d`;
   }
 
   function openStreetMapSearchUrl(order) {
@@ -178,6 +196,107 @@ export function createTeamUi(deps) {
         <a class="ghost-btn" href="${escapeHtml(openStreetMapSearchUrl(order))}" target="_blank" rel="noopener">OSM</a>
         ${phone ? `<a class="ghost-btn" href="${escapeHtml(phone)}">Call</a>` : ""}
       </div>
+    `;
+  }
+
+  function deliveryRouteMetricText(order) {
+    if (Number(order.deliveryDistanceRemainingMeters) > 0) return `${formatDeliveryDistance(order.deliveryDistanceRemainingMeters)} left`;
+    if (Number(order.deliveryRoute?.distanceMeters) > 0) return `${formatDeliveryDistance(order.deliveryRoute.distanceMeters)} route`;
+    return formatDeliveryEta(order);
+  }
+
+  function deliveryRouteEtaText(order) {
+    const seconds = Number(order.deliveryEtaSeconds) || Number(order.deliveryRoute?.durationSeconds) || 0;
+    if (!seconds) return order.deliveryTrackingStatus || "Route pending";
+    return `${formatDuration(Math.max(1, Math.round(seconds / 60)))} drive`;
+  }
+
+  function deliveryTripActionHtml(order) {
+    const status = getDeliveryStatus(order) || "Assigned";
+    if (status !== "On the way") return "";
+    const label = order.deliveryLastLocation ? "Refresh GPS" : "Enable live GPS";
+    return `<button class="mini-btn" type="button" data-start-delivery-trip="${escapeHtml(order.id)}">${escapeHtml(label)}</button>`;
+  }
+
+  function liveMapIcon(label, className) {
+    return L.divIcon({
+      className: `live-map-marker ${className}`,
+      html: `<span>${escapeHtml(label)}</span>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+  }
+
+  function renderDeliveryMaps() {
+    window.requestAnimationFrame(() => {
+      document.querySelectorAll("[data-delivery-map]").forEach((mapNode: any) => {
+        if (mapNode._leaflet_id) return;
+        const order = orderById(mapNode.dataset.deliveryMap);
+        if (!order) return;
+        const routePoints = (order.deliveryRoute?.geometry || [])
+          .filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
+          .map((point) => [Number(point.lat), Number(point.lng)] as [number, number]);
+        const current = currentDriverCoordinates(order);
+        const destination = order.deliveryRoute?.destination;
+        const origin = order.deliveryRoute?.origin || RESTAURANT_COORDINATES;
+        const map = L.map(mapNode, {
+          zoomControl: false,
+          attributionControl: false,
+          scrollWheelZoom: false,
+          minZoom: LIVE_MAP_MIN_ZOOM,
+          maxZoom: LIVE_MAP_MAX_ZOOM
+        });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: LIVE_MAP_MAX_ZOOM,
+          attribution: "&copy; OpenStreetMap"
+        }).addTo(map);
+
+        const bounds: Array<[number, number]> = [];
+        if (routePoints.length > 1) {
+          L.polyline(routePoints, { color: "#1f6f4a", weight: 6, opacity: 0.88 }).addTo(map);
+          L.polyline(routePoints, { color: "#ffffff", weight: 2, opacity: 0.8, dashArray: "8 10" }).addTo(map);
+          bounds.push(...routePoints);
+        }
+
+        if (origin?.lat && origin?.lng) {
+          const point: [number, number] = [Number(origin.lat), Number(origin.lng)];
+          L.marker(point, { icon: liveMapIcon("R", "restaurant") }).addTo(map);
+          bounds.push(point);
+        }
+        if (destination?.lat && destination?.lng) {
+          const point: [number, number] = [Number(destination.lat), Number(destination.lng)];
+          L.marker(point, { icon: liveMapIcon("C", "customer") }).addTo(map);
+          bounds.push(point);
+        }
+        if (current) {
+          const point: [number, number] = [current.lat, current.lng];
+          L.marker(point, { icon: liveMapIcon("D", "driver") }).addTo(map);
+          bounds.push(point);
+        }
+
+        if (bounds.length > 1) {
+          map.fitBounds(bounds, { padding: [34, 34], maxZoom: 16 });
+        } else {
+          const fallback = current || origin || RESTAURANT_COORDINATES;
+          map.setView([Number(fallback.lat), Number(fallback.lng)], 14);
+        }
+      });
+    });
+  }
+
+  function deliveryTurnStepsHtml(order) {
+    const steps = Array.isArray(order.deliveryRoute?.steps) ? order.deliveryRoute.steps : [];
+    if (!steps.length || getDeliveryStatus(order) !== "On the way") return "";
+    return `
+      <ol class="driver-turn-steps">
+        ${steps.slice(0, 5).map((step, index) => `
+          <li>
+            <span>${index + 1}</span>
+            <strong>${escapeHtml(step.instruction)}</strong>
+            <small>${escapeHtml(formatDeliveryDistance(step.distanceMeters))}</small>
+          </li>
+        `).join("")}
+      </ol>
     `;
   }
 
@@ -230,18 +349,18 @@ export function createTeamUi(deps) {
   }
 
   function driverRouteMapHtml(order) {
+    const progress = Math.max(0, Math.min(100, Math.round(Number(order.deliveryRouteProgress) || 0)));
+    const trackingStatus = order.deliveryTrackingStatus || order.deliveryRoute?.status || (getDeliveryStatus(order) === "On the way" ? "Starting live GPS" : "Trip not started");
     return `
       <div class="driver-route-map">
-        <iframe title="Roermond delivery map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="${escapeHtml(ROERMOND_MAP_EMBED_URL)}"></iframe>
-        <div class="driver-route-line" aria-hidden="true">
-          <span class="route-point restaurant">R</span>
-          <span class="route-road"></span>
-          <span class="route-point customer">C</span>
-        </div>
+        <div class="delivery-live-map" data-delivery-map="${escapeHtml(order.id)}" aria-label="Live delivery route map"></div>
         <div class="driver-map-overlay">
-          <span>${escapeHtml(formatDeliveryEta(order))}</span>
+          <span>${escapeHtml(`${deliveryRouteMetricText(order)} | ${deliveryRouteEtaText(order)}`)}</span>
           <strong>${escapeHtml(shortDeliveryAddress(order))}</strong>
-          <small>${escapeHtml(deliveryDestination(order))}</small>
+          <small>${escapeHtml(trackingStatus)}</small>
+          <div class="driver-route-progress" aria-label="Route progress">
+            <span style="width: ${progress}%"></span>
+          </div>
         </div>
       </div>
     `;
@@ -273,6 +392,7 @@ export function createTeamUi(deps) {
         <div class="driver-route-body">
           ${driverNavigationActionsHtml(order)}
           ${driverRouteStepsHtml(order)}
+          ${deliveryTurnStepsHtml(order)}
 
           <div class="driver-stop-grid">
             <div>
@@ -294,7 +414,7 @@ export function createTeamUi(deps) {
           </div>
 
           <div class="driver-status-panel">
-            <div class="mini-actions">${deliveryStatusActionsHtml(order)}</div>
+            <div class="mini-actions">${deliveryStatusActionsHtml(order)}${deliveryTripActionHtml(order)}</div>
             ${!paymentSummary.paid ? `<button class="mini-btn" type="button" data-delivery-cash="${escapeHtml(order.id)}">Mark cash collected</button>` : ""}
           </div>
 
@@ -423,6 +543,7 @@ export function createTeamUi(deps) {
     list.innerHTML = activeOrders.length
       ? activeOrders.map((order) => driverRouteCard(order)).join("")
       : emptyState(driver ? "No assigned delivery orders right now." : "No driver profile found for this account.");
+    renderDeliveryMaps();
   }
   
   function driverOptionHtml(order) {

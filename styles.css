@@ -3809,6 +3809,16 @@ body.is-driver-app .driver-app-panel .panel-header h2 {
     #e8ede7;
 }
 
+.delivery-live-map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.delivery-live-map .leaflet-control-attribution {
+  font-size: 0.6rem;
+}
+
 .driver-route-map iframe {
   position: absolute;
   inset: 0;
@@ -3866,6 +3876,7 @@ body.is-driver-app .driver-app-panel .panel-header h2 {
 
 .driver-map-overlay {
   position: absolute;
+  z-index: 2;
   left: 14px;
   right: 14px;
   bottom: 14px;
@@ -3878,6 +3889,7 @@ body.is-driver-app .driver-app-panel .panel-header h2 {
   color: var(--foreground);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(8px);
+  pointer-events: none;
 }
 
 .driver-map-overlay span {
@@ -3897,6 +3909,52 @@ body.is-driver-app .driver-app-panel .panel-header h2 {
   font-weight: 650;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+.driver-route-progress {
+  height: 6px;
+  overflow: hidden;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(32, 52, 39, 0.12);
+}
+
+.driver-route-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f7d52, #d8b16d);
+}
+
+.live-map-marker {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.live-map-marker span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(22, 34, 28, 0.24);
+}
+
+.live-map-marker.restaurant span {
+  background: #203427;
+}
+
+.live-map-marker.customer span {
+  background: #b96b3b;
+}
+
+.live-map-marker.driver span {
+  background: #1f6f9f;
 }
 
 .driver-route-body {
@@ -3990,6 +4048,51 @@ body.is-driver-app .driver-app-panel .panel-header h2 {
   color: var(--muted-foreground);
   font-size: 0.82rem;
   line-height: 1.3;
+}
+
+.driver-turn-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.driver-turn-steps li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid #d9e1d7;
+  border-radius: var(--radius);
+  background: #f7faf4;
+}
+
+.driver-turn-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #203427;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.driver-turn-steps strong {
+  color: var(--foreground);
+  font-size: 0.83rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.driver-turn-steps small {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .driver-stop-grid {
