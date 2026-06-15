@@ -28,12 +28,28 @@ export function createSettingsUi(deps) {
     if (!form || !defaultLanguageSelect || !languageChecks || !schemaGrid) return;
   
     const settings = state.restaurantSettings;
+    const printerSettings = state.receiptPrinterSettings;
     const editable = can("canEditSettings");
     form.elements.restaurantName.value = settings.restaurantName;
     form.elements.location.value = settings.location;
     form.elements.currency.value = settings.currency;
     form.elements.opensAt.value = settings.opensAt;
     form.elements.closesAt.value = settings.closesAt;
+    form.elements.receiptPrinterEnabled.checked = Boolean(printerSettings.enabled);
+    form.elements.receiptPrinterId.value = printerSettings.printerId;
+    form.elements.receiptPrinterName.value = printerSettings.printerName;
+    form.elements.receiptPrinterHost.value = printerSettings.host;
+    form.elements.receiptPrinterPort.value = printerSettings.port;
+    form.elements.receiptPrinterPaperWidth.value = printerSettings.paperWidth;
+    form.elements.receiptPrinterCopies.value = printerSettings.copies;
+    form.elements.receiptPrinterMaxAttempts.value = printerSettings.maxAttempts;
+    form.elements.receiptPrintOnOrderSent.checked = Boolean(printerSettings.printOnOrderSent);
+    form.elements.receiptPrintOnPaid.checked = Boolean(printerSettings.printOnPaid);
+    form.elements.receiptPrintOnQrOrder.checked = Boolean(printerSettings.printOnQrOrder);
+    form.elements.receiptPrintOnWebsitePayment.checked = Boolean(printerSettings.printOnWebsitePayment);
+    form.elements.receiptPrintOnExternalImport.checked = Boolean(printerSettings.printOnExternalImport);
+    form.elements.receiptPrinterCutPaper.checked = Boolean(printerSettings.cutPaper);
+    form.elements.receiptPrinterOpenDrawer.checked = Boolean(printerSettings.openCashDrawer);
   
     defaultLanguageSelect.innerHTML = LANGUAGE_OPTIONS
       .map((language) => `<option value="${escapeHtml(language.id)}">${escapeHtml(language.label)}</option>`)
@@ -71,7 +87,8 @@ export function createSettingsUi(deps) {
       reservation_capacity_rules: state.reservationCapacityRules.length,
       procedures: state.procedures.length,
       procedure_completions: state.procedureCompletions.length,
-      recipes: state.products.reduce((sum, product) => sum + (product.recipe?.length || 0), 0)
+      recipes: state.products.reduce((sum, product) => sum + (product.recipe?.length || 0), 0),
+      receipt_print_jobs: (state.receiptPrintJobs || []).length
     };
   
     schemaGrid.innerHTML = DATA_MODEL
@@ -87,6 +104,48 @@ export function createSettingsUi(deps) {
       .join("");
   
     renderQrCodeManagement();
+    renderReceiptPrinterJobs();
+  }
+
+  function formatJobTime(timestampMs) {
+    const value = Number(timestampMs) || 0;
+    return value ? new Date(value).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "-";
+  }
+
+  function receiptJobClass(status) {
+    if (status === "printed") return "ok";
+    if (status === "failed") return "danger";
+    if (status === "cancelled") return "warning";
+    return "info";
+  }
+
+  function receiptJobLabel(job) {
+    if (job.trigger === "test_print") return "Test print";
+    if (job.trigger === "manual_reprint") return "Manual reprint";
+    if (job.trigger === "order_paid") return "Paid order";
+    if (job.trigger === "qr_order_sent") return "QR order";
+    if (job.trigger === "website_payment_paid") return "Website payment";
+    if (job.trigger === "external_order_imported") return "External order";
+    return "Order sent";
+  }
+
+  function renderReceiptPrinterJobs() {
+    const list = document.querySelector("#receiptPrintJobList");
+    if (!list) return;
+
+    const jobs = (state.receiptPrintJobs || []).slice(0, 12);
+    list.innerHTML = jobs.length
+      ? jobs.map((job) => `
+        <article class="schema-card receipt-job-card">
+          <header>
+            <strong>${escapeHtml(job.orderNumber ? `Order #${job.orderNumber}` : receiptJobLabel(job))}</strong>
+            <span class="pill ${receiptJobClass(job.status)}">${escapeHtml(job.status)}</span>
+          </header>
+          <p>${escapeHtml(receiptJobLabel(job))} · ${escapeHtml(job.printerName || "Receipt printer")} · ${escapeHtml(formatJobTime(job.updatedAtMs || job.createdAtMs))}</p>
+          ${job.error ? `<p>${escapeHtml(job.error)}</p>` : ""}
+        </article>
+      `).join("")
+      : emptyState("Receipt print jobs will appear here after orders are paid, accepted, or reprinted.");
   }
   
   function tableOptionsHtml(selectedTableId) {

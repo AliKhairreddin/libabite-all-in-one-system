@@ -1,9 +1,11 @@
 import {
+  DEFAULT_RECEIPT_PRINTER_SETTINGS,
   DEFAULT_RESTAURANT_SETTINGS,
   LANGUAGE_OPTIONS,
   ROLE_DEFINITIONS
 } from "../shared/constants.js";
-import { normalizeRestaurantSettings } from "../data/normalize.js";
+import { normalizeReceiptPrinterSettings, normalizeRestaurantSettings } from "../data/normalize.js";
+import { enqueueReceiptPrintJob } from "./receipt-printing.js";
 import { uniqueRecordId } from "../shared/ids.js";
 import { saveState, state } from "./state.js";
 
@@ -86,14 +88,49 @@ export function createAdminActionsRuntime(deps) {
       defaultLanguage,
       supportedLanguages
     });
+    state.receiptPrinterSettings = normalizeReceiptPrinterSettings({
+      ...DEFAULT_RECEIPT_PRINTER_SETTINGS,
+      enabled: formData.get("receiptPrinterEnabled") === "on",
+      printerId: String(formData.get("receiptPrinterId") || "").trim(),
+      printerName: String(formData.get("receiptPrinterName") || "").trim(),
+      connection: "network-escpos",
+      host: String(formData.get("receiptPrinterHost") || "").trim(),
+      port: Number(formData.get("receiptPrinterPort") || DEFAULT_RECEIPT_PRINTER_SETTINGS.port),
+      paperWidth: Number(formData.get("receiptPrinterPaperWidth") || DEFAULT_RECEIPT_PRINTER_SETTINGS.paperWidth),
+      copies: Number(formData.get("receiptPrinterCopies") || DEFAULT_RECEIPT_PRINTER_SETTINGS.copies),
+      printOnOrderSent: formData.get("receiptPrintOnOrderSent") === "on",
+      printOnPaid: formData.get("receiptPrintOnPaid") === "on",
+      printOnQrOrder: formData.get("receiptPrintOnQrOrder") === "on",
+      printOnWebsitePayment: formData.get("receiptPrintOnWebsitePayment") === "on",
+      printOnExternalImport: formData.get("receiptPrintOnExternalImport") === "on",
+      cutPaper: formData.get("receiptPrinterCutPaper") === "on",
+      openCashDrawer: formData.get("receiptPrinterOpenDrawer") === "on",
+      maxAttempts: Number(formData.get("receiptPrinterMaxAttempts") || DEFAULT_RECEIPT_PRINTER_SETTINGS.maxAttempts)
+    });
 
     saveState();
     render();
     showToast("Restaurant settings saved.");
   }
 
+  function queueReceiptPrinterTest() {
+    if (!can("canEditSettings")) {
+      showToast("This role cannot test receipt printers.");
+      return;
+    }
+
+    const job = enqueueReceiptPrintJob({ id: "", number: 0 }, "test_print", {
+      force: true,
+      detail: "Printer test from Settings"
+    });
+    saveState();
+    render();
+    showToast(job ? "Receipt printer test queued." : "Could not queue receipt printer test.");
+  }
+
   return {
     createStaffUser,
+    queueReceiptPrinterTest,
     saveRestaurantSettings
   };
 }

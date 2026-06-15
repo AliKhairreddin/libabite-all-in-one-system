@@ -1,5 +1,6 @@
 import { state } from "../app/state.js";
 import { escapeHtml } from "../shared/html.js";
+import { getReceiptPrintSummary } from "../app/receipt-printing.js";
 
 export function createOrdersUi(deps) {
   const {
@@ -136,6 +137,7 @@ export function createOrdersUi(deps) {
     const paymentSummary = getOrderPaymentSummary(order);
     const vatBreakdown = getOrderVatBreakdown(order);
     const fulfillmentMeta = getOrderFulfillmentMeta(order);
+    const receiptPrint = getReceiptPrintSummary(order.id);
     state.receiptOrderId = order.id;
     container.innerHTML = `
       <article class="receipt-card">
@@ -180,6 +182,7 @@ export function createOrdersUi(deps) {
         </div>
         <div class="receipt-meta">
           <span>Payment method: ${escapeHtml(paymentSummary.method)}</span>
+          <span>Print: ${escapeHtml(receiptPrint.label)}</span>
           ${paymentSummary.paid && order.paidAt ? `<span>Paid ${escapeHtml(formatDateTime(order.paidAtMs, order.paidAt))}</span>` : ""}
           ${paymentSummary.paid ? `<span>Paid by: ${escapeHtml(getOrderPaidByName(order))}</span>` : ""}
           ${order.paymentProcessor ? `<span>Processor: ${escapeHtml(order.paymentProcessor)}</span>` : ""}
@@ -187,7 +190,7 @@ export function createOrdersUi(deps) {
         <div class="mini-actions receipt-actions">
           ${can("canCreateOrders") && !paymentSummary.paid && order.status !== "Cancelled" ? paymentCaptureHtml(order) : ""}
           <button class="mini-btn" type="button" data-pdf-receipt="${escapeHtml(order.id)}">PDF Receipt</button>
-          <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Print Receipt</button>
+          <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Queue Print</button>
         </div>
       </article>
     `;

@@ -253,7 +253,7 @@ export function createCustomerOrderingRuntime(deps) {
     state.customerCart = [];
     state.customerLastOrderId = order.id;
     state.receiptOrderId = order.id;
-    sendOrderToKitchen(order.id, { silent: true, skipPermission: true });
+    sendOrderToKitchen(order.id, { silent: true, skipPermission: true, receiptPrintTrigger: "qr_order_sent" });
     showToast(`Order #${number} sent to the kitchen.`);
   }
 

@@ -338,7 +338,7 @@ export function createExternalDeliveryRuntime(deps) {
       statusPushedAtMs: ""
     });
     state.externalOrderImports = state.externalOrderImports.slice(-80);
-    sendOrderToKitchen(order.id, { silent: true, skipPermission: true });
+    sendOrderToKitchen(order.id, { silent: true, skipPermission: true, receiptPrintTrigger: "external_order_imported" });
     showToast(`${platform.name} order ${externalOrderId} imported and sent to kitchen.`);
   }
 

@@ -5,6 +5,7 @@ import {
 import { isDeliveryTerminal } from "../domain/delivery.js";
 import { isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
 import { escapeHtml } from "../shared/html.js";
+import { getReceiptPrintSummary } from "../app/receipt-printing.js";
 
 export function createOrderCardsUi(deps) {
   const {
@@ -116,6 +117,7 @@ export function createOrderCardsUi(deps) {
     }).filter(Boolean).join(", ");
     const statusClass = orderStatusClass(order.status);
     const paymentSummary = getOrderPaymentSummary(order);
+    const receiptPrint = getReceiptPrintSummary(order.id);
     const canFrontUpdate = can("canCreateOrders") && order.status !== "Paid" && order.status !== "Cancelled";
     const canKitchenUpdate = can("canAdvanceTickets") && ["Sent to kitchen", "Preparing", "Delayed"].includes(order.status);
     const kitchenSummary = getOrderProgressSummary(order);
@@ -131,6 +133,7 @@ export function createOrderCardsUi(deps) {
             <strong>#${order.number} ${escapeHtml(productLines)}</strong>
             <span class="pill ${statusClass}">${escapeHtml(order.status)}</span>
             <span class="pill ${paymentSummary.className}">${escapeHtml(paymentSummary.statusLabel)}</span>
+            ${receiptPrint.job ? `<span class="pill ${receiptPrint.className}">Print: ${escapeHtml(receiptPrint.label)}</span>` : ""}
           </div>
           <div class="meta-line">
             <span>${escapeHtml(orderTypeLabel(order))}</span>
@@ -157,7 +160,7 @@ export function createOrderCardsUi(deps) {
           ${order.status === "New" && canFrontUpdate ? `<button class="mini-btn danger-action" type="button" data-cancel-order="${escapeHtml(order.id)}">Cancel</button>` : ""}
           <button class="mini-btn" type="button" data-show-receipt="${escapeHtml(order.id)}">Receipt</button>
           <button class="mini-btn" type="button" data-pdf-receipt="${escapeHtml(order.id)}">PDF</button>
-          <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Print</button>
+          <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Queue Print</button>
         </div>
       </article>
     `;

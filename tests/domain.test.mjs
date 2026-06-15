@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { convertWasteQuantityToStockUnits, getWasteUnitOptionsForIngredient, unitTypeDefinition } from "../dist/data/normalize.js";
+import { convertWasteQuantityToStockUnits, getWasteUnitOptionsForIngredient, normalizeReceiptPrinterSettings, unitTypeDefinition } from "../dist/data/normalize.js";
 import {
   findCustomerBySearchValue,
   getAddressHistoryForCustomer,
@@ -215,6 +215,34 @@ test("receipt PDF generator returns a PDF blob payload", async () => {
   assert.equal(payload.startsWith("%PDF-1.4"), true);
   assert.equal(payload.includes("Order #42"), true);
   assert.equal(payload.includes("EUR 44,00"), true);
+});
+
+test("receipt printer settings normalize hardware options", () => {
+  const settings = normalizeReceiptPrinterSettings({
+    enabled: false,
+    printerId: " front ",
+    printerName: " Front Printer ",
+    host: " 192.168.1.50 ",
+    port: 999999,
+    paperWidth: 12,
+    copies: 20,
+    maxAttempts: 0,
+    printOnPaid: false,
+    cutPaper: false,
+    openCashDrawer: true
+  });
+
+  assert.equal(settings.enabled, false);
+  assert.equal(settings.printerId, "front");
+  assert.equal(settings.printerName, "Front Printer");
+  assert.equal(settings.host, "192.168.1.50");
+  assert.equal(settings.port, 65535);
+  assert.equal(settings.paperWidth, 32);
+  assert.equal(settings.copies, 5);
+  assert.equal(settings.maxAttempts, 3);
+  assert.equal(settings.printOnPaid, false);
+  assert.equal(settings.cutPaper, false);
+  assert.equal(settings.openCashDrawer, true);
 });
 
 test("external delivery helpers parse, map, and prepare platform payloads", () => {

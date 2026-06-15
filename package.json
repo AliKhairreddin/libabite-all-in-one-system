@@ -12,6 +12,7 @@
     "deploy:worker": "npx wrangler deploy --config wrangler.worker.toml",
     "deploy:pages": "npx wrangler pages deploy dist --project-name libabite --branch main",
     "dev": "vite --host 127.0.0.1",
+    "printer:agent": "node scripts/receipt-printer-agent.mjs",
     "test": "npm run build:domain && node --test tests/*.test.mjs"
   },
   "devDependencies": {

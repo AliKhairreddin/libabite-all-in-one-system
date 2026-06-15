@@ -807,6 +807,7 @@ const {
 
 const {
   createStaffUser,
+  queueReceiptPrinterTest,
   saveRestaurantSettings
 } = createAdminActionsRuntime({
   can,
@@ -993,6 +994,7 @@ export function createAppRuntime() {
       submitWebsiteOrder,
       tableById,
       pushExternalOrderStatus,
+      queueReceiptPrinterTest,
       pushMenuToExternalPlatform,
       togglePurchasedProduct,
       toggleExternalProductMapping,

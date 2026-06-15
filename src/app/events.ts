@@ -63,6 +63,7 @@ export function bindAppEvents(handlers) {
     openOrderReceiptPdf,
     printOrderReceipt,
     promptAndRecordProcedureStatus,
+    queueReceiptPrinterTest,
     receiveSupplierOrder,
     recordProcedureCompletion,
     recordProduction,
@@ -633,6 +634,8 @@ export function bindAppEvents(handlers) {
     event.preventDefault();
     saveRestaurantSettings(new FormData(event.currentTarget));
   });
+
+  document.querySelector("#testReceiptPrinterBtn")?.addEventListener("click", queueReceiptPrinterTest);
 
   document.querySelector("#qrCodeForm").addEventListener("submit", (event: any) => {
     event.preventDefault();

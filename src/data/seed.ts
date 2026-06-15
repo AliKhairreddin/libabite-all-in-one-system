@@ -1,4 +1,4 @@
-import { DEFAULT_RESTAURANT_SETTINGS, MINUTE_MS, WEBSITE_DEFAULT_FULFILLMENT } from "../shared/constants.js";
+import { DEFAULT_RECEIPT_PRINTER_SETTINGS, DEFAULT_RESTAURANT_SETTINGS, MINUTE_MS, WEBSITE_DEFAULT_FULFILLMENT } from "../shared/constants.js";
 import { addDays, getWeekStartDate, toDateInputString } from "../domain/scheduling.js";
 
 const seedToday = toDateInputString();
@@ -31,6 +31,8 @@ export const seedState = {
   scheduleWeekStart: seedWeekStart,
   orderDraft: [],
   receiptOrderId: "",
+  receiptPrinterSettings: structuredClone(DEFAULT_RECEIPT_PRINTER_SETTINGS),
+  receiptPrintJobs: [],
   restaurantSettings: structuredClone(DEFAULT_RESTAURANT_SETTINGS),
   users: [
     {

@@ -4,6 +4,7 @@ import { saveState, state } from "./state.js";
 import { timeNow } from "../shared/dates.js";
 import { WEBSITE_PAYMENT_PROCESSOR } from "../shared/constants.js";
 import { applyPaidPaymentToOrder } from "./payment-ledger.js";
+import { enqueueReceiptPrintJob } from "./receipt-printing.js";
 
 function paymentReturnUrl(orderId: string, result: "success" | "cancelled", provider = "stripe") {
   const url = new URL(window.location.href);
@@ -107,6 +108,7 @@ export async function handleWebsitePaymentReturn(deps: {
       paidByName: "Stripe checkout",
       captureMode: "online_checkout"
     });
+    enqueueReceiptPrintJob(order, "website_payment_paid");
     state.websiteLastOrderId = order.id;
     state.receiptOrderId = order.id;
 

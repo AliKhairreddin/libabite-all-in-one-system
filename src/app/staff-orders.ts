@@ -19,6 +19,7 @@ import { isReservationTime } from "../domain/reservations.js";
 import { timeNow } from "../shared/dates.js";
 import { saveState, state } from "./state.js";
 import { applyPaidPaymentToOrder } from "./payment-ledger.js";
+import { enqueueReceiptPrintJob } from "./receipt-printing.js";
 
 export function createStaffOrderRuntime(deps) {
   const {
@@ -251,6 +252,7 @@ export function createStaffOrderRuntime(deps) {
     order.inventoryDeducted = true;
 
     assignDriverToDeliveryOrder(order);
+    enqueueReceiptPrintJob(order, options.receiptPrintTrigger || "order_sent");
 
     saveState();
     render();
@@ -388,6 +390,7 @@ export function createStaffOrderRuntime(deps) {
     state.nextOrderNumber += 1;
     state.orderDraft = [];
     state.receiptOrderId = order.id;
+    if (paymentStatus === "Paid") enqueueReceiptPrintJob(order, "order_paid");
 
     if (mode === "kitchen") {
       sendOrderToKitchen(order.id);
@@ -596,13 +599,14 @@ export function createStaffOrderRuntime(deps) {
       paidByName: staff?.name || order.paidByName || "",
       captureMode: paidMethod === "Cash" ? "staff_recorded" : "terminal"
     });
+    const printJob = enqueueReceiptPrintJob(order, "order_paid");
     if (order.status === "Served") order.status = "Paid";
     order.operationalStatus = normalizeOrderOperationalStatus(order.status);
     order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
     state.receiptOrderId = order.id;
     saveState();
     render();
-    showToast(`Payment recorded for order #${order.number}.`);
+    showToast(`Payment recorded for order #${order.number}.${printJob ? " Receipt queued." : ""}`);
   }
 
   function cancelOrder(orderId) {
@@ -639,8 +643,15 @@ export function createStaffOrderRuntime(deps) {
   }
 
   function printOrderReceipt(orderId) {
-    showOrderReceipt(orderId);
-    window.setTimeout(() => window.print(), 50);
+    const order = orderById(orderId);
+    if (!order) return;
+    state.receiptOrderId = order.id;
+    const printJob = enqueueReceiptPrintJob(order, "manual_reprint", { force: true });
+    saveState();
+    render();
+    showToast(printJob
+      ? `Receipt print queued for order #${order.number}.`
+      : `Could not queue receipt print for order #${order.number}.`);
   }
 
   function buildReceiptPdfInput(order) {

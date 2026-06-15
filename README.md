@@ -87,6 +87,26 @@ The Convex snapshot stores shared restaurant data. Per-browser session fields
 like the current login, active view, filters, carts, and in-progress drafts stay
 local so one device does not take over another device's workspace.
 
+## Automatic Receipt Printing
+
+Receipt printing is handled by queued jobs in Convex plus a local printer agent
+running on the POS machine or a device on the same network as the receipt
+printer. The browser queues jobs automatically; it does not open the browser
+print dialog.
+
+Configure the printer in Settings, then run the agent:
+
+```sh
+CONVEX_URL=https://your-deployment.convex.cloud \
+CONVEX_STATE_KEY=libabite-main \
+RECEIPT_PRINTER_HOST=192.168.1.50 \
+RECEIPT_PRINTER_PORT=9100 \
+npm run printer:agent
+```
+
+Use `RECEIPT_DRY_RUN=true npm run printer:agent -- --once` to claim one queued
+job and print the rendered receipt to the terminal without contacting hardware.
+
 Website checkout uses Stripe Checkout through Convex. Set the backend secret
 before deploying live checkout:
 

@@ -22,6 +22,7 @@ import { normalizeFulfillmentStatus, normalizeOrderOperationalStatus } from "../
 import { getShiftAttendanceStatus, normalizeScheduleRole } from "../domain/scheduling.js";
 import { saveState, state } from "./state.js";
 import { applyPaidPaymentToOrder } from "./payment-ledger.js";
+import { enqueueReceiptPrintJob } from "./receipt-printing.js";
 
 const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
 const OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving";
@@ -647,12 +648,13 @@ export function createDeliveryRuntime(deps) {
       paidByName: user?.name || order.paidByName || "Driver",
       captureMode: "staff_recorded"
     });
+    const printJob = enqueueReceiptPrintJob(order, "order_paid");
     if (order.status === "Served" || getDeliveryStatus(order) === "Delivered") order.status = "Paid";
     order.operationalStatus = normalizeOrderOperationalStatus(order.status);
     order.fulfillmentStatus = normalizeFulfillmentStatus(order.fulfillmentStatus || order.status);
     saveState();
     render();
-    showToast(`Cash collected for order #${order.number}.`);
+    showToast(`Cash collected for order #${order.number}.${printJob ? " Receipt queued." : ""}`);
   }
 
   function addDeliveryNote(orderId) {

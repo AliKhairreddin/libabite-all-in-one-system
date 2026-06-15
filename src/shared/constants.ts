@@ -358,10 +358,42 @@ export const DEFAULT_RESTAURANT_SETTINGS = {
   supportedLanguages: ["nl", "ar", "tr", "en"]
 };
 
+export const RECEIPT_PRINT_TRIGGERS = [
+  "order_sent",
+  "order_paid",
+  "qr_order_sent",
+  "website_payment_paid",
+  "external_order_imported",
+  "manual_reprint",
+  "test_print"
+];
+
+export const RECEIPT_PRINT_JOB_STATUSES = ["queued", "claimed", "printed", "failed", "cancelled"];
+
+export const DEFAULT_RECEIPT_PRINTER_SETTINGS = {
+  enabled: true,
+  printerId: "main-receipt",
+  printerName: "Main receipt printer",
+  connection: "network-escpos",
+  host: "",
+  port: 9100,
+  paperWidth: 42,
+  copies: 1,
+  printOnOrderSent: false,
+  printOnPaid: true,
+  printOnQrOrder: true,
+  printOnWebsitePayment: true,
+  printOnExternalImport: true,
+  cutPaper: true,
+  openCashDrawer: false,
+  maxAttempts: 3
+};
+
 export const DATA_MODEL = [
   { name: "users", fields: "id, name, email, role, password, status" },
   { name: "roles", fields: "role id, label, visible views, permissions" },
   { name: "restaurant_settings", fields: "name, location, currency, hours, languages" },
+  { name: "receipt_print_jobs", fields: "order, trigger, printer, status, attempts, timestamps, error" },
   { name: "sellable_products", fields: "name, code/SKU, category, kitchen station, price, VAT, status, availability, margin settings, recipe links" },
   { name: "purchased_products", fields: "ingredient, supplier, purchase price, unit type, min/max, total stock, stock by location, expiry, barcode, status" },
   { name: "suppliers", fields: "name, contact person, email, phone, integration/API details, delivery days, minimum order amount, products supplied" },

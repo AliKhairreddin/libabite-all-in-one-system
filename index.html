@@ -1292,8 +1292,97 @@ Switch off signs and lock the restaurant.</textarea>
                   </label>
                 </div>
                 <div class="language-checks" id="supportedLanguageChecks"></div>
+                <div class="receipt-printer-settings">
+                  <div class="panel-header compact inline-panel-header">
+                    <div>
+                      <p class="eyebrow">Receipt printer</p>
+                      <h3>Automatic printing</h3>
+                    </div>
+                    <label class="check-row compact-check">
+                      <input name="receiptPrinterEnabled" type="checkbox">
+                      <span>Enabled</span>
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Printer ID
+                      <input name="receiptPrinterId" type="text" autocomplete="off">
+                    </label>
+                    <label>
+                      Printer name
+                      <input name="receiptPrinterName" type="text" autocomplete="off">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Host/IP
+                      <input name="receiptPrinterHost" type="text" inputmode="decimal" placeholder="192.168.1.50" autocomplete="off">
+                    </label>
+                    <label>
+                      Port
+                      <input name="receiptPrinterPort" type="number" min="1" max="65535" step="1">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Paper columns
+                      <input name="receiptPrinterPaperWidth" type="number" min="32" max="64" step="1">
+                    </label>
+                    <label>
+                      Copies
+                      <input name="receiptPrinterCopies" type="number" min="1" max="5" step="1">
+                    </label>
+                  </div>
+                  <div class="form-row">
+                    <label>
+                      Retry attempts
+                      <input name="receiptPrinterMaxAttempts" type="number" min="1" max="10" step="1">
+                    </label>
+                  </div>
+                  <div class="language-checks receipt-trigger-checks">
+                    <label class="check-row">
+                      <input name="receiptPrintOnPaid" type="checkbox">
+                      <span>Paid orders</span>
+                    </label>
+                    <label class="check-row">
+                      <input name="receiptPrintOnQrOrder" type="checkbox">
+                      <span>QR table orders</span>
+                    </label>
+                    <label class="check-row">
+                      <input name="receiptPrintOnWebsitePayment" type="checkbox">
+                      <span>Website payments</span>
+                    </label>
+                    <label class="check-row">
+                      <input name="receiptPrintOnExternalImport" type="checkbox">
+                      <span>External imports</span>
+                    </label>
+                    <label class="check-row">
+                      <input name="receiptPrintOnOrderSent" type="checkbox">
+                      <span>Every sent order</span>
+                    </label>
+                    <label class="check-row">
+                      <input name="receiptPrinterCutPaper" type="checkbox">
+                      <span>Cut paper</span>
+                    </label>
+                    <label class="check-row">
+                      <input name="receiptPrinterOpenDrawer" type="checkbox">
+                      <span>Open cash drawer</span>
+                    </label>
+                  </div>
+                  <button class="ghost-btn" type="button" id="testReceiptPrinterBtn">Test Printer</button>
+                </div>
                 <button class="primary-btn" type="submit">Save Settings</button>
               </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Receipt queue</p>
+                  <h2>Printer jobs</h2>
+                </div>
+              </div>
+              <div class="schema-grid" id="receiptPrintJobList"></div>
             </section>
 
             <section class="panel">

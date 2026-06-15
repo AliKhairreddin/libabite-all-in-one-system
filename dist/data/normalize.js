@@ -1,4 +1,4 @@
-import { AVAILABILITY_OPTIONS, DEFAULT_INVENTORY_LOCATIONS, DEFAULT_MARGIN_MINIMUM, DEFAULT_MARGIN_TARGET, DEFAULT_PAID_PAYMENT_METHOD, DEFAULT_PRODUCT_AVAILABILITY, DEFAULT_RESTAURANT_SETTINGS, EXTERNAL_DELIVERY_ORDER_CHANNEL, EXTERNAL_DELIVERY_PLATFORMS, INVENTORY_ACTIONS, KITCHEN_STATION_ALIASES, LANGUAGE_OPTIONS, ORDER_STATUSES, PHASE_11_SEED_INGREDIENT_IDS, PHASE_11_SEED_PRODUCT_IDS, PHASE_18_SEED_PRODUCT_IDS, PROCEDURE_ASSIGNED_ROLES, PROCEDURE_COMPLETION_STATUSES, PROCEDURE_FREQUENCIES, PRODUCT_CATEGORIES, QR_CODE_STATUSES, RECIPE_APPLIES_OPTIONS, RESERVATION_SOURCES, ROLE_DEFINITIONS, SUPPLIER_INTEGRATION_METHODS, SUPPLIER_ORDER_STATUSES, TICKET_STATUSES, UNIT_TYPES, WASTE_REASONS } from "../shared/constants.js";
+import { AVAILABILITY_OPTIONS, DEFAULT_INVENTORY_LOCATIONS, DEFAULT_MARGIN_MINIMUM, DEFAULT_MARGIN_TARGET, DEFAULT_PAID_PAYMENT_METHOD, DEFAULT_PRODUCT_AVAILABILITY, DEFAULT_RECEIPT_PRINTER_SETTINGS, DEFAULT_RESTAURANT_SETTINGS, EXTERNAL_DELIVERY_ORDER_CHANNEL, EXTERNAL_DELIVERY_PLATFORMS, INVENTORY_ACTIONS, KITCHEN_STATION_ALIASES, LANGUAGE_OPTIONS, ORDER_STATUSES, PHASE_11_SEED_INGREDIENT_IDS, PHASE_11_SEED_PRODUCT_IDS, PHASE_18_SEED_PRODUCT_IDS, PROCEDURE_ASSIGNED_ROLES, PROCEDURE_COMPLETION_STATUSES, PROCEDURE_FREQUENCIES, PRODUCT_CATEGORIES, QR_CODE_STATUSES, RECEIPT_PRINT_JOB_STATUSES, RECEIPT_PRINT_TRIGGERS, RECIPE_APPLIES_OPTIONS, RESERVATION_SOURCES, ROLE_DEFINITIONS, SUPPLIER_INTEGRATION_METHODS, SUPPLIER_ORDER_STATUSES, TICKET_STATUSES, UNIT_TYPES, WASTE_REASONS } from "../shared/constants.js";
 import { normalizeOptionalTimestamp, normalizeTimestamp, timeNow } from "../shared/dates.js";
 import { normalizePrecautionaryAllergenStatus, normalizeProductAllergens, normalizeVatSetting } from "../domain/commerce.js";
 import { normalizeDeliveryLocationHistory, normalizeDeliveryLocationSample, normalizeDeliveryCoordinates, normalizeDeliveryRoute, normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
@@ -675,6 +675,88 @@ export function normalizeRestaurantSettings(settings) {
         supportedLanguages: supportedLanguages.length ? supportedLanguages : [...DEFAULT_RESTAURANT_SETTINGS.supportedLanguages]
     };
 }
+function cleanReceiptText(value, fallback = "") {
+    return String(value || fallback).replace(/\s+/g, " ").trim();
+}
+export function normalizeReceiptPrinterSettings(settings) {
+    const source = settings && typeof settings === "object" ? settings : {};
+    const defaults = DEFAULT_RECEIPT_PRINTER_SETTINGS;
+    const port = Math.max(1, Math.min(65535, Math.floor(Number(source.port) || defaults.port)));
+    const paperWidth = Math.max(32, Math.min(64, Math.floor(Number(source.paperWidth) || defaults.paperWidth)));
+    const copies = Math.max(1, Math.min(5, Math.floor(Number(source.copies) || defaults.copies)));
+    const maxAttempts = Math.max(1, Math.min(10, Math.floor(Number(source.maxAttempts) || defaults.maxAttempts)));
+    return {
+        enabled: source.enabled === undefined ? defaults.enabled : Boolean(source.enabled),
+        printerId: cleanReceiptText(source.printerId, defaults.printerId) || defaults.printerId,
+        printerName: cleanReceiptText(source.printerName, defaults.printerName) || defaults.printerName,
+        connection: source.connection === "network-escpos" ? "network-escpos" : defaults.connection,
+        host: cleanReceiptText(source.host),
+        port,
+        paperWidth,
+        copies,
+        printOnOrderSent: source.printOnOrderSent === undefined ? defaults.printOnOrderSent : Boolean(source.printOnOrderSent),
+        printOnPaid: source.printOnPaid === undefined ? defaults.printOnPaid : Boolean(source.printOnPaid),
+        printOnQrOrder: source.printOnQrOrder === undefined ? defaults.printOnQrOrder : Boolean(source.printOnQrOrder),
+        printOnWebsitePayment: source.printOnWebsitePayment === undefined ? defaults.printOnWebsitePayment : Boolean(source.printOnWebsitePayment),
+        printOnExternalImport: source.printOnExternalImport === undefined ? defaults.printOnExternalImport : Boolean(source.printOnExternalImport),
+        cutPaper: source.cutPaper === undefined ? defaults.cutPaper : Boolean(source.cutPaper),
+        openCashDrawer: source.openCashDrawer === undefined ? defaults.openCashDrawer : Boolean(source.openCashDrawer),
+        maxAttempts
+    };
+}
+function normalizeReceiptPrintJob(job, index, printerSettings, orderIds) {
+    if (!job || typeof job !== "object")
+        return null;
+    const trigger = RECEIPT_PRINT_TRIGGERS.includes(job.trigger) ? job.trigger : "order_sent";
+    const orderId = cleanReceiptText(job.orderId);
+    if (!orderId && trigger !== "test_print")
+        return null;
+    if (orderId && orderIds && !orderIds.has(orderId))
+        return null;
+    const status = RECEIPT_PRINT_JOB_STATUSES.includes(job.status) ? job.status : "queued";
+    const printerId = cleanReceiptText(job.printerId, printerSettings.printerId) || printerSettings.printerId;
+    const createdAtMs = normalizeOptionalTimestamp(job.createdAtMs) || Date.now();
+    const attemptCount = Math.max(0, Math.floor(Number(job.attemptCount ?? job.attempts) || 0));
+    const maxAttempts = Math.max(1, Math.min(10, Math.floor(Number(job.maxAttempts) || printerSettings.maxAttempts)));
+    const fallbackDedupe = trigger === "manual_reprint"
+        ? `receipt:${printerId}:${orderId || "test"}:${createdAtMs}`
+        : `receipt:${printerId}:${orderId || "test"}:${trigger}:v1`;
+    return {
+        id: cleanReceiptText(job.id, `RCP-${createdAtMs}-${index + 1}`),
+        orderId,
+        orderNumber: Math.max(0, Math.floor(Number(job.orderNumber) || 0)),
+        trigger,
+        status,
+        printerId,
+        printerName: cleanReceiptText(job.printerName, printerSettings.printerName) || printerSettings.printerName,
+        copies: Math.max(1, Math.min(5, Math.floor(Number(job.copies) || printerSettings.copies))),
+        attemptCount,
+        maxAttempts,
+        dedupeKey: cleanReceiptText(job.dedupeKey, fallbackDedupe) || fallbackDedupe,
+        createdAtMs,
+        updatedAtMs: normalizeOptionalTimestamp(job.updatedAtMs) || createdAtMs,
+        claimedAtMs: normalizeOptionalTimestamp(job.claimedAtMs),
+        claimedBy: cleanReceiptText(job.claimedBy),
+        printedAtMs: normalizeOptionalTimestamp(job.printedAtMs),
+        failedAtMs: normalizeOptionalTimestamp(job.failedAtMs),
+        error: cleanReceiptText(job.error),
+        detail: cleanReceiptText(job.detail)
+    };
+}
+function normalizeReceiptPrintJobs(jobs, printerSettings, orderIds) {
+    const seen = new Set();
+    return (Array.isArray(jobs) ? jobs : [])
+        .map((job, index) => normalizeReceiptPrintJob(job, index, printerSettings, orderIds))
+        .filter(Boolean)
+        .filter((job) => {
+        if (seen.has(job.id))
+            return false;
+        seen.add(job.id);
+        return true;
+    })
+        .sort((first, second) => Number(second.createdAtMs) - Number(first.createdAtMs))
+        .slice(0, 250);
+}
 export function normalizeUsers(users) {
     const seenEmails = new Set();
     return users
@@ -1275,6 +1357,7 @@ export function normalizeState(candidate) {
         "staff",
         "staffShifts",
         "drivers",
+        "receiptPrintJobs",
         "reservations",
         "reservationBlocks",
         "reservationCapacityRules",
@@ -1298,6 +1381,7 @@ export function normalizeState(candidate) {
         next.nextOrderNumber = Math.max(Number(next.nextOrderNumber) || 0, Number(seedState.nextOrderNumber) || 0);
     }
     next.restaurantSettings = normalizeRestaurantSettings(source.restaurantSettings);
+    next.receiptPrinterSettings = normalizeReceiptPrinterSettings(source.receiptPrinterSettings);
     next.users = normalizeUsers(next.users);
     if (!next.users.some((user) => user.id === next.currentUserId))
         next.currentUserId = "";
@@ -1576,6 +1660,7 @@ export function normalizeState(candidate) {
         .filter((order) => order.id && order.items.length);
     if (!next.orders.some((order) => order.id === next.receiptOrderId))
         next.receiptOrderId = "";
+    next.receiptPrintJobs = normalizeReceiptPrintJobs(candidate?.receiptPrintJobs || next.receiptPrintJobs, next.receiptPrinterSettings, new Set(next.orders.map((order) => order.id)));
     next.customerLastOrderId = String(candidate?.customerLastOrderId || "");
     if (next.customerLastOrderId && !next.orders.some((order) => order.id === next.customerLastOrderId))
         next.customerLastOrderId = "";

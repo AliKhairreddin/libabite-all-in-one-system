@@ -2162,6 +2162,30 @@ textarea {
   accent-color: var(--brand);
 }
 
+.receipt-printer-settings {
+  display: grid;
+  gap: 12px;
+  padding-block: 6px;
+}
+
+.inline-panel-header {
+  margin-bottom: 0;
+}
+
+.inline-panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.compact-check {
+  width: auto;
+  min-width: 0;
+}
+
+.receipt-trigger-checks {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .modifier-fieldset {
   display: grid;
   gap: 10px;
