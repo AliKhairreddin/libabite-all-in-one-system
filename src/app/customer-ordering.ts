@@ -7,7 +7,6 @@ import {
 } from "../shared/constants.js";
 import { getPaymentStatusForMethod } from "../domain/payments.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext } from "../domain/orders.js";
-import { isReservationTime } from "../domain/reservations.js";
 import { flushRemoteState, saveState, state } from "./state.js";
 import { recordPendingOnlinePayment } from "./payment-ledger.js";
 import { timeNow } from "../shared/dates.js";
@@ -273,7 +272,6 @@ export function createCustomerOrderingRuntime(deps) {
     const customerName = String(formData.get("customerName") || "").trim();
     const customerPhone = String(formData.get("customerPhone") || "").trim();
     const customerEmail = String(formData.get("customerEmail") || "").trim();
-    const requestedTime = String(formData.get("requestedTime") || "").trim();
     const paymentProvider = String(formData.get("paymentProvider") || "stripe").trim().toLowerCase() === "mollie" ? "mollie" : "stripe";
     const deliveryAddress = fulfillment === "Delivery" ? String(formData.get("deliveryAddress") || "").trim() : "";
     const deliveryAddressLabel = fulfillment === "Delivery" ? String(formData.get("deliveryAddressLabel") || deliveryAddress).trim() : "";
@@ -285,10 +283,6 @@ export function createCustomerOrderingRuntime(deps) {
 
     if (!customerName || !customerPhone) {
       showToast("Enter your name and phone number.");
-      return;
-    }
-    if (!isReservationTime(requestedTime)) {
-      showToast("Choose a valid pickup or delivery time.");
       return;
     }
     if (fulfillment === "Delivery" && !deliveryAddress) {
@@ -320,7 +314,7 @@ export function createCustomerOrderingRuntime(deps) {
       deliveryAddressLocation,
       deliveryAddressSource: fulfillment === "Delivery" ? String(formData.get("deliveryAddressSource") || "").trim() : "",
       deliveryAddressPlaceId: fulfillment === "Delivery" ? String(formData.get("deliveryAddressPlaceId") || "").trim() : "",
-      requestedTime,
+      requestedTime: "",
       paymentStatus: "Unpaid",
       paymentMethod: "Online payment",
       paymentReference: "",

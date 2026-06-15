@@ -20,7 +20,7 @@ import {
   matchExternalOrderItems,
   parseExternalOrderLines
 } from "../dist/domain/external-delivery.js";
-import { formatDeliveryDistance, getDeliveryRouteProgress, normalizeDeliveryLocationHistory } from "../dist/domain/delivery.js";
+import { formatCustomerDeliveryEta, formatDeliveryDistance, getDeliveryRouteProgress, normalizeDeliveryLocationHistory } from "../dist/domain/delivery.js";
 import { externalPlatformRequiredSecrets, getExternalPlatformReadiness } from "../dist/domain/external-platform-adapters.js";
 import { buildPaymentLedgerRecord, getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus } from "../dist/domain/payments.js";
 import {
@@ -329,6 +329,12 @@ test("delivery route helpers normalize GPS samples and estimate route progress",
   assert.ok(progress.distanceRemainingMeters < 750);
   assert.equal(formatDeliveryDistance(42), "<50 m");
   assert.equal(normalizeDeliveryLocationHistory([{ lat: "bad", lng: 5 }, { lat: 51.2, lng: 6, atMs: 1000 }]).length, 1);
+});
+
+test("customer delivery ETA avoids internal assignment language", () => {
+  assert.equal(formatCustomerDeliveryEta({ fulfillment: "Delivery", assignedDriver: "", deliveryStatus: "" }), "ETA after confirmation");
+  assert.equal(formatCustomerDeliveryEta({ fulfillment: "Delivery", assignedDriver: "driver-1", deliveryStatus: "Assigned", deliveryStatusUpdatedAtMs: Date.now() }), "18 min");
+  assert.equal(formatCustomerDeliveryEta({ fulfillment: "Delivery", assignedDriver: "", deliveryStatus: "Delivered" }), "Delivered");
 });
 
 test("kitchen status flow advances and stamps status milestones", () => {

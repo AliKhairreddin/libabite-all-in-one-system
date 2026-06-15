@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 
 import { state } from "../app/state.js";
 import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS, WEBSITE_ORDER_CHANNEL } from "../shared/constants.js";
-import { formatDeliveryDistance, formatDeliveryEta, getDeliveryStatus, RESTAURANT_COORDINATES } from "../domain/delivery.js";
+import { formatCustomerDeliveryEta, formatDeliveryDistance, getDeliveryStatus, RESTAURANT_COORDINATES } from "../domain/delivery.js";
 import { getReservationDateLabel } from "../domain/reservations.js";
 import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
@@ -106,7 +106,7 @@ export function createPublicOrderingUi(deps) {
   function customerDeliveryMetricText(order) {
     if (Number(order.deliveryDistanceRemainingMeters) > 0) return `${formatDeliveryDistance(order.deliveryDistanceRemainingMeters)} away`;
     if (Number(order.deliveryRoute?.distanceMeters) > 0) return `${formatDeliveryDistance(order.deliveryRoute.distanceMeters)} route`;
-    return formatDeliveryEta(order);
+    return formatCustomerDeliveryEta(order);
   }
 
   function customerDeliveryTrackingText(order) {
@@ -193,7 +193,7 @@ export function createPublicOrderingUi(deps) {
           </div>
           <div class="customer-delivery-progress">
             <span>${escapeHtml(customerDeliveryMetricText(order))}</span>
-            <strong>${escapeHtml(formatDeliveryEta(order))}</strong>
+            <strong>${escapeHtml(formatCustomerDeliveryEta(order))}</strong>
           </div>
           <div class="driver-route-progress" aria-label="Delivery progress">
             <span style="width: ${progress}%"></span>
@@ -213,6 +213,33 @@ export function createPublicOrderingUi(deps) {
           ? "Order received. You can pay when you collect or receive it."
           : "Order received. We will confirm payment with you soon.";
     return `<p class="customer-confirmation-note">${escapeHtml(message)}</p>`;
+  }
+
+  function websiteOrderTimingText(order) {
+    const fulfillment = normalizeWebsiteFulfillment(order.fulfillment);
+    if (fulfillment === "Delivery") {
+      const eta = formatCustomerDeliveryEta(order);
+      return eta === "ETA after confirmation" ? "Delivery ETA after confirmation" : `Delivery ETA ${eta}`;
+    }
+    const status = String(order.fulfillmentStatus || order.status || "").trim();
+    if (status === "Ready") return "Ready for pickup";
+    if (["Sent to kitchen", "Preparing", "Scheduled"].includes(status)) return "Pickup estimate updating";
+    return "Pickup estimate after confirmation";
+  }
+
+  function customerFulfillmentPromiseHtml(fulfillment) {
+    const deliverySelected = normalizeWebsiteFulfillment(fulfillment) === "Delivery";
+    return `
+      <section class="customer-fulfillment-promise" aria-label="${deliverySelected ? "Delivery estimate" : "Pickup estimate"}">
+        <div>
+          <span>${deliverySelected ? "Delivery estimate" : "Pickup estimate"}</span>
+          <strong>${deliverySelected ? "Shown after confirmation" : "Confirmed after ordering"}</strong>
+        </div>
+        <p>${deliverySelected
+          ? "We prepare the order ASAP, assign a driver, and update the ETA here."
+          : "We prepare the order ASAP and show the pickup status after confirmation."}</p>
+      </section>
+    `;
   }
 
   function customerAnchorId(value) {
@@ -624,14 +651,6 @@ export function createPublicOrderingUi(deps) {
     `;
   }
   
-  function getDefaultWebsiteRequestedTime() {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + 30);
-    const minutes = now.getMinutes();
-    now.setMinutes(Math.ceil(minutes / 5) * 5, 0, 0);
-    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  }
-
   function getDefaultReservationTime() {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 120);
@@ -717,11 +736,8 @@ export function createPublicOrderingUi(deps) {
             Email
             <input name="customerEmail" type="email" autocomplete="email">
           </label>
-          <label>
-            ${deliverySelected ? "Delivery time" : "Pickup time"}
-            <input name="requestedTime" type="time" value="${escapeHtml(getDefaultWebsiteRequestedTime())}" required>
-          </label>
         </div>
+        ${customerFulfillmentPromiseHtml(fulfillment)}
         ${customerDeliveryAddressHtml(deliverySelected)}
         <fieldset class="customer-payment-options customer-payment-card">
           <legend>Online payment</legend>
@@ -897,7 +913,7 @@ export function createPublicOrderingUi(deps) {
         <div>
           <p class="eyebrow">Confirmed</p>
           <h2>Order #${escapeHtml(lastOrder.number)} received</h2>
-          <p>${escapeHtml(fulfillmentLabel(lastOrder))} ${escapeHtml(lastOrder.requestedTime || "as soon as possible")} · ${escapeHtml(getOrderPaymentSummary(lastOrder).statusLabel)} · ${escapeHtml(money(getOrderTotal(lastOrder)))}</p>
+          <p>${escapeHtml(websiteOrderTimingText(lastOrder))} · ${escapeHtml(getOrderPaymentSummary(lastOrder).statusLabel)} · ${escapeHtml(money(getOrderTotal(lastOrder)))}</p>
           ${websiteOrderConfirmationNoteHtml(lastOrder)}
         </div>
         <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>

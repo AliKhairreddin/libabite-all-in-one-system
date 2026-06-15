@@ -825,6 +825,45 @@ body.has-customer-upsell-flow {
   gap: 12px;
 }
 
+.customer-fulfillment-promise {
+  display: grid;
+  gap: 6px;
+  padding: 10px 11px;
+  border: 1px solid #d7e5dd;
+  border-radius: 8px;
+  background: #f5faf7;
+}
+
+.customer-fulfillment-promise div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.customer-fulfillment-promise span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-fulfillment-promise strong,
+.customer-fulfillment-promise p {
+  margin: 0;
+}
+
+.customer-fulfillment-promise strong {
+  color: var(--brand);
+  font-size: 0.9rem;
+}
+
+.customer-fulfillment-promise p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
 .customer-delivery-address,
 .customer-payment-card {
   padding-top: 2px;

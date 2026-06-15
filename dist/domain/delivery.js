@@ -100,6 +100,18 @@ export function formatDeliveryEta(order) {
         return `Late ${formatDuration(lateMinutes)}`;
     return `${getDeliveryEtaMinutes(order)} min`;
 }
+export function formatCustomerDeliveryEta(order) {
+    const status = getDeliveryStatus(order);
+    if (status === "Delivered")
+        return "Delivered";
+    if (status === "Returned")
+        return "Returned";
+    if (status === "Failed delivery")
+        return "Delivery issue";
+    if (!order?.assignedDriver)
+        return "ETA after confirmation";
+    return formatDeliveryEta(order);
+}
 export function getDeliveryLocationForStatus(order, status = getDeliveryStatus(order)) {
     const address = String(order?.deliveryAddress || "").trim();
     const shortAddress = address.split(",")[0] || "customer";
