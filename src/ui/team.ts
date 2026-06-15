@@ -44,6 +44,7 @@ export function createTeamUi(deps) {
     currentUserCanUpdateDelivery,
     driverById,
     emptyState,
+    getDriverAssignmentState,
     getOrderPaymentSummary,
     orderById,
     orderItemDetailText,
@@ -548,8 +549,8 @@ export function createTeamUi(deps) {
   
   function driverOptionHtml(order) {
     return state.drivers.map((driver) => {
-      const blocked = driver.status !== DRIVER_IDLE_STATUS && driver.orderId !== order.id;
-      return `<option value="${escapeHtml(driver.id)}" ${driver.id === order.assignedDriver ? "selected" : ""} ${blocked ? "disabled" : ""}>${escapeHtml(driver.name)} - ${escapeHtml(driver.status)}</option>`;
+      const assignment = getDriverAssignmentState(driver, order);
+      return `<option value="${escapeHtml(driver.id)}" ${driver.id === order.assignedDriver ? "selected" : ""} ${assignment.canAssign ? "" : "disabled"}>${escapeHtml(driver.name)} - ${escapeHtml(assignment.label)}</option>`;
     }).join("");
   }
   

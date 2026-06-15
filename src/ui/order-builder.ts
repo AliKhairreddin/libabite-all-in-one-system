@@ -29,6 +29,7 @@ export function createOrderBuilderUi(deps) {
     getOrderTotal,
     getOrderableProductsForContext,
     getOrdersForCustomer,
+    getAssignableDrivers,
     getProductAvailability,
     getProductionProducts,
     getStockShortages,
@@ -214,14 +215,14 @@ export function createOrderBuilderUi(deps) {
 
     if (driverSelect) {
       const selectedDriver = driverSelect.value;
-      const driverOptions = state.drivers
+      const assignableDrivers = getAssignableDrivers?.() || [];
+      const driverOptions = assignableDrivers
         .map((driver) => {
-          const blocked = driver.status !== "Available" && driver.orderId !== null;
-          return `<option value="${escapeHtml(driver.id)}" ${blocked ? "disabled" : ""}>${escapeHtml(driver.name)} - ${escapeHtml(driver.status)}</option>`;
+          return `<option value="${escapeHtml(driver.id)}">${escapeHtml(driver.name)} - ${escapeHtml(driver.status)}</option>`;
         })
         .join("");
       driverSelect.innerHTML = `<option value="">Auto assign available driver</option>${driverOptions}`;
-      driverSelect.value = state.drivers.some((driver) => driver.id === selectedDriver) ? selectedDriver : "";
+      driverSelect.value = assignableDrivers.some((driver) => driver.id === selectedDriver) ? selectedDriver : "";
       driverSelect.disabled = !isDelivery || !editable;
     }
 

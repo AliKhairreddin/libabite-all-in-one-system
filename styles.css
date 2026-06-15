@@ -2808,8 +2808,109 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.order-driver-reassign {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--brand);
+}
+
+.order-driver-reassign summary {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f7faf8;
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  list-style: none;
+}
+
+.order-driver-reassign summary::-webkit-details-marker {
+  display: none;
+}
+
+.order-driver-reassign[open] summary {
+  border-color: var(--brand-2);
+  background: #eef7f1;
+}
+
+.order-driver-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: min(280px, 86vw);
+  padding: 10px;
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(23, 39, 28, 0.14);
+}
+
+.order-driver-menu > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.order-driver-options {
+  display: grid;
+  gap: 7px;
+}
+
+.order-driver-option {
+  min-height: 42px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfdfc;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.order-driver-option input {
+  width: 16px;
+  height: 16px;
+}
+
+.order-driver-option span,
+.order-driver-option strong,
+.order-driver-option small {
+  min-width: 0;
+  display: block;
+}
+
+.order-driver-option strong {
+  overflow-wrap: anywhere;
+}
+
+.order-driver-option small,
+.order-driver-empty {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.order-driver-empty {
+  margin: 0;
 }
 
 .pill {
@@ -6007,6 +6108,16 @@ textarea:focus {
 
   .order-card {
     grid-template-columns: 1fr;
+  }
+
+  .order-driver-reassign {
+    display: grid;
+  }
+
+  .order-driver-menu {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
   }
 
   .order-progress-mini {

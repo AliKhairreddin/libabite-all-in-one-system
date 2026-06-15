@@ -2,15 +2,20 @@ import {
   DEFAULT_PAID_PAYMENT_METHOD,
   PAYMENT_METHOD_OPTIONS
 } from "../shared/constants.js";
+import { isDeliveryTerminal } from "../domain/delivery.js";
 import { isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
 import { escapeHtml } from "../shared/html.js";
 
 export function createOrderCardsUi(deps) {
   const {
     can,
+    canManageDeliveryOperations,
+    driverById,
     formatStockAmount,
     fulfillmentLabel,
     getActiveSupplierOrder,
+    getAssignableDrivers,
+    getDriverAssignmentState,
     getOrderFulfillmentMeta,
     getOrderPaymentSummary,
     getOrderProgressSummary,
@@ -57,6 +62,51 @@ export function createOrderCardsUi(deps) {
     return details.join(" · ");
   }
 
+  function orderDriverAssignmentHtml(order) {
+    if (order.fulfillment !== "Delivery" || order.status === "Cancelled") return "";
+
+    const currentDriver = driverById?.(order.assignedDriver);
+    const driverLabel = currentDriver?.name || "Unassigned";
+    if (!canManageDeliveryOperations?.() || isDeliveryTerminal(order)) {
+      return currentDriver ? `<span>Driver: ${escapeHtml(driverLabel)}</span>` : "";
+    }
+
+    const assignableDrivers = (getAssignableDrivers?.(order) || [])
+      .filter((driver) => driver.id !== order.assignedDriver);
+    const optionName = `order-driver-${order.id}`;
+    const optionsHtml = assignableDrivers.length
+      ? assignableDrivers.map((driver, index) => {
+        const assignment = getDriverAssignmentState?.(driver, order);
+        const inputId = `${optionName}-${driver.id}`;
+        return `
+          <label class="order-driver-option" for="${escapeHtml(inputId)}">
+            <input id="${escapeHtml(inputId)}" type="radio" name="${escapeHtml(optionName)}" value="${escapeHtml(driver.id)}" data-order-driver-option="${escapeHtml(order.id)}" ${index === 0 ? "checked" : ""}>
+            <span>
+              <strong>${escapeHtml(driver.name)}</strong>
+              <small>${escapeHtml(assignment?.label || driver.status)}</small>
+            </span>
+          </label>
+        `;
+      }).join("")
+      : `<p class="order-driver-empty">No clocked-in available drivers.</p>`;
+
+    return `
+      <details class="order-driver-reassign">
+        <summary aria-label="Reassign driver for order #${escapeHtml(order.number)}">
+          <span>Driver:</span>
+          <strong>${escapeHtml(driverLabel)}</strong>
+        </summary>
+        <div class="order-driver-menu">
+          <span>Available drivers</span>
+          <div class="order-driver-options">
+            ${optionsHtml}
+          </div>
+          <button class="mini-btn" type="button" data-assign-delivery-driver="${escapeHtml(order.id)}" ${assignableDrivers.length ? "" : "disabled"}>Confirm</button>
+        </div>
+      </details>
+    `;
+  }
+
   function orderCard(order) {
     const productLines = order.items.map((item) => {
       const product = productById(item.productId);
@@ -70,6 +120,10 @@ export function createOrderCardsUi(deps) {
     const canKitchenUpdate = can("canAdvanceTickets") && ["Sent to kitchen", "Preparing", "Delayed"].includes(order.status);
     const kitchenSummary = getOrderProgressSummary(order);
     const fulfillmentMeta = getOrderFulfillmentMeta(order);
+    const driverAssignment = orderDriverAssignmentHtml(order);
+    const cardFulfillmentMeta = driverAssignment
+      ? fulfillmentMeta.filter((item) => !String(item).startsWith("Driver:"))
+      : fulfillmentMeta;
     return `
       <article class="order-card">
         <div>
@@ -85,7 +139,8 @@ export function createOrderCardsUi(deps) {
             <span>${escapeHtml(money(getOrderTotal(order)))}</span>
             <span>Payment: ${escapeHtml(paymentSummary.method)}</span>
             <span>Staff: ${escapeHtml(getOrderStaffName(order))}</span>
-            ${fulfillmentMeta.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+            ${cardFulfillmentMeta.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+            ${driverAssignment}
           </div>
           ${kitchenSummary.total ? `
             <div class="order-progress-mini">

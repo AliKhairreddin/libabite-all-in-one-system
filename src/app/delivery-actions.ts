@@ -6,6 +6,7 @@ import {
   getDeliveryRouteProgress,
   getDistanceMeters,
   getDeliveryStatus,
+  isDeliveryTerminal,
   isDeliveryOrder,
   normalizeDeliveryLocationHistory,
   normalizeDeliveryLocationSample,
@@ -17,6 +18,7 @@ import {
 } from "../domain/delivery.js";
 import { setTicketStatus } from "../domain/kitchen.js";
 import { normalizeFulfillmentStatus, normalizeOrderOperationalStatus } from "../domain/orders.js";
+import { getShiftAttendanceStatus, normalizeScheduleRole } from "../domain/scheduling.js";
 import { saveState, state } from "./state.js";
 import { applyPaidPaymentToOrder } from "./payment-ledger.js";
 
@@ -77,6 +79,48 @@ export function createDeliveryRuntime(deps) {
   function driverMatchesUser(driver, user = currentUser()) {
     if (!driver || !user) return false;
     return driver.id === user.id || driver.name.split(" ")[0].toLowerCase() === user.name.split(" ")[0].toLowerCase();
+  }
+
+  function activeUserForDriver(driver) {
+    if (!driver) return null;
+    return state.users.find((user) => user.status === "Active" && user.role === "driver" && driverMatchesUser(driver, user)) || null;
+  }
+
+  function activeClockedDriverShift(driver) {
+    const user = activeUserForDriver(driver);
+    if (!user) return null;
+    return state.staffShifts.find((shift) => {
+      return shift.staffId === user.id
+        && normalizeScheduleRole(shift.role, "") === "Driver"
+        && Number(shift.clockInAtMs)
+        && !Number(shift.clockOutAtMs);
+    }) || null;
+  }
+
+  function getDriverAssignmentState(driver, order = null) {
+    if (!driver) return { canAssign: false, label: "Unknown driver" };
+
+    const assignedToThisOrder = Boolean(order?.id && driver.orderId === order.id);
+    const busyOnAnotherOrder = Boolean(driver.orderId && driver.orderId !== order?.id);
+    if (busyOnAnotherOrder || (driver.status !== DRIVER_IDLE_STATUS && !assignedToThisOrder)) {
+      return { canAssign: false, label: `Busy - ${driver.status}` };
+    }
+
+    const user = activeUserForDriver(driver);
+    if (!user) return { canAssign: false, label: "No active driver account" };
+
+    const shift = activeClockedDriverShift(driver);
+    const shiftLabel = shift ? getShiftAttendanceStatus(shift) : "Not clocked in";
+    if (assignedToThisOrder) {
+      return { canAssign: true, label: `Current order - ${shiftLabel}` };
+    }
+    if (!shift) return { canAssign: false, label: "Not clocked in" };
+    if (shift.breakStartedAtMs) return { canAssign: false, label: "On break" };
+    return { canAssign: true, label: shiftLabel };
+  }
+
+  function getAssignableDrivers(order = null) {
+    return state.drivers.filter((driver) => getDriverAssignmentState(driver, order).canAssign);
   }
 
   function currentDriverRecord() {
@@ -360,9 +404,9 @@ export function createDeliveryRuntime(deps) {
   function assignDriverToDeliveryOrder(order) {
     if (order.fulfillment !== "Delivery") return null;
     const requestedDriver = driverById(order.assignedDriver);
-    const driver = requestedDriver && (requestedDriver.status === "Available" || requestedDriver.orderId === order.id)
+    const driver = requestedDriver && getDriverAssignmentState(requestedDriver, order).canAssign
       ? requestedDriver
-      : state.drivers.find((candidate) => candidate.status === "Available");
+      : getAssignableDrivers(order).find((candidate) => candidate.id !== order.assignedDriver);
     if (!driver) {
       order.assignedDriver = "";
       return null;
@@ -386,7 +430,38 @@ export function createDeliveryRuntime(deps) {
     return driver;
   }
 
-  function assignDeliveryOrderToDriver(orderId) {
+  function selectedDriverIdFromAction(orderId, action = null) {
+    const root = action?.closest?.(".order-driver-reassign, .delivery-assignment-controls") || document;
+    const scopedSelect = root.querySelector?.("[data-delivery-driver-select]") as HTMLSelectElement | null;
+    if (scopedSelect) return scopedSelect.value;
+    const checkedOption = root.querySelector?.("[data-order-driver-option]:checked") as HTMLInputElement | null;
+    if (checkedOption) return checkedOption.value;
+
+    const fallbackSelect = document.querySelector(`[data-delivery-driver-select="${orderId}"]`) as HTMLSelectElement | null;
+    return fallbackSelect?.value || "";
+  }
+
+  function addDeliveryAssignmentNote(order, previousDriver, nextDriver) {
+    const user = currentUser();
+    const previousName = previousDriver?.name || "Unassigned";
+    const nextName = nextDriver?.name || "Unassigned";
+    const text = previousDriver
+      ? `Driver reassigned from ${previousName} to ${nextName}.`
+      : `Driver assigned to ${nextName}.`;
+    order.deliveryNotes = [
+      ...(order.deliveryNotes || []),
+      {
+        id: `DLV-NOTE-${Date.now()}`,
+        text,
+        authorId: user?.id || "",
+        authorName: user?.name || "Dispatcher",
+        at: timeNow(),
+        atMs: Date.now()
+      }
+    ].slice(-12);
+  }
+
+  function assignDeliveryOrderToDriver(orderId, action = null) {
     if (!canManageDeliveryOperations()) {
       showToast("Only managers can assign deliveries.");
       return;
@@ -397,31 +472,42 @@ export function createDeliveryRuntime(deps) {
       showToast("Choose a delivery order to assign.");
       return;
     }
+    if (order.status === "Cancelled" || isDeliveryTerminal(order)) {
+      showToast(`Order #${order.number} cannot be reassigned from its current delivery status.`);
+      return;
+    }
 
-    const select = document.querySelector(`[data-delivery-driver-select="${orderId}"]`) as HTMLSelectElement | null;
-    const driver = driverById(select?.value);
+    const driver = driverById(selectedDriverIdFromAction(orderId, action));
     if (!driver) {
       showToast("Choose a driver for this delivery.");
       return;
     }
 
-    if (driver.status !== DRIVER_IDLE_STATUS && driver.orderId !== order.id) {
-      showToast(`${driver.name} already has an active delivery.`);
+    const assignmentState = getDriverAssignmentState(driver, order);
+    if (!assignmentState.canAssign) {
+      showToast(`${driver.name} is not available: ${assignmentState.label.toLowerCase()}.`);
+      return;
+    }
+    if (order.assignedDriver === driver.id) {
+      showToast(`${driver.name} is already assigned to order #${order.number}.`);
       return;
     }
 
+    const previousDriver = driverById(order.assignedDriver);
+    const now = Date.now();
     state.drivers.forEach((candidate) => {
       if (candidate.orderId === order.id && candidate.id !== driver.id) setDriverIdle(candidate);
     });
     order.assignedDriver = driver.id;
     order.deliveryStatus = getDeliveryStatus(order) || "Assigned";
     order.pickupStatus = normalizePickupStatus(order.pickupStatus, order.deliveryStatus);
-    order.deliveryAssignedAtMs = order.deliveryAssignedAtMs || Date.now();
-    order.deliveryStatusUpdatedAtMs = Date.now();
+    order.deliveryAssignedAtMs = now;
+    order.deliveryStatusUpdatedAtMs = now;
+    addDeliveryAssignmentNote(order, previousDriver, driver);
     syncDriverWithDeliveryOrder(driver, order);
     saveState();
     render();
-    showToast(`Order #${order.number} assigned to ${driver.name}.`);
+    showToast(`Order #${order.number} ${previousDriver ? "reassigned" : "assigned"} to ${driver.name}.`);
   }
 
   function updateDeliveryStatus(orderId, status, options: any = {}) {
@@ -620,6 +706,8 @@ export function createDeliveryRuntime(deps) {
     currentDriverRecord,
     currentUserCanUpdateDelivery,
     driverById,
+    getAssignableDrivers,
+    getDriverAssignmentState,
     markDeliveryCashCollected,
     startDeliveryTrip,
     updateDeliveryStatus,

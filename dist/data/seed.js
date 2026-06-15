@@ -85,6 +85,7 @@ export const seedState = {
     customerCart: [],
     customerCartOpen: false,
     customerUpsellProductId: "",
+    customerUpsellStep: 0,
     customerLastOrderId: "",
     websiteCart: [],
     websiteLastOrderId: "",

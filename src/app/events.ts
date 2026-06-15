@@ -197,7 +197,7 @@ export function bindAppEvents(handlers) {
     if (markPaid) markOrderPaid(markPaid.dataset.markPaid, getSelectedPaymentMethodFromAction(markPaid));
 
     const assignDeliveryDriver = event.target.closest("[data-assign-delivery-driver]");
-    if (assignDeliveryDriver) assignDeliveryOrderToDriver(assignDeliveryDriver.dataset.assignDeliveryDriver);
+    if (assignDeliveryDriver) assignDeliveryOrderToDriver(assignDeliveryDriver.dataset.assignDeliveryDriver, assignDeliveryDriver);
 
     const deliveryStatus = event.target.closest("[data-delivery-status][data-delivery-order]");
     if (deliveryStatus) updateDeliveryStatus(deliveryStatus.dataset.deliveryOrder, deliveryStatus.dataset.deliveryStatus);
