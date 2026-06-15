@@ -600,10 +600,15 @@ export function bindAppEvents(handlers) {
     const previousUserId = state.currentUserId;
     const nextState = resetState();
     if (nextState.users.some((user) => user.id === previousUserId)) nextState.currentUserId = previousUserId;
+    nextState.reservations = [];
+    nextState.reservationBlocks = [];
+    nextState.reservationCapacityRules = [];
+    nextState.websiteLastReservationId = "";
+    nextState.reservationEditingId = "";
     saveState();
     await flushRemoteState();
     render();
-    showToast("Demo data reset, including bookings.");
+    showToast("Demo data reset; bookings cleared.");
   });
   
   document.querySelector("#wasteKeftaBtn")?.addEventListener("click", logWaste);
