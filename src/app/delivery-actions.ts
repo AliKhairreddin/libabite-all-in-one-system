@@ -8,6 +8,7 @@ import {
   getDeliveryStatus,
   isDeliveryTerminal,
   isDeliveryOrder,
+  normalizeDeliveryCoordinates,
   normalizeDeliveryLocationHistory,
   normalizeDeliveryLocationSample,
   normalizeDriverDeliveryStatus,
@@ -152,6 +153,15 @@ export function createDeliveryRuntime(deps) {
   }
 
   async function geocodeDeliveryDestination(order) {
+    const selectedLocation = normalizeDeliveryCoordinates(order?.deliveryAddressLocation);
+    if (selectedLocation) {
+      return {
+        lat: roundedCoordinate(selectedLocation.lat),
+        lng: roundedCoordinate(selectedLocation.lng),
+        label: String(order.deliveryAddressLabel || order.deliveryAddress || deliveryDestination(order)).replace(/\s+/g, " ").trim()
+      };
+    }
+
     const destination = deliveryDestination(order);
     const url = `${NOMINATIM_SEARCH_URL}?format=json&limit=1&addressdetails=0&accept-language=nl,en&q=${encodeURIComponent(destination)}`;
     const response = await fetch(url);

@@ -39,6 +39,7 @@ import {
 import {
   normalizeDeliveryLocationHistory,
   normalizeDeliveryLocationSample,
+  normalizeDeliveryCoordinates,
   normalizeDeliveryRoute,
   normalizeDriverDeliveryStatus,
   normalizeDriverStatus,
@@ -1668,6 +1669,10 @@ export function normalizeState(candidate) {
         customerPhone: String(order.customerPhone || "").trim(),
         customerEmail: String(order.customerEmail || "").trim(),
         deliveryAddress: String(order.deliveryAddress || order.address || "").trim(),
+        deliveryAddressLabel: String(order.deliveryAddressLabel || "").replace(/\s+/g, " ").trim(),
+        deliveryAddressLocation: normalizeDeliveryCoordinates(order.deliveryAddressLocation),
+        deliveryAddressSource: String(order.deliveryAddressSource || "").replace(/\s+/g, " ").trim(),
+        deliveryAddressPlaceId: String(order.deliveryAddressPlaceId || "").replace(/\s+/g, " ").trim(),
         paymentReference: String(order.paymentReference || "").trim(),
         paymentProcessor: String(order.paymentProcessor || "").trim(),
         externalPlatformId,

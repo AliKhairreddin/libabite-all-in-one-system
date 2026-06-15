@@ -191,12 +191,19 @@ export function createTeamUi(deps) {
   function driverNavigationActionsHtml(order) {
     const phone = phoneHref(order);
     return `
-      <div class="driver-nav-actions">
-        <a class="primary-btn" href="${escapeHtml(googleDirectionsUrl(order))}" target="_blank" rel="noopener">Google Maps</a>
-        <a class="ghost-btn" href="${escapeHtml(appleDirectionsUrl(order))}" target="_blank" rel="noopener">Apple Maps</a>
-        <a class="ghost-btn" href="${escapeHtml(openStreetMapSearchUrl(order))}" target="_blank" rel="noopener">OSM</a>
-        ${phone ? `<a class="ghost-btn" href="${escapeHtml(phone)}">Call</a>` : ""}
-      </div>
+      <section class="driver-navigation-panel" aria-label="External navigation">
+        <div>
+          <span>Navigation</span>
+          <strong>Open route in maps</strong>
+          <p>${escapeHtml(shortDeliveryAddress(order))}</p>
+        </div>
+        <div class="driver-nav-actions">
+          <a class="primary-btn" href="${escapeHtml(googleDirectionsUrl(order))}" target="_blank" rel="noopener">Google Maps</a>
+          <a class="ghost-btn" href="${escapeHtml(appleDirectionsUrl(order))}" target="_blank" rel="noopener">Apple Maps</a>
+          <a class="ghost-btn" href="${escapeHtml(openStreetMapSearchUrl(order))}" target="_blank" rel="noopener">OSM</a>
+          ${phone ? `<a class="ghost-btn" href="${escapeHtml(phone)}">Call</a>` : ""}
+        </div>
+      </section>
     `;
   }
 
@@ -388,10 +395,10 @@ export function createTeamUi(deps) {
           </div>
         </header>
 
+        ${driverNavigationActionsHtml(order)}
         ${driverRouteMapHtml(order)}
 
         <div class="driver-route-body">
-          ${driverNavigationActionsHtml(order)}
           ${driverRouteStepsHtml(order)}
           ${deliveryTurnStepsHtml(order)}
 

@@ -1,5 +1,9 @@
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
 import { state } from "../app/state.js";
 import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS, WEBSITE_ORDER_CHANNEL } from "../shared/constants.js";
+import { formatDeliveryDistance, formatDeliveryEta, getDeliveryStatus, RESTAURANT_COORDINATES } from "../domain/delivery.js";
 import { getReservationDateLabel } from "../domain/reservations.js";
 import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
@@ -90,6 +94,112 @@ export function createPublicOrderingUi(deps) {
           <strong>${escapeHtml(getRestaurantDisplayName())}</strong>
         </div>
       </div>
+    `;
+  }
+
+  function deliveryMapPoint(value) {
+    const lat = Number(value?.lat);
+    const lng = Number(value?.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+
+  function customerDeliveryMetricText(order) {
+    if (Number(order.deliveryDistanceRemainingMeters) > 0) return `${formatDeliveryDistance(order.deliveryDistanceRemainingMeters)} away`;
+    if (Number(order.deliveryRoute?.distanceMeters) > 0) return `${formatDeliveryDistance(order.deliveryRoute.distanceMeters)} route`;
+    return formatDeliveryEta(order);
+  }
+
+  function customerDeliveryTrackingText(order) {
+    const status = getDeliveryStatus(order) || "Received";
+    if (status === "On the way" && order.deliveryLastLocation) return "Driver is on the way";
+    if (status === "On the way") return "Driver route started";
+    if (status === "Delivered") return "Delivered";
+    if (status === "Assigned" || status === "At restaurant" || status === "Picked up") return status;
+    return order.deliveryTrackingStatus || "Preparing your delivery";
+  }
+
+  function liveMapIcon(label, className) {
+    return L.divIcon({
+      className: `live-map-marker ${className}`,
+      html: `<span>${escapeHtml(label)}</span>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+  }
+
+  function renderCustomerDeliveryMaps() {
+    window.requestAnimationFrame(() => {
+      document.querySelectorAll("[data-customer-delivery-map]").forEach((mapNode: any) => {
+        if (mapNode._leaflet_id) return;
+        const order = orderById(mapNode.dataset.customerDeliveryMap);
+        if (!order) return;
+        const routePoints = (order.deliveryRoute?.geometry || [])
+          .map(deliveryMapPoint)
+          .filter(Boolean)
+          .map((point) => [point.lat, point.lng] as [number, number]);
+        const current = deliveryMapPoint(order.deliveryLastLocation);
+        const destination = deliveryMapPoint(order.deliveryRoute?.destination || order.deliveryAddressLocation);
+        const origin = deliveryMapPoint(order.deliveryRoute?.origin) || RESTAURANT_COORDINATES;
+        const map = L.map(mapNode, {
+          zoomControl: false,
+          attributionControl: false,
+          scrollWheelZoom: false,
+          dragging: false,
+          touchZoom: false,
+          doubleClickZoom: false
+        });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 18,
+          attribution: "&copy; OpenStreetMap"
+        }).addTo(map);
+
+        const bounds: Array<[number, number]> = [];
+        if (routePoints.length > 1) {
+          L.polyline(routePoints, { color: "#1f6f4a", weight: 6, opacity: 0.84 }).addTo(map);
+          bounds.push(...routePoints);
+        }
+        if (origin?.lat && origin?.lng) {
+          const point: [number, number] = [Number(origin.lat), Number(origin.lng)];
+          L.marker(point, { icon: liveMapIcon("R", "restaurant") }).addTo(map);
+          bounds.push(point);
+        }
+        if (destination?.lat && destination?.lng) {
+          const point: [number, number] = [Number(destination.lat), Number(destination.lng)];
+          L.marker(point, { icon: liveMapIcon("C", "customer") }).addTo(map);
+          bounds.push(point);
+        }
+        if (current) {
+          const point: [number, number] = [current.lat, current.lng];
+          L.marker(point, { icon: liveMapIcon("D", "driver") }).addTo(map);
+          bounds.push(point);
+        }
+        if (bounds.length > 1) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+        else map.setView([Number(origin.lat), Number(origin.lng)], 14);
+      });
+    });
+  }
+
+  function customerDeliveryTrackingHtml(order) {
+    if (!order || normalizeWebsiteFulfillment(order.fulfillment) !== "Delivery") return "";
+    const progress = Math.max(0, Math.min(100, Math.round(Number(order.deliveryRouteProgress) || 0)));
+    return `
+      <section class="customer-delivery-tracking" aria-label="Delivery tracking">
+        <div class="customer-delivery-map" data-customer-delivery-map="${escapeHtml(order.id)}"></div>
+        <div class="customer-delivery-tracking-content">
+          <div>
+            <p class="eyebrow">Live tracking</p>
+            <h3>${escapeHtml(customerDeliveryTrackingText(order))}</h3>
+            <p>${escapeHtml(order.deliveryAddress || "Delivery address")}</p>
+          </div>
+          <div class="customer-delivery-progress">
+            <span>${escapeHtml(customerDeliveryMetricText(order))}</span>
+            <strong>${escapeHtml(formatDeliveryEta(order))}</strong>
+          </div>
+          <div class="driver-route-progress" aria-label="Delivery progress">
+            <span style="width: ${progress}%"></span>
+          </div>
+        </div>
+      </section>
     `;
   }
 
@@ -237,7 +347,7 @@ export function createPublicOrderingUi(deps) {
   function snapshotCustomerFormValues(form) {
     const values = {};
     form.querySelectorAll("[name]").forEach((control: any) => {
-      if (control.type === "hidden") return;
+      if (control.type === "hidden" && !String(control.name || "").startsWith("deliveryAddress")) return;
       if (control.type === "radio" || control.type === "checkbox") {
         values[`${control.name}:${control.value}`] = control.checked;
         return;
@@ -249,7 +359,7 @@ export function createPublicOrderingUi(deps) {
 
   function restoreCustomerFormValues(form, values) {
     form.querySelectorAll("[name]").forEach((control: any) => {
-      if (control.type === "hidden") return;
+      if (control.type === "hidden" && !String(control.name || "").startsWith("deliveryAddress")) return;
       if (control.type === "radio" || control.type === "checkbox") {
         const key = `${control.name}:${control.value}`;
         if (Object.prototype.hasOwnProperty.call(values, key)) control.checked = values[key];
@@ -508,6 +618,43 @@ export function createPublicOrderingUi(deps) {
       </div>
     `;
   }
+
+  function customerDeliveryAddressHtml(deliverySelected) {
+    return `
+      <div class="customer-delivery-address" data-address-combobox ${deliverySelected ? "" : "hidden"}>
+        <label for="websiteDeliveryAddress">Address</label>
+        <div class="customer-address-combobox">
+          <input
+            id="websiteDeliveryAddress"
+            name="deliveryAddress"
+            type="text"
+            autocomplete="street-address"
+            inputmode="text"
+            placeholder="Street and house number"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="websiteDeliveryAddressSuggestions"
+            data-address-input
+            ${deliverySelected ? "required" : ""}
+          >
+          <div
+            id="websiteDeliveryAddressSuggestions"
+            class="customer-address-suggestions"
+            role="listbox"
+            data-address-suggestions
+            hidden
+          ></div>
+        </div>
+        <p class="customer-address-helper" data-address-helper aria-live="polite"></p>
+        <input name="deliveryAddressLabel" type="hidden">
+        <input name="deliveryAddressLat" type="hidden">
+        <input name="deliveryAddressLng" type="hidden">
+        <input name="deliveryAddressSource" type="hidden">
+        <input name="deliveryAddressPlaceId" type="hidden">
+      </div>
+    `;
+  }
   
   function customerCartHtml(cartItems, options: any = {}) {
     const mode = options.mode || "qr";
@@ -542,10 +689,7 @@ export function createPublicOrderingUi(deps) {
             <input name="requestedTime" type="time" value="${escapeHtml(getDefaultWebsiteRequestedTime())}" required>
           </label>
         </div>
-        <label class="customer-delivery-address" ${deliverySelected ? "" : "hidden"}>
-          Address
-          <textarea name="deliveryAddress" rows="3" autocomplete="street-address" ${deliverySelected ? "required" : ""}></textarea>
-        </label>
+        ${customerDeliveryAddressHtml(deliverySelected)}
         <fieldset class="customer-payment-options customer-payment-card">
           <legend>Online payment</legend>
           <div class="check-row">
@@ -727,6 +871,7 @@ export function createPublicOrderingUi(deps) {
       </header>
       <main class="customer-shell">
         ${confirmation}
+        ${customerDeliveryTrackingHtml(lastOrder)}
         <section class="customer-menu-panel">
           <div class="panel-header compact customer-order-header">
             <div>
@@ -756,6 +901,7 @@ export function createPublicOrderingUi(deps) {
         ${customerUpsellFlowHtml(cartItems, orderContext)}
       </div>
     `;
+    renderCustomerDeliveryMaps();
   }
 
   function renderPublicHomeScreen() {

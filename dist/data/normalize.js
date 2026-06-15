@@ -1,7 +1,7 @@
 import { AVAILABILITY_OPTIONS, DEFAULT_INVENTORY_LOCATIONS, DEFAULT_MARGIN_MINIMUM, DEFAULT_MARGIN_TARGET, DEFAULT_PAID_PAYMENT_METHOD, DEFAULT_PRODUCT_AVAILABILITY, DEFAULT_RESTAURANT_SETTINGS, EXTERNAL_DELIVERY_ORDER_CHANNEL, EXTERNAL_DELIVERY_PLATFORMS, INVENTORY_ACTIONS, KITCHEN_STATION_ALIASES, LANGUAGE_OPTIONS, ORDER_STATUSES, PHASE_11_SEED_INGREDIENT_IDS, PHASE_11_SEED_PRODUCT_IDS, PHASE_18_SEED_PRODUCT_IDS, PROCEDURE_ASSIGNED_ROLES, PROCEDURE_COMPLETION_STATUSES, PROCEDURE_FREQUENCIES, PRODUCT_CATEGORIES, QR_CODE_STATUSES, RECIPE_APPLIES_OPTIONS, RESERVATION_SOURCES, ROLE_DEFINITIONS, SUPPLIER_INTEGRATION_METHODS, SUPPLIER_ORDER_STATUSES, TICKET_STATUSES, UNIT_TYPES, WASTE_REASONS } from "../shared/constants.js";
 import { normalizeOptionalTimestamp, normalizeTimestamp, timeNow } from "../shared/dates.js";
 import { normalizePrecautionaryAllergenStatus, normalizeProductAllergens, normalizeVatSetting } from "../domain/commerce.js";
-import { normalizeDeliveryLocationHistory, normalizeDeliveryLocationSample, normalizeDeliveryRoute, normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
+import { normalizeDeliveryLocationHistory, normalizeDeliveryLocationSample, normalizeDeliveryCoordinates, normalizeDeliveryRoute, normalizeDriverDeliveryStatus, normalizeDriverStatus, normalizePickupStatus, reconcileDeliveryAssignments } from "../domain/delivery.js";
 import { externalPlatformName, normalizeExternalCommissionRate, normalizeExternalImportMethod, normalizeExternalPlatformId, normalizeExternalPlatformStatus } from "../domain/external-delivery.js";
 import { normalizeFulfillmentStatus, normalizeOrderFulfillment, normalizeOrderOperationalStatus, normalizeOrderType, normalizeWebsiteFulfillment, orderTypeDefinition } from "../domain/orders.js";
 import { buildPaymentLedgerRecord, getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus as normalizeLedgerPaymentStatus, upsertPaymentLedgerRecord } from "../domain/payments.js";
@@ -1521,6 +1521,10 @@ export function normalizeState(candidate) {
             customerPhone: String(order.customerPhone || "").trim(),
             customerEmail: String(order.customerEmail || "").trim(),
             deliveryAddress: String(order.deliveryAddress || order.address || "").trim(),
+            deliveryAddressLabel: String(order.deliveryAddressLabel || "").replace(/\s+/g, " ").trim(),
+            deliveryAddressLocation: normalizeDeliveryCoordinates(order.deliveryAddressLocation),
+            deliveryAddressSource: String(order.deliveryAddressSource || "").replace(/\s+/g, " ").trim(),
+            deliveryAddressPlaceId: String(order.deliveryAddressPlaceId || "").replace(/\s+/g, " ").trim(),
             paymentReference: String(order.paymentReference || "").trim(),
             paymentProcessor: String(order.paymentProcessor || "").trim(),
             externalPlatformId,

@@ -4,6 +4,7 @@ import { createCustomerOrderingRuntime } from "./customer-ordering.js";
 import { createWebsiteCheckoutSession, handleWebsitePaymentReturn } from "./payment-actions.js";
 import { createStaffOrderRuntime } from "./staff-orders.js";
 import { createDeliveryRuntime } from "./delivery-actions.js";
+import { createAddressAutocompleteRuntime } from "./address-autocomplete.js";
 import { createExternalDeliveryRuntime } from "./external-delivery-actions.js";
 import { createProductActionsRuntime } from "./product-actions.js";
 import { createProcedureActionsRuntime } from "./procedure-actions.js";
@@ -212,6 +213,15 @@ const {
   render: () => render(),
   showToast
 });
+
+const {
+  chooseAddressSuggestion,
+  closeAddressSuggestions,
+  handleAddressFocus,
+  handleAddressFocusOut,
+  handleAddressInput,
+  handleAddressKeydown
+} = createAddressAutocompleteRuntime();
 
 const {
   canManageSchedule,
@@ -880,6 +890,8 @@ export function createAppRuntime() {
   return {
     handlers: {
       addCustomerCartItem,
+      chooseAddressSuggestion,
+      closeAddressSuggestions,
       addDeliveryNote,
       addOrderDraftLine,
       addReservation,
@@ -913,6 +925,10 @@ export function createAppRuntime() {
       deleteReservationCapacityRule,
       findCustomerBySearchValue,
       getCustomerOrderingSession,
+      handleAddressFocus,
+      handleAddressFocusOut,
+      handleAddressInput,
+      handleAddressKeydown,
       getSelectedLineModifiers,
       getSelectedPaymentMethodFromAction,
       loadCustomerIntoManualOrder,

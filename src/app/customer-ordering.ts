@@ -276,6 +276,12 @@ export function createCustomerOrderingRuntime(deps) {
     const requestedTime = String(formData.get("requestedTime") || "").trim();
     const paymentProvider = String(formData.get("paymentProvider") || "stripe").trim().toLowerCase() === "mollie" ? "mollie" : "stripe";
     const deliveryAddress = fulfillment === "Delivery" ? String(formData.get("deliveryAddress") || "").trim() : "";
+    const deliveryAddressLabel = fulfillment === "Delivery" ? String(formData.get("deliveryAddressLabel") || deliveryAddress).trim() : "";
+    const deliveryAddressLat = Number(formData.get("deliveryAddressLat"));
+    const deliveryAddressLng = Number(formData.get("deliveryAddressLng"));
+    const deliveryAddressLocation = fulfillment === "Delivery" && Number.isFinite(deliveryAddressLat) && Number.isFinite(deliveryAddressLng)
+      ? { lat: deliveryAddressLat, lng: deliveryAddressLng }
+      : null;
 
     if (!customerName || !customerPhone) {
       showToast("Enter your name and phone number.");
@@ -310,6 +316,10 @@ export function createCustomerOrderingRuntime(deps) {
       customerPhone,
       customerEmail,
       deliveryAddress,
+      deliveryAddressLabel,
+      deliveryAddressLocation,
+      deliveryAddressSource: fulfillment === "Delivery" ? String(formData.get("deliveryAddressSource") || "").trim() : "",
+      deliveryAddressPlaceId: fulfillment === "Delivery" ? String(formData.get("deliveryAddressPlaceId") || "").trim() : "",
       requestedTime,
       paymentStatus: "Unpaid",
       paymentMethod: "Online payment",

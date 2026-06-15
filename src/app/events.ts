@@ -22,10 +22,12 @@ export function bindAppEvents(handlers) {
     cancelReservationEdit,
     cancelStaffShiftEdit,
     can,
+    chooseAddressSuggestion,
     clearSupplierForm,
     clearOrderDraft,
     clockInShift,
     clockOutShift,
+    closeAddressSuggestions,
     createOrder,
     createProcedure,
     createPurchasedProduct,
@@ -40,6 +42,10 @@ export function bindAppEvents(handlers) {
     getCustomerOrderingSession,
     getSelectedLineModifiers,
     getSelectedPaymentMethodFromAction,
+    handleAddressFocus,
+    handleAddressFocusOut,
+    handleAddressInput,
+    handleAddressKeydown,
     importExternalOrder,
     loadCustomerIntoManualOrder,
     logWaste,
@@ -115,7 +121,20 @@ export function bindAppEvents(handlers) {
     uploadDeliveryProof,
     endShiftBreak
   } = handlers;
+  document.addEventListener("keydown", (event: any) => {
+    handleAddressKeydown(event);
+  });
+
   document.addEventListener("click", (event: any) => {
+    const addressSuggestion = event.target.closest("[data-address-suggestion]");
+    if (addressSuggestion) {
+      event.preventDefault();
+      chooseAddressSuggestion(addressSuggestion);
+      return;
+    }
+
+    if (!event.target.closest("[data-address-combobox]")) closeAddressSuggestions();
+
     const demoLogin = event.target.closest("[data-demo-login]");
     if (demoLogin) {
       const loginForm = document.querySelector("#loginForm");
@@ -361,6 +380,21 @@ export function bindAppEvents(handlers) {
 
     const customerNewOrder = event.target.closest("[data-customer-new-order]");
     if (customerNewOrder) startNewCustomerOrder();
+  });
+
+  document.addEventListener("input", (event: any) => {
+    const addressInput = event.target.closest("[data-address-input]");
+    if (addressInput) handleAddressInput(addressInput);
+  });
+
+  document.addEventListener("focusin", (event: any) => {
+    const addressInput = event.target.closest("[data-address-input]");
+    if (addressInput) handleAddressFocus(addressInput);
+  });
+
+  document.addEventListener("focusout", (event: any) => {
+    const addressCombobox = event.target.closest("[data-address-combobox]");
+    if (addressCombobox) handleAddressFocusOut(event.target);
   });
   
   document.addEventListener("change", (event: any) => {
