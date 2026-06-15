@@ -169,3 +169,29 @@ export function getOrderPaymentSummary(order) {
 export function getKitchenOrderProgressSummary(order) {
   return summarizeOrderProgress(order, state.tickets);
 }
+
+export function isWaiterPickupOrder(order) {
+  return orderTypeDefinition(order.orderType || order.channel).requiresTable && order.fulfillment === "Kitchen";
+}
+
+export function getWaiterPickupOrders() {
+  const statusRank = {
+    Ready: 0,
+    Delayed: 1,
+    Preparing: 2,
+    "Sent to kitchen": 3
+  };
+
+  return state.orders
+    .filter((order) => isWaiterPickupOrder(order))
+    .filter((order) => ["Sent to kitchen", "Preparing", "Delayed", "Ready"].includes(order.status))
+    .filter((order) => state.tickets.some((ticket) => ticket.orderId === order.id))
+    .slice()
+    .sort((first, second) => {
+      const firstPickedUp = first.waiterPickupStatus === "Picked up" ? 1 : 0;
+      const secondPickedUp = second.waiterPickupStatus === "Picked up" ? 1 : 0;
+      return (statusRank[first.status] ?? 9) - (statusRank[second.status] ?? 9)
+        || firstPickedUp - secondPickedUp
+        || (first.createdAtMs || 0) - (second.createdAtMs || 0);
+    });
+}

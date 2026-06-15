@@ -70,6 +70,7 @@ export default defineSchema({
     number: v.optional(v.number()),
     channel: v.optional(v.string()),
     fulfillment: v.optional(v.string()),
+    tableId: v.optional(v.string()),
     paymentStatus: v.optional(v.string()),
     paymentMethod: v.optional(v.string()),
     paymentId: v.optional(v.string()),
@@ -77,6 +78,11 @@ export default defineSchema({
     customerName: v.optional(v.string()),
     customerPhone: v.optional(v.string()),
     requestedTime: v.optional(v.string()),
+    waiterPickupStatus: v.optional(v.string()),
+    waiterNotifiedAtMs: v.optional(v.number()),
+    waiterPickedUpAtMs: v.optional(v.number()),
+    servedAtMs: v.optional(v.number()),
+    servedByName: v.optional(v.string()),
     totalCents: v.optional(v.number()),
     createdAtMs: v.optional(v.number())
   })

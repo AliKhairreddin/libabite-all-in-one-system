@@ -10,6 +10,7 @@ export function createOrdersUi(deps) {
     getOrderFulfillmentMeta,
     getOrderPaidByName,
     getOrderPaymentSummary,
+    getOrderProgressSummary,
     getOrderStaffName,
     getOrderSubtotalExcludingVat,
     getOrderTotal,
@@ -25,7 +26,8 @@ export function createOrdersUi(deps) {
     orderTypeDefinition,
     orderTypeLabel,
     paymentCaptureHtml,
-    productById
+    productById,
+    getWaiterPickupOrders
   } = deps;
 
   function renderOrders() {
@@ -48,7 +50,60 @@ export function createOrdersUi(deps) {
       button.classList.toggle("is-selected", button.dataset.orderFilter === state.orderFilter);
     });
   
+    renderWaiterPickupQueue();
     renderReceipt();
+  }
+
+  function waiterPickupItemsText(order) {
+    return order.items.map((item) => {
+      const product = productById(item.productId);
+      if (!product) return null;
+      const detail = orderItemDetailText(item);
+      return `${item.quantity}x ${product.name}${detail ? ` (${detail})` : ""}`;
+    }).filter(Boolean).join(", ");
+  }
+
+  function waiterPickupCard(order) {
+    const progress = getOrderProgressSummary(order);
+    const paymentSummary = getOrderPaymentSummary(order);
+    const pickupStatus = order.waiterPickupStatus || (order.status === "Ready" ? "Ready for pickup" : order.status);
+    const pickedUpBy = order.waiterPickedUpByName ? `Picked up by ${order.waiterPickedUpByName}` : "";
+    const notifiedAt = order.waiterNotifiedAtMs ? `Notified ${formatDateTime(order.waiterNotifiedAtMs, order.waiterNotifiedAt)}` : "";
+    const ready = order.status === "Ready";
+    const pickedUp = pickupStatus === "Picked up";
+    return `
+      <article class="waiter-pickup-card ${ready ? "is-ready" : ""} ${order.status === "Delayed" ? "is-delayed" : ""}">
+        <div>
+          <header>
+            <strong>#${escapeHtml(order.number)} ${escapeHtml(orderLocationLabel(order))}</strong>
+            <span class="pill ${orderStatusClass(order.status)}">${escapeHtml(pickupStatus)}</span>
+            <span class="pill ${paymentSummary.className}">${escapeHtml(paymentSummary.statusLabel)}</span>
+          </header>
+          <div class="waiter-pickup-meta">
+            <span>${escapeHtml(orderTypeLabel(order))}</span>
+            <span>${escapeHtml(progress.finished)}/${escapeHtml(progress.total)} kitchen tasks ready</span>
+            ${notifiedAt ? `<span>${escapeHtml(notifiedAt)}</span>` : ""}
+            ${pickedUpBy ? `<span>${escapeHtml(pickedUpBy)}</span>` : ""}
+          </div>
+          <p class="waiter-pickup-items">${escapeHtml(waiterPickupItemsText(order))}</p>
+        </div>
+        <div class="mini-actions waiter-pickup-actions">
+          ${ready && !pickedUp ? `<button class="mini-btn" type="button" data-waiter-pickup="${escapeHtml(order.id)}">Pick up</button>` : ""}
+          ${ready ? `<button class="mini-btn" type="button" data-mark-served="${escapeHtml(order.id)}">Served</button>` : ""}
+          <button class="mini-btn" type="button" data-show-receipt="${escapeHtml(order.id)}">Receipt</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderWaiterPickupQueue() {
+    const container = document.querySelector("#waiterPickupQueue");
+    if (!container) return;
+
+    const queue = getWaiterPickupOrders();
+    container.innerHTML = queue.length
+      ? queue.map(waiterPickupCard).join("")
+      : "";
   }
   
   function receiptLineHtml(item) {
@@ -131,6 +186,7 @@ export function createOrdersUi(deps) {
         </div>
         <div class="mini-actions receipt-actions">
           ${can("canCreateOrders") && !paymentSummary.paid && order.status !== "Cancelled" ? paymentCaptureHtml(order) : ""}
+          <button class="mini-btn" type="button" data-pdf-receipt="${escapeHtml(order.id)}">PDF Receipt</button>
           <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Print Receipt</button>
         </div>
       </article>

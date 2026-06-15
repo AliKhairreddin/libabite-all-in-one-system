@@ -10,8 +10,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/webp" href="https://inch-digital.com/libabiteimg/logo.webp">
     <link rel="apple-touch-icon" href="https://inch-digital.com/libabiteimg/logo.webp">
-    <script type="module" crossorigin src="/assets/app-D9zHxIHH.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/app-DIvcLBg_.css">
+    <script type="module" crossorigin src="/assets/app-hczuT2ie.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/app-D1vEUifq.css">
   </head>
   <body>
     <section class="customer-qr-screen" id="customerQrScreen" aria-label="Customer ordering" hidden></section>
@@ -415,6 +415,7 @@
                   <button type="button" data-order-filter="Unpaid">Unpaid</button>
                 </div>
               </div>
+              <div class="waiter-pickup-queue" id="waiterPickupQueue" aria-live="polite"></div>
               <div class="order-list" id="orderList"></div>
               <div class="receipt-preview" id="receiptPreview" aria-live="polite"></div>
             </section>
@@ -1544,22 +1545,17 @@ Switch off signs and lock the restaurant.</textarea>
                     </select>
                   </label>
                 </div>
-                <div class="form-row">
-                  <label>
-                    Deposit provider
-                    <select name="paymentProcessor">
-                      <option value="">None</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Manual">Manual</option>
-                      <option value="Stripe">Stripe</option>
-                      <option value="Mollie">Mollie</option>
-                    </select>
-                  </label>
-                  <label>
-                    Payment reference
-                    <input name="paymentReference" type="text" autocomplete="off">
-                  </label>
-                </div>
+                <label>
+                  Deposit provider
+                  <select name="paymentProcessor">
+                    <option value="">None</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Manual">Manual</option>
+                    <option value="Stripe">Stripe</option>
+                    <option value="Mollie">Mollie</option>
+                  </select>
+                </label>
+                <input name="paymentReference" type="hidden">
                 <label>
                   Notes
                   <textarea name="notes" rows="3" placeholder="Occasion, high chair, accessibility, allergies"></textarea>

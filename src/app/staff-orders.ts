@@ -4,7 +4,7 @@ import {
   UNPAID_PAYMENT_METHOD
 } from "../shared/constants.js";
 import { normalizeKitchenStation, normalizeLineModifiers } from "../data/normalize.js";
-import { advanceStatus, setTicketStatus } from "../domain/kitchen.js";
+import { advanceStatus, resolveOrderStatusFromTickets, setTicketStatus } from "../domain/kitchen.js";
 import {
   normalizeFulfillmentStatus,
   normalizeOrderFulfillment,
@@ -14,6 +14,7 @@ import {
   productCanBeOrderedForOrderContext
 } from "../domain/orders.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
+import { createReceiptPdfBlob } from "../domain/receipt-pdf.js";
 import { isReservationTime } from "../domain/reservations.js";
 import { timeNow } from "../shared/dates.js";
 import { saveState, state } from "./state.js";
@@ -26,17 +27,28 @@ export function createStaffOrderRuntime(deps) {
     canView,
     currentUser,
     deductInventoryForItems,
+    formatDateTime,
     formatStockAmount,
+    fulfillmentLabel,
     getManualOrderCustomerDetails,
     getOrderCompletionToast,
     getOrderFulfillmentMeta,
+    getOrderPaidByName,
+    getOrderPaymentSummary,
+    getOrderStaffName,
+    getOrderSubtotalExcludingVat,
     getOrderTotal,
+    getOrderVatBreakdown,
+    getVatLabel,
     getSelectedPaymentMethodFromAction,
     getStockShortages,
     ingredientById,
     isOrderPaid,
+    money,
     normalizeOrderItems,
     orderById,
+    orderLocationLabel,
+    orderTypeLabel,
     productById,
     recipeLineAppliesToOrder,
     render,
@@ -326,6 +338,17 @@ export function createStaffOrderRuntime(deps) {
       staffName: staff?.name || "",
       paidByUserId: paymentStatus === "Paid" ? staff?.id || "" : "",
       paidByName: paymentStatus === "Paid" ? staff?.name || "" : "",
+      waiterPickupStatus: "",
+      waiterNotifiedAt: "",
+      waiterNotifiedAtMs: "",
+      waiterPickedUpAt: "",
+      waiterPickedUpAtMs: "",
+      waiterPickedUpByUserId: "",
+      waiterPickedUpByName: "",
+      servedAt: "",
+      servedAtMs: "",
+      servedByUserId: "",
+      servedByName: "",
       inventoryDeducted: false,
       assignedDriver: fulfillment === "Delivery" ? String(formData.get("assignedDriver") || "").trim() : "",
       pickupStatus: "",
@@ -376,18 +399,36 @@ export function createStaffOrderRuntime(deps) {
     showToast(`Order #${number} saved as New.`);
   }
 
+  function isWaiterPickupOrder(order) {
+    return orderTypeDefinition(order.channel || order.orderType).requiresTable && order.fulfillment === "Kitchen";
+  }
+
+  function updateWaiterPickupStatus(order) {
+    if (!isWaiterPickupOrder(order)) return;
+    if (order.status === "Ready") {
+      const now = Date.now();
+      order.waiterPickupStatus = order.waiterPickupStatus === "Picked up" ? "Picked up" : "Ready for pickup";
+      order.waiterNotifiedAt = order.waiterNotifiedAt || timeNow();
+      order.waiterNotifiedAtMs = order.waiterNotifiedAtMs || now;
+      return;
+    }
+    if (order.status === "Served" || order.status === "Paid") {
+      order.waiterPickupStatus = "Served";
+    }
+  }
+
   function syncOrderStatus(orderId) {
     const tickets = state.tickets.filter((ticket) => ticket.orderId === orderId);
     const order = orderById(orderId);
     if (!order || !tickets.length) return;
     if (order.status === "Paid" || order.status === "Cancelled") return;
-    if (tickets.every((ticket) => ticket.status === "Done")) order.status = isOrderPaid(order) ? "Paid" : "Served";
-    else if (tickets.every((ticket) => ticket.status === "Ready" || ticket.status === "Done")) order.status = "Ready";
-    else if (tickets.some((ticket) => ticket.status === "Delayed")) order.status = "Delayed";
-    else if (tickets.some((ticket) => ["Accepted", "Preparing"].includes(ticket.status))) order.status = "Preparing";
-    else order.status = "Sent to kitchen";
+    order.status = resolveOrderStatusFromTickets(order, tickets, {
+      isPaid: isOrderPaid(order),
+      isTableService: isWaiterPickupOrder(order)
+    });
     order.operationalStatus = normalizeOrderOperationalStatus(order.status);
     order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
+    updateWaiterPickupStatus(order);
   }
 
   function advanceTicket(ticketId) {
@@ -493,15 +534,47 @@ export function createStaffOrderRuntime(deps) {
 
     const order = orderById(orderId);
     if (!order || order.status === "Cancelled" || order.status === "Paid") return;
+    const staff = currentUser();
+    const now = Date.now();
     state.tickets
       .filter((ticket) => ticket.orderId === orderId)
       .forEach((ticket) => setTicketStatus(ticket, "Done"));
     order.status = isOrderPaid(order) ? "Paid" : "Served";
     order.operationalStatus = normalizeOrderOperationalStatus(order.status);
     order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
+    order.waiterPickupStatus = isWaiterPickupOrder(order) ? "Served" : order.waiterPickupStatus || "";
+    order.servedAt = order.servedAt || timeNow();
+    order.servedAtMs = order.servedAtMs || now;
+    order.servedByUserId = staff?.id || order.servedByUserId || "";
+    order.servedByName = staff?.name || order.servedByName || "";
     saveState();
     render();
     showToast(`Order #${order.number} marked served.`);
+  }
+
+  function markWaiterPickup(orderId) {
+    if (!can("canCreateOrders")) {
+      showToast("This role cannot update table pickups.");
+      return;
+    }
+
+    const order = orderById(orderId);
+    if (!order || !isWaiterPickupOrder(order)) return;
+    if (order.status !== "Ready") {
+      showToast(`Order #${order.number} is not ready for pickup yet.`);
+      return;
+    }
+
+    const staff = currentUser();
+    const now = Date.now();
+    order.waiterPickupStatus = "Picked up";
+    order.waiterPickedUpAt = timeNow();
+    order.waiterPickedUpAtMs = now;
+    order.waiterPickedUpByUserId = staff?.id || "";
+    order.waiterPickedUpByName = staff?.name || "";
+    saveState();
+    render();
+    showToast(`Order #${order.number} picked up for ${orderLocationLabel(order)}.`);
   }
 
   function markOrderPaid(orderId, paymentMethod = DEFAULT_PAID_PAYMENT_METHOD) {
@@ -570,6 +643,77 @@ export function createStaffOrderRuntime(deps) {
     window.setTimeout(() => window.print(), 50);
   }
 
+  function buildReceiptPdfInput(order) {
+    const settings = state.restaurantSettings;
+    const paymentSummary = getOrderPaymentSummary(order);
+    const totals = [
+      { label: "Subtotal excl. VAT", value: money(getOrderSubtotalExcludingVat(order)) },
+      ...getOrderVatBreakdown(order).map((row) => ({
+        label: `${getVatLabel(row.vatSetting)} (${Math.round(row.rate * 100)}%)`,
+        value: money(row.tax)
+      })),
+      { label: "Total", value: money(getOrderTotal(order)) }
+    ];
+    const paymentRows = [
+      `Payment: ${paymentSummary.statusLabel}`,
+      `Method: ${paymentSummary.method}`,
+      paymentSummary.paid && order.paidAt ? `Paid: ${formatDateTime(order.paidAtMs, order.paidAt)}` : "",
+      paymentSummary.paid ? `Paid by: ${getOrderPaidByName(order)}` : "",
+      order.paymentProcessor ? `Processor: ${order.paymentProcessor}` : ""
+    ].filter(Boolean);
+
+    return {
+      restaurantName: settings.restaurantName,
+      location: settings.location,
+      orderNumber: order.number,
+      createdAt: formatDateTime(order.createdAtMs, order.createdAt),
+      orderType: orderTypeLabel(order),
+      locationLabel: orderLocationLabel(order),
+      fulfillment: fulfillmentLabel(order),
+      staffName: getOrderStaffName(order),
+      items: order.items.map((item) => {
+        const product = productById(item.productId);
+        const detail = [
+          item.modifiers?.length ? item.modifiers.join(", ") : "",
+          item.note || ""
+        ].filter(Boolean).join(" · ");
+        return {
+          name: product?.name || "Unknown item",
+          detail,
+          quantity: item.quantity,
+          unitPrice: money(product?.price || 0),
+          total: money((product?.price || 0) * item.quantity)
+        };
+      }),
+      notes: order.notes,
+      totals,
+      paymentRows,
+      footerRows: getOrderFulfillmentMeta(order)
+    };
+  }
+
+  function openOrderReceiptPdf(orderId) {
+    const order = orderById(orderId);
+    if (!order) return;
+    state.receiptOrderId = order.id;
+    saveState();
+    render();
+
+    const blob = createReceiptPdfBlob(buildReceiptPdfInput(order));
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank", "noopener");
+    if (!opened) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `receipt-${order.number}.pdf`;
+      link.click();
+      showToast(`Receipt PDF downloaded for order #${order.number}.`);
+    } else {
+      showToast(`Receipt PDF opened for order #${order.number}.`);
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   return {
     addOrderDraftLine,
     addTicketIssueNote,
@@ -581,7 +725,9 @@ export function createStaffOrderRuntime(deps) {
     getSelectedLineModifiers,
     markOrderPaid,
     markOrderServed,
+    markWaiterPickup,
     markTicketDelayed,
+    openOrderReceiptPdf,
     printOrderReceipt,
     removeOrderDraftLine,
     sendOrderToKitchen,

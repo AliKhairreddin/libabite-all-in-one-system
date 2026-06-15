@@ -9,7 +9,7 @@ import {
   upsertCustomerFromOrderDetails
 } from "../dist/domain/customers.js";
 import { getProductAvailability, getStockRequirementsForItems, getStockShortages, planStockDeduction } from "../dist/domain/inventory.js";
-import { advanceStatus, getOrderProgressSummary, setTicketStatus } from "../dist/domain/kitchen.js";
+import { advanceStatus, getOrderProgressSummary, resolveOrderStatusFromTickets, setTicketStatus } from "../dist/domain/kitchen.js";
 import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderFulfillment, normalizeOrderItems } from "../dist/domain/orders.js";
 import { normalizeProductAllergens, productAllergenSummary, vatRateForSetting } from "../dist/domain/commerce.js";
 import {
@@ -29,6 +29,7 @@ import {
   getProductionOutputUnitType,
   getProductionReadiness
 } from "../dist/domain/production.js";
+import { createReceiptPdfBlob } from "../dist/domain/receipt-pdf.js";
 import { getProductMarginProfile, productAvailabilityLabel } from "../dist/domain/products.js";
 import { procedureAssignedToUser, procedureFrequencyWindowMs, procedureStatusClass } from "../dist/domain/procedures.js";
 import { convertActualUsageToStockUnits, convertRecipeLineToStockUnits, getRecipeUsageLabel, recipeLineAppliesToOrder } from "../dist/domain/recipes.js";
@@ -168,6 +169,52 @@ test("website order fulfillment preserves delivery checkout choice", () => {
   assert.equal(normalizeOrderFulfillment("Website order", "Delivery"), "Delivery");
   assert.equal(normalizeOrderFulfillment("Website order", "Pickup"), "Pickup");
   assert.equal(normalizeOrderFulfillment("Website order", "Unknown"), "Pickup");
+});
+
+test("table-service orders stay ready until a waiter serves them", () => {
+  const tableOrder = { id: "ORD-1", status: "Ready", servedAtMs: "" };
+  const doneTickets = [
+    { orderId: "ORD-1", status: "Done" },
+    { orderId: "ORD-1", status: "Done" }
+  ];
+
+  assert.equal(resolveOrderStatusFromTickets(tableOrder, doneTickets, { isTableService: true }), "Ready");
+  assert.equal(resolveOrderStatusFromTickets({ ...tableOrder, servedAtMs: 1000 }, doneTickets, { isTableService: true }), "Served");
+  assert.equal(resolveOrderStatusFromTickets({ ...tableOrder, status: "Preparing" }, [
+    { orderId: "ORD-1", status: "Ready" },
+    { orderId: "ORD-1", status: "Preparing" }
+  ], { isTableService: true }), "Preparing");
+  assert.equal(resolveOrderStatusFromTickets({ id: "ORD-2", status: "Ready" }, [
+    { orderId: "ORD-2", status: "Done" }
+  ], { isPaid: true }), "Paid");
+});
+
+test("receipt PDF generator returns a PDF blob payload", async () => {
+  const blob = createReceiptPdfBlob({
+    restaurantName: "Libabite",
+    location: "Roermond",
+    orderNumber: 42,
+    createdAt: "2026-06-14 12:00",
+    orderType: "Dine-in",
+    locationLabel: "Table 1",
+    fulfillment: "Kitchen",
+    staffName: "Yusuf",
+    items: [
+      { name: "Shish Taouk", quantity: 2, unitPrice: "€ 22,00", total: "€ 44,00", detail: "No onion" }
+    ],
+    totals: [
+      { label: "Subtotal excl. VAT", value: "€ 40,37" },
+      { label: "Total", value: "€ 44,00" }
+    ],
+    paymentRows: ["Payment: Unpaid"],
+    footerRows: ["Thanks"]
+  });
+  const payload = await blob.text();
+
+  assert.equal(blob.type, "application/pdf");
+  assert.equal(payload.startsWith("%PDF-1.4"), true);
+  assert.equal(payload.includes("Order #42"), true);
+  assert.equal(payload.includes("EUR 44,00"), true);
 });
 
 test("external delivery helpers parse, map, and prepare platform payloads", () => {

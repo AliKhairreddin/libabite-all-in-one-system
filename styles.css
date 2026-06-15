@@ -2605,6 +2605,7 @@ textarea {
 }
 
 .order-card,
+.waiter-pickup-card,
 .ticket-card,
 .station-card,
 .alert-card,
@@ -2813,6 +2814,65 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
+}
+
+.waiter-pickup-queue {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.waiter-pickup-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-left: 4px solid var(--info);
+  background: #ffffff;
+}
+
+.waiter-pickup-card.is-ready {
+  border-left-color: var(--ok);
+  background: #f3fbf6;
+}
+
+.waiter-pickup-card.is-delayed {
+  border-color: #efaaa5;
+  border-left-color: var(--danger);
+  background: #fff4f3;
+}
+
+.waiter-pickup-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.waiter-pickup-card header strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.waiter-pickup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.waiter-pickup-items {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.waiter-pickup-actions {
+  justify-content: flex-end;
 }
 
 .order-progress-mini {
@@ -6191,6 +6251,14 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .waiter-pickup-card {
+    grid-template-columns: 1fr;
+  }
+
+  .waiter-pickup-actions {
+    justify-content: flex-start;
+  }
+
   .order-driver-reassign {
     display: grid;
   }
@@ -6365,6 +6433,7 @@ textarea:focus {
   #view-orders .form-panel,
   #view-orders .panel-header,
   #orderList,
+  #waiterPickupQueue,
   .toast,
   .receipt-actions {
     display: none !important;

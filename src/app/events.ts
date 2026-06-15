@@ -48,11 +48,13 @@ export function bindAppEvents(handlers) {
     markDeliveryCashCollected,
     markOrderPaid,
     markOrderServed,
+    markWaiterPickup,
     markSupplierOrderOrdered,
     markTicketDelayed,
     moveScheduleWeek,
     notifyStaffShift,
     openQrCustomerUrl,
+    openOrderReceiptPdf,
     printOrderReceipt,
     promptAndRecordProcedureStatus,
     receiveSupplierOrder,
@@ -193,6 +195,9 @@ export function bindAppEvents(handlers) {
     const markServed = event.target.closest("[data-mark-served]");
     if (markServed) markOrderServed(markServed.dataset.markServed);
 
+    const waiterPickup = event.target.closest("[data-waiter-pickup]");
+    if (waiterPickup) markWaiterPickup(waiterPickup.dataset.waiterPickup);
+
     const markPaid = event.target.closest("[data-mark-paid]");
     if (markPaid) markOrderPaid(markPaid.dataset.markPaid, getSelectedPaymentMethodFromAction(markPaid));
 
@@ -246,6 +251,9 @@ export function bindAppEvents(handlers) {
 
     const printReceipt = event.target.closest("[data-print-receipt]");
     if (printReceipt) printOrderReceipt(printReceipt.dataset.printReceipt);
+
+    const pdfReceipt = event.target.closest("[data-pdf-receipt]");
+    if (pdfReceipt) openOrderReceiptPdf(pdfReceipt.dataset.pdfReceipt);
   
     const removeRecipeLine = event.target.closest("[data-remove-recipe-line]");
     if (removeRecipeLine) removeSellableRecipeLine(removeRecipeLine.dataset.removeRecipeLine);

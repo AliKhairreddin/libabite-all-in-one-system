@@ -36,6 +36,21 @@ export function setTicketStatus(ticket, status, options: { now?: number } = {}) 
   return true;
 }
 
+export function resolveOrderStatusFromTickets(order, tickets = [], options: { isPaid?: boolean; isTableService?: boolean } = {}) {
+  const orderTickets = tickets.filter((ticket: any) => ticket.orderId === order.id);
+  if (!order || !orderTickets.length) return order?.status || "New";
+  if (order.status === "Paid" || order.status === "Cancelled") return order.status;
+  if (orderTickets.every((ticket: any) => ticket.status === "Done")) {
+    return options.isTableService && !order.servedAtMs
+      ? "Ready"
+      : options.isPaid ? "Paid" : "Served";
+  }
+  if (orderTickets.every((ticket: any) => ticket.status === "Ready" || ticket.status === "Done")) return "Ready";
+  if (orderTickets.some((ticket: any) => ticket.status === "Delayed")) return "Delayed";
+  if (orderTickets.some((ticket: any) => ["Accepted", "Preparing"].includes(ticket.status))) return "Preparing";
+  return "Sent to kitchen";
+}
+
 export function getOrderProgressSummary(order, tickets = []) {
   const orderTickets = tickets.filter((ticket: any) => ticket.orderId === order.id);
   const finished = orderTickets.filter((ticket: any) => ticket.status === "Ready" || ticket.status === "Done").length;

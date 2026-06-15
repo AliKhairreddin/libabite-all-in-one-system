@@ -1097,6 +1097,15 @@ export function normalizeDeliveryNotes(notes) {
     .slice(-12);
 }
 
+export function normalizeWaiterPickupStatus(status, orderStatus = "New", isTableService = false) {
+  const candidate = String(status || "").trim();
+  if (["Ready for pickup", "Picked up", "Served"].includes(candidate)) return candidate;
+  if (!isTableService) return "";
+  if (orderStatus === "Ready") return "Ready for pickup";
+  if (orderStatus === "Served" || orderStatus === "Paid") return "Served";
+  return "";
+}
+
 export function normalizeLineModifiers(modifiers) {
   const source = Array.isArray(modifiers)
     ? modifiers
@@ -1617,6 +1626,8 @@ export function normalizeState(candidate) {
       const externalCommissionRate = isExternalOrder
         ? normalizeExternalCommissionRate(order.externalCommissionRate, externalPlatform?.commissionRate)
         : 0;
+      const status = normalizeOrderStatus(order.status, paymentStatus);
+      const isTableService = typeDefinition.requiresTable && fulfillment === "Kitchen";
 
       return {
         ...order,
@@ -1630,7 +1641,7 @@ export function normalizeState(candidate) {
         fulfillment,
         operationalStatus: normalizeOrderOperationalStatus(order.operationalStatus || order.lifecycleStatus || order.status),
         fulfillmentStatus: normalizeFulfillmentStatus(order.fulfillmentStatus || order.status),
-        status: normalizeOrderStatus(order.status, paymentStatus),
+        status,
         createdAt,
         createdAtMs: normalizeTimestamp(order.createdAtMs, createdAt),
         sentAt: order.sentAt || (order.status && order.status !== "New" ? createdAt : ""),
@@ -1640,6 +1651,17 @@ export function normalizeState(candidate) {
         staffName,
         paidByUserId: paymentStatus === "Paid" ? paidByUser?.id || "" : "",
         paidByName: paymentStatus === "Paid" ? String(order.paidByName || paidByUser?.name || staffName || "").trim() : "",
+        waiterPickupStatus: normalizeWaiterPickupStatus(order.waiterPickupStatus, status, isTableService),
+        waiterNotifiedAt: String(order.waiterNotifiedAt || "").trim(),
+        waiterNotifiedAtMs: normalizeOptionalTimestamp(order.waiterNotifiedAtMs),
+        waiterPickedUpAt: String(order.waiterPickedUpAt || "").trim(),
+        waiterPickedUpAtMs: normalizeOptionalTimestamp(order.waiterPickedUpAtMs),
+        waiterPickedUpByUserId: String(order.waiterPickedUpByUserId || "").trim(),
+        waiterPickedUpByName: String(order.waiterPickedUpByName || "").trim(),
+        servedAt: String(order.servedAt || "").trim(),
+        servedAtMs: normalizeOptionalTimestamp(order.servedAtMs),
+        servedByUserId: String(order.servedByUserId || "").trim(),
+        servedByName: String(order.servedByName || "").trim(),
         inventoryDeducted: order.inventoryDeducted === undefined ? order.status && order.status !== "New" : Boolean(order.inventoryDeducted),
         requestedTime: String(order.requestedTime || "").trim(),
         customerName: String(order.customerName || "").trim(),

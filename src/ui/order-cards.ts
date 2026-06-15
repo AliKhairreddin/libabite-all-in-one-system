@@ -156,6 +156,7 @@ export function createOrderCardsUi(deps) {
           ${!paymentSummary.paid && canFrontUpdate ? paymentCaptureHtml(order) : ""}
           ${order.status === "New" && canFrontUpdate ? `<button class="mini-btn danger-action" type="button" data-cancel-order="${escapeHtml(order.id)}">Cancel</button>` : ""}
           <button class="mini-btn" type="button" data-show-receipt="${escapeHtml(order.id)}">Receipt</button>
+          <button class="mini-btn" type="button" data-pdf-receipt="${escapeHtml(order.id)}">PDF</button>
           <button class="mini-btn" type="button" data-print-receipt="${escapeHtml(order.id)}">Print</button>
         </div>
       </article>

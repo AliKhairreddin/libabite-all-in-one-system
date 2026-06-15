@@ -108,10 +108,10 @@ export function createKitchenUi(deps) {
       <div class="mini-actions kds-actions">
         ${ticket.status === "Queued" ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Accepted">Accept order</button>` : ""}
         ${!["Preparing", "Ready", "Done"].includes(ticket.status) ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Preparing">Preparing</button>` : ""}
-        ${!ready && !done ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Ready">Ready</button>` : ""}
+        ${!ready && !done ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Ready">Finished</button>` : ""}
         ${!["Delayed", "Ready", "Done"].includes(ticket.status) ? `<button class="mini-btn danger-action" type="button" data-delay-ticket="${escapeHtml(ticket.id)}">Delayed</button>` : ""}
         ${!done ? `<button class="mini-btn" type="button" data-issue-ticket="${escapeHtml(ticket.id)}">Issue note</button>` : ""}
-        ${ready ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Done">Complete task</button>` : ""}
+        ${ready ? `<button class="mini-btn" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-status="Done">Clear task</button>` : ""}
       </div>
     `;
   }
@@ -134,11 +134,12 @@ export function createKitchenUi(deps) {
     const orderLabel = order ? `#${order.number} ${orderLocationLabel(order)}` : ticket.orderId;
     const notes = ticket.notes || "No notes or modifiers";
     const noteParts = visibleTicketNoteParts(notes);
+    const stationScope = state.activeStation === "All" ? ticket.station : `${state.activeStation} only`;
     return `
       <article class="ticket-card ${sla.cardClass} status-${escapeHtml(slugify(ticket.status))}">
         <header>
           <div class="ticket-heading">
-            <span class="ticket-kicker">${escapeHtml(ticket.station)}</span>
+            <span class="ticket-kicker">${escapeHtml(stationScope)}</span>
             <strong>${escapeHtml(orderLabel)}</strong>
             <p>${ticket.quantity}x ${escapeHtml(product?.name || "Unknown item")}</p>
           </div>
