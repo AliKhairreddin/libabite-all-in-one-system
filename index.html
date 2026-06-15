@@ -1543,22 +1543,17 @@ Switch off signs and lock the restaurant.</textarea>
                     </select>
                   </label>
                 </div>
-                <div class="form-row">
-                  <label>
-                    Deposit provider
-                    <select name="paymentProcessor">
-                      <option value="">None</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Manual">Manual</option>
-                      <option value="Stripe">Stripe</option>
-                      <option value="Mollie">Mollie</option>
-                    </select>
-                  </label>
-                  <label>
-                    Payment reference
-                    <input name="paymentReference" type="text" autocomplete="off">
-                  </label>
-                </div>
+                <label>
+                  Deposit provider
+                  <select name="paymentProcessor">
+                    <option value="">None</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Manual">Manual</option>
+                    <option value="Stripe">Stripe</option>
+                    <option value="Mollie">Mollie</option>
+                  </select>
+                </label>
+                <input name="paymentReference" type="hidden">
                 <label>
                   Notes
                   <textarea name="notes" rows="3" placeholder="Occasion, high chair, accessibility, allergies"></textarea>

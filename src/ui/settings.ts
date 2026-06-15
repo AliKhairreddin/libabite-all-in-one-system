@@ -351,7 +351,7 @@ export function createSettingsUi(deps) {
         const statusText = issues.length ? "Review" : reservation.status;
         const contact = [reservation.phone, reservation.email].filter(Boolean).join(" | ") || "No contact";
         const depositText = Number(reservation.depositAmount || 0) > 0
-          ? ` | Deposit ${reservation.paymentStatus || "Unpaid"} EUR ${Number(reservation.depositAmount || 0).toFixed(2)}${reservation.paymentReference ? ` ${reservation.paymentReference}` : ""}`
+          ? ` | Deposit ${reservation.paymentStatus || "Unpaid"} EUR ${Number(reservation.depositAmount || 0).toFixed(2)}`
           : "";
         return `
           <article class="reservation-card ${issues.length ? "is-conflict" : ""}">

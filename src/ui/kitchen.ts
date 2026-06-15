@@ -115,6 +115,14 @@ export function createKitchenUi(deps) {
       </div>
     `;
   }
+
+  function visibleTicketNoteParts(notes) {
+    const parts = String(notes || "")
+      .split(/\s+\|\s+/)
+      .map((part) => part.trim())
+      .filter((part) => part && !/^Payment ref(?:erence)?:/i.test(part));
+    return parts.length ? parts : ["No notes or modifiers"];
+  }
   
   function ticketCard(ticket) {
     const product = productById(ticket.productId);
@@ -125,10 +133,11 @@ export function createKitchenUi(deps) {
     const orderAge = getTicketOrderAgeMinutes(ticket);
     const orderLabel = order ? `#${order.number} ${orderLocationLabel(order)}` : ticket.orderId;
     const notes = ticket.notes || "No notes or modifiers";
+    const noteParts = visibleTicketNoteParts(notes);
     return `
       <article class="ticket-card ${sla.cardClass} status-${escapeHtml(slugify(ticket.status))}">
         <header>
-          <div>
+          <div class="ticket-heading">
             <span class="ticket-kicker">${escapeHtml(ticket.station)}</span>
             <strong>${escapeHtml(orderLabel)}</strong>
             <p>${ticket.quantity}x ${escapeHtml(product?.name || "Unknown item")}</p>
@@ -141,7 +150,9 @@ export function createKitchenUi(deps) {
         </header>
         <div class="ticket-notes">
           <span>Notes/modifiers</span>
-          <p>${escapeHtml(notes)}</p>
+          <div class="ticket-note-list">
+            ${noteParts.map((part) => `<p>${escapeHtml(part)}</p>`).join("")}
+          </div>
         </div>
         ${ticket.issueNote ? `
           <div class="ticket-issue">

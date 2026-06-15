@@ -2813,6 +2813,11 @@ textarea {
   font-size: 0.84rem;
 }
 
+.meta-line span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .order-driver-reassign {
   position: relative;
   display: inline-flex;
@@ -3026,6 +3031,11 @@ textarea {
   gap: 8px 12px;
 }
 
+.receipt-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .receipt-lines {
   display: grid;
   gap: 9px;
@@ -3127,7 +3137,6 @@ textarea {
   gap: 12px;
 }
 
-.ticket-card header,
 .recipe-card header,
 .supplier-card header,
 .staff-card header,
@@ -3182,9 +3191,30 @@ textarea {
 }
 
 .ticket-card {
+  min-width: 0;
+  overflow: hidden;
   display: grid;
   gap: 10px;
   border-left: 4px solid var(--line);
+}
+
+.ticket-card header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.ticket-heading {
+  min-width: 0;
+}
+
+.ticket-heading strong,
+.ticket-heading p {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ticket-card.sla-aging {
@@ -3226,10 +3256,25 @@ textarea {
 
 .ticket-notes,
 .ticket-issue {
+  min-width: 0;
   display: grid;
   gap: 3px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
+}
+
+.ticket-note-list {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-note-list p,
+.ticket-issue p,
+.reservation-card p {
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .ticket-issue {
@@ -3247,6 +3292,7 @@ textarea {
 }
 
 .ticket-pills {
+  min-width: 0;
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;

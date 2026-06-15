@@ -130,7 +130,6 @@ export function getOrderFulfillmentMeta(order) {
   if (driver) details.push(`Driver: ${driver.name}`);
   const deliveryStatus = getDeliveryStatus(order);
   if (deliveryStatus) details.push(`Delivery: ${deliveryStatus}`);
-  if (order.paymentReference) details.push(`Payment ref: ${order.paymentReference}`);
   if (order.externalPlatformName || order.externalOrderId) {
     details.push(`Platform: ${[order.externalPlatformName, order.externalOrderId].filter(Boolean).join(" ")}`);
   }
