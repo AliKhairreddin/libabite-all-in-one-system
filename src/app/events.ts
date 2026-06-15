@@ -1,4 +1,4 @@
-import { resetState, saveState, state } from "./state.js";
+import { flushRemoteState, resetState, saveState, state } from "./state.js";
 
 export function bindAppEvents(handlers) {
   const document: any = window.document;
@@ -595,14 +595,15 @@ export function bindAppEvents(handlers) {
     document.querySelector("#orderForm").scrollIntoView({ behavior: "smooth", block: "start" });
   });
   
-  document.querySelector("#resetDemoBtn").addEventListener("click", () => {
+  document.querySelector("#resetDemoBtn").addEventListener("click", async () => {
     if (!can("canResetDemo")) return;
     const previousUserId = state.currentUserId;
     const nextState = resetState();
     if (nextState.users.some((user) => user.id === previousUserId)) nextState.currentUserId = previousUserId;
     saveState();
+    await flushRemoteState();
     render();
-    showToast("Demo data reset.");
+    showToast("Demo data reset, including bookings.");
   });
   
   document.querySelector("#wasteKeftaBtn")?.addEventListener("click", logWaste);
