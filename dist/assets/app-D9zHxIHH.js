@@ -968,7 +968,7 @@ var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=
             ${t.length?t.map(e=>ge(e,{compact:!0})).join(``):u(`No shifts`)}
           </div>
         </section>
-      `}).join(``);let y=new Map;l.forEach(e=>{y.set(e.staffId,[...y.get(e.staffId)||[],e])}),a.innerHTML=[...y.entries()].map(([e,t])=>{let n=Z.users.find(t=>t.id===e);return n?be(n,t):``}).join(``)||u(`No scheduled shifts in this week.`),o.value=xe(l)}function Ce(){let e=t.querySelector(`#staffRoleSelect`),i=t.querySelector(`#userList`),a=t.querySelector(`#driversPanel`),s=t.querySelector(`#timeClockPanel`),c=r(),l=o()===`driver`;t.querySelectorAll(`.admin-only`).forEach(e=>{e.hidden=!n(`canCreateUsers`)}),s&&(s.hidden=l),a&&(a.hidden=!c,a.classList.toggle(`wide-panel`,!1)),e&&(e.innerHTML=Ae.filter(e=>e!==`owner_admin`).map(e=>`<option value="${$(e)}">${$(g(e).label)}</option>`).join(``)),i&&(i.innerHTML=Z.users.map(e=>`
+      `}).join(``);let y=new Map;l.forEach(e=>{y.set(e.staffId,[...y.get(e.staffId)||[],e])}),a.innerHTML=[...y.entries()].map(([e,t])=>{let n=Z.users.find(t=>t.id===e);return n?be(n,t):``}).join(``)||u(`No scheduled shifts in this week.`),o.value=xe(l)}function Ce(){let e=t.querySelector(`#staffRoleSelect`),i=t.querySelector(`#userList`),a=t.querySelector(`#driversPanel`),s=t.querySelector(`#timeClockPanel`),c=r();o(),t.querySelectorAll(`.admin-only`).forEach(e=>{e.hidden=!n(`canCreateUsers`)}),s&&(s.hidden=!1),a&&(a.hidden=!c,a.classList.toggle(`wide-panel`,!1)),e&&(e.innerHTML=Ae.filter(e=>e!==`owner_admin`).map(e=>`<option value="${$(e)}">${$(g(e).label)}</option>`).join(``)),i&&(i.innerHTML=Z.users.map(e=>`
           <article class="user-card">
             <div>
               <strong>${$(e.name)}</strong>
@@ -976,7 +976,7 @@ var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=
             </div>
             <span class="pill ${e.status===`Active`?`ok`:`warning`}">${$(g(e.role).label)}</span>
           </article>
-        `).join(``));let d=c?Z.drivers:[],f=t.querySelector(`#driverList`);f&&(c?f.innerHTML=d.length?d.map(e=>{let t=e.orderId?p(e.orderId):null,n=e.status===`Available`?`ok`:e.status===`Failed delivery`?`danger`:`info`;return`
+        `).join(``));let l=c?Z.drivers:[],d=t.querySelector(`#driverList`);d&&(c?d.innerHTML=l.length?l.map(e=>{let t=e.orderId?p(e.orderId):null,n=e.status===`Available`?`ok`:e.status===`Failed delivery`?`danger`:`info`;return`
               <article class="driver-card">
                 <header>
                   <div>
@@ -987,7 +987,7 @@ var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=
                 </header>
                 <p>${$(t?`Order #${t.number} | ETA ${J(t)}`:`Ready for next delivery.`)}</p>
               </article>
-            `}).join(``):u(`No drivers created yet.`):f.innerHTML=``),l||ve(),Se(),re(),ce()}return{getCurrentDriverDeliveryOrders:y,getDeliveryOrders:_,getDriverDeliveryOrders:v,renderDeliveryManager:ce,renderDriverApp:re,renderTeam:Ce}}function Kl(e,t=`QR code`){try{return Jl(e,t)}catch{return ql(e,t)}}function ql(e,t){let n=[],r=2166136261;String(e).split(``).forEach(e=>{r^=e.charCodeAt(0),r=Math.imul(r,16777619)});for(let e=0;e<29;e+=1)for(let t=0;t<29;t+=1){let i=t<7&&e<7||t>=22&&e<7||t<7&&e>=22,a=i&&(t%22==0||e%22==0||t%22==6||e%22==6),o=i&&t%22>=2&&t%22<=4&&e%22>=2&&e%22<=4;(a||o||!i&&Math.imul(r^t*31+e*17,1103515245)>>>27&1)&&n.push(`<rect x="${t+2}" y="${e+2}" width="1" height="1"/>`)}return`
+            `}).join(``):u(`No drivers created yet.`):d.innerHTML=``),ve(),Se(),re(),ce()}return{getCurrentDriverDeliveryOrders:y,getDeliveryOrders:_,getDriverDeliveryOrders:v,renderDeliveryManager:ce,renderDriverApp:re,renderTeam:Ce}}function Kl(e,t=`QR code`){try{return Jl(e,t)}catch{return ql(e,t)}}function ql(e,t){let n=[],r=2166136261;String(e).split(``).forEach(e=>{r^=e.charCodeAt(0),r=Math.imul(r,16777619)});for(let e=0;e<29;e+=1)for(let t=0;t<29;t+=1){let i=t<7&&e<7||t>=22&&e<7||t<7&&e>=22,a=i&&(t%22==0||e%22==0||t%22==6||e%22==6),o=i&&t%22>=2&&t%22<=4&&e%22>=2&&e%22<=4;(a||o||!i&&Math.imul(r^t*31+e*17,1103515245)>>>27&1)&&n.push(`<rect x="${t+2}" y="${e+2}" width="1" height="1"/>`)}return`
     <svg class="qr-code-svg" viewBox="0 0 33 33" role="img" aria-label="${$(t)}" xmlns="http://www.w3.org/2000/svg">
       <title>${$(t)}</title>
       <rect width="33" height="33" fill="#fff"/>

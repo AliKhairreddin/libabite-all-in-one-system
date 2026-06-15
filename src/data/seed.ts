@@ -10,6 +10,8 @@ const seedOnlineOrderAssignedAtMs = seedNowMs - (11 * MINUTE_MS);
 const seedOnlineOrderUpdatedAtMs = seedNowMs - (4 * MINUTE_MS);
 const seedActiveShiftClockInMs = seedNowMs - (45 * MINUTE_MS);
 const seedActiveShiftClockIn = seedClockTime(seedActiveShiftClockInMs);
+const seedActiveShiftEnd = seedClockTime(seedNowMs + (4 * 60 * MINUTE_MS));
+const seedActiveShiftPlanned = `${seedActiveShiftClockIn}-${seedActiveShiftEnd}`;
 
 function seedShiftTimestamp(date, time) {
   return new Date(`${date}T${time}:00`).getTime();
@@ -7523,10 +7525,10 @@ export const seedState = {
   staff: [
     { id: "amina", name: "Amina", role: "Kitchen", planned: "10:00-17:00", clocked: "10:02", status: "On shift" },
     { id: "yusuf", name: "Yusuf", role: "Front", planned: "12:00-21:00", clocked: "11:58", status: "On shift" },
-    { id: "samir", name: "Samir", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
-    { id: "omar", name: "Omar", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
-    { id: "nadia", name: "Nadia", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
-    { id: "yara", name: "Yara", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "samir", name: "Samir", role: "Driver", planned: seedActiveShiftPlanned, clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "omar", name: "Omar", role: "Driver", planned: seedActiveShiftPlanned, clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "nadia", name: "Nadia", role: "Driver", planned: seedActiveShiftPlanned, clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "yara", name: "Yara", role: "Driver", planned: seedActiveShiftPlanned, clocked: seedActiveShiftClockIn, status: "On shift" },
     { id: "lina", name: "Lina", role: "Sweets", planned: "15:00-22:00", clocked: "-", status: "Starts soon" }
   ],
   staffShifts: [
@@ -7636,8 +7638,8 @@ export const seedState = {
       role: "Driver",
       station: "Delivery",
       date: seedToday,
-      startTime: "09:00",
-      endTime: "23:00",
+      startTime: seedActiveShiftClockIn,
+      endTime: seedActiveShiftEnd,
       notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
       notifiedAt: "08:30",
       clockInAtMs: seedActiveShiftClockInMs,
@@ -7657,8 +7659,8 @@ export const seedState = {
       role: "Driver",
       station: "Delivery",
       date: seedToday,
-      startTime: "09:00",
-      endTime: "23:00",
+      startTime: seedActiveShiftClockIn,
+      endTime: seedActiveShiftEnd,
       notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
       notifiedAt: "08:30",
       clockInAtMs: seedActiveShiftClockInMs,
@@ -7678,8 +7680,8 @@ export const seedState = {
       role: "Driver",
       station: "Delivery",
       date: seedToday,
-      startTime: "09:00",
-      endTime: "23:00",
+      startTime: seedActiveShiftClockIn,
+      endTime: seedActiveShiftEnd,
       notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
       notifiedAt: "08:30",
       clockInAtMs: seedActiveShiftClockInMs,
@@ -7699,8 +7701,8 @@ export const seedState = {
       role: "Driver",
       station: "Delivery",
       date: seedToday,
-      startTime: "09:00",
-      endTime: "23:00",
+      startTime: seedActiveShiftClockIn,
+      endTime: seedActiveShiftEnd,
       notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
       notifiedAt: "08:30",
       clockInAtMs: seedActiveShiftClockInMs,

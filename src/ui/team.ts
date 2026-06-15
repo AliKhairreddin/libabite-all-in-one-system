@@ -981,7 +981,7 @@ export function createTeamUi(deps) {
       panel.hidden = !can("canCreateUsers");
     });
 
-    if (timeClockPanel) timeClockPanel.hidden = isDriverRole;
+    if (timeClockPanel) timeClockPanel.hidden = false;
   
     if (driversPanel) {
       driversPanel.hidden = !showDriverDirectory;
@@ -1037,7 +1037,7 @@ export function createTeamUi(deps) {
       }
     }
   
-    if (!isDriverRole) renderTimeClock();
+    renderTimeClock();
     renderScheduleManagement();
     renderDriverApp();
     renderDeliveryManager();
