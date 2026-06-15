@@ -125,6 +125,16 @@ export function bindAppEvents(handlers) {
     handleAddressKeydown(event);
   });
 
+  const handleAddressSuggestionPress = (event: any) => {
+    const addressSuggestion = event.target.closest("[data-address-suggestion]");
+    if (!addressSuggestion) return;
+    event.preventDefault();
+    chooseAddressSuggestion(addressSuggestion);
+  };
+
+  document.addEventListener("pointerdown", handleAddressSuggestionPress);
+  document.addEventListener("mousedown", handleAddressSuggestionPress);
+
   document.addEventListener("click", (event: any) => {
     const addressSuggestion = event.target.closest("[data-address-suggestion]");
     if (addressSuggestion) {

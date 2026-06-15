@@ -86,6 +86,7 @@ function setAddressMetadata(input, suggestion: any = {}) {
 
 function resetAddressMetadata(input) {
   setAddressMetadata(input, {});
+  delete input.dataset.addressSelected;
 }
 
 function setAddressHelper(input, text) {
@@ -153,7 +154,7 @@ function nominatimSuggestion(result) {
     address.postcode,
     address.city || address.town || address.village || address.municipality || "Roermond"
   ].filter(Boolean).join(" ");
-  const label = cleanAddressText(streetLine || result?.display_name);
+  const label = cleanAddressText([streetLine, cityLine].filter(Boolean).join(", ") || result?.display_name);
   const detail = cleanAddressText(cityLine || result?.display_name);
   const lat = Number(result?.lat);
   const lng = Number(result?.lon);
@@ -239,7 +240,9 @@ export function createAddressAutocompleteRuntime() {
   }
 
   function handleAddressFocus(input) {
+    if (input.dataset.addressSkipFocus === "true") return;
     if (cleanAddressText(input.value)) {
+      if (input.dataset.addressSelected === "true") return;
       handleAddressInput(input);
       return;
     }
@@ -258,10 +261,15 @@ export function createAddressAutocompleteRuntime() {
       placeId: button.dataset.addressPlaceId || ""
     };
     input.value = suggestion.label;
+    input.dataset.addressSelected = "true";
+    input.dataset.addressSkipFocus = "true";
     setAddressMetadata(input, suggestion);
     setAddressHelper(input, suggestion.source ? `Selected ${suggestion.source.toLowerCase()}` : "");
     closeAddressSuggestions(input);
-    input.focus();
+    input.focus({ preventScroll: true });
+    window.setTimeout(() => {
+      delete input.dataset.addressSkipFocus;
+    }, 120);
   }
 
   function handleAddressKeydown(event) {

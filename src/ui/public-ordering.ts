@@ -346,6 +346,8 @@ export function createPublicOrderingUi(deps) {
 
   function snapshotCustomerFormValues(form) {
     const values = {};
+    const activeElement = document.activeElement;
+    let focus: any = null;
     form.querySelectorAll("[name]").forEach((control: any) => {
       if (control.type === "hidden" && !String(control.name || "").startsWith("deliveryAddress")) return;
       if (control.type === "radio" || control.type === "checkbox") {
@@ -353,11 +355,23 @@ export function createPublicOrderingUi(deps) {
         return;
       }
       values[control.name] = control.value;
+      if (control === activeElement) {
+        focus = {
+          name: control.name,
+          selectionStart: typeof control.selectionStart === "number" ? control.selectionStart : null,
+          selectionEnd: typeof control.selectionEnd === "number" ? control.selectionEnd : null
+        };
+      }
     });
-    return values;
+    return {
+      focus,
+      scrollTop: Number(form.scrollTop) || 0,
+      values
+    };
   }
 
-  function restoreCustomerFormValues(form, values) {
+  function restoreCustomerFormValues(form, snapshot) {
+    const values = snapshot?.values || {};
     form.querySelectorAll("[name]").forEach((control: any) => {
       if (control.type === "hidden" && !String(control.name || "").startsWith("deliveryAddress")) return;
       if (control.type === "radio" || control.type === "checkbox") {
@@ -367,6 +381,25 @@ export function createPublicOrderingUi(deps) {
       }
       if (Object.prototype.hasOwnProperty.call(values, control.name)) control.value = values[control.name];
     });
+
+    const addressInput: any = form.querySelector("[data-address-input]");
+    if (addressInput) {
+      const selectedAddress = String(values.deliveryAddressLabel || values.deliveryAddress || "").trim();
+      const hasSelectedMetadata = Boolean(values.deliveryAddressLat || values.deliveryAddressLng || values.deliveryAddressPlaceId || values.deliveryAddressSource);
+      if (selectedAddress && hasSelectedMetadata && addressInput.value === selectedAddress) addressInput.dataset.addressSelected = "true";
+      else delete addressInput.dataset.addressSelected;
+    }
+
+    if (Number(snapshot?.scrollTop) > 0) form.scrollTop = snapshot.scrollTop;
+    if (snapshot?.focus?.name) {
+      const focusControl: any = form.querySelector(`[name="${CSS.escape(snapshot.focus.name)}"]`);
+      if (focusControl) {
+        focusControl.focus({ preventScroll: true });
+        if (snapshot.focus.selectionStart !== null && typeof focusControl.setSelectionRange === "function") {
+          focusControl.setSelectionRange(snapshot.focus.selectionStart, snapshot.focus.selectionEnd ?? snapshot.focus.selectionStart);
+        }
+      }
+    }
   }
 
   function updateWebsiteFulfillmentSurfaces(orderContext) {
@@ -761,6 +794,8 @@ export function createPublicOrderingUi(deps) {
     const screen = document.querySelector("#customerQrScreen");
     const session = getCustomerQrSession();
     if (!screen || !session) return;
+    const existingForm: any = document.querySelector("#customerOrderForm");
+    const formSnapshot = existingForm?.dataset.customerMode === "qr" ? snapshotCustomerFormValues(existingForm) : null;
   
     if (session.error) {
       screen.innerHTML = `
@@ -835,12 +870,16 @@ export function createPublicOrderingUi(deps) {
         ${customerUpsellFlowHtml(cartItems, CUSTOMER_QR_ORDER_CONTEXT)}
       </div>
     `;
+    const nextForm = document.querySelector("#customerOrderForm");
+    if (formSnapshot && nextForm) restoreCustomerFormValues(nextForm, formSnapshot);
   }
   
   function renderWebsiteOrderScreen() {
     const screen = document.querySelector("#customerQrScreen");
     const session = getWebsiteOrderSession();
     if (!screen || !session) return;
+    const existingForm: any = document.querySelector("#customerOrderForm");
+    const formSnapshot = existingForm?.dataset.customerMode === "website" ? snapshotCustomerFormValues(existingForm) : null;
   
     const orderContext = getCustomerOrderContext("website");
     const fulfillmentOption = websiteFulfillmentOption(orderContext.fulfillment);
@@ -901,6 +940,8 @@ export function createPublicOrderingUi(deps) {
         ${customerUpsellFlowHtml(cartItems, orderContext)}
       </div>
     `;
+    const nextForm = document.querySelector("#customerOrderForm");
+    if (formSnapshot && nextForm) restoreCustomerFormValues(nextForm, formSnapshot);
     renderCustomerDeliveryMaps();
   }
 
