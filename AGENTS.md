@@ -10,3 +10,13 @@ when that better serves the new direction.
 Preserve existing behavior only when the user explicitly asks for it, when a
 security, data-integrity, or compatibility requirement clearly depends on it, or
 when changing it would obviously undermine the requested outcome.
+
+## Domain Context
+
+The active development/current system domain for this project is
+`thatcanadian.dev`.
+
+`libabite.nl` is the old/currently used external system that the team wants to
+improve on and eventually stop using. Do not assume `libabite.nl` is the domain
+where new development should be deployed or verified unless the user explicitly
+says so.
