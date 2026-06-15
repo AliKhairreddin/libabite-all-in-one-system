@@ -158,13 +158,20 @@ export function createAppRenderer(deps) {
     const container = document.querySelector("#demoLogins");
     if (!container) return;
   
-    container.innerHTML = ROLE_ORDER
-      .map((role) => {
-        const user = state.users.find((account) => account.role === role && account.status === "Active");
-        if (!user) return "";
+    container.innerHTML = state.users
+      .filter((account) => account.status === "Active")
+      .slice()
+      .sort((first, second) => {
+        const firstRoleIndex = ROLE_ORDER.indexOf(first.role);
+        const secondRoleIndex = ROLE_ORDER.indexOf(second.role);
+        return (firstRoleIndex === -1 ? ROLE_ORDER.length : firstRoleIndex)
+          - (secondRoleIndex === -1 ? ROLE_ORDER.length : secondRoleIndex)
+          || first.name.localeCompare(second.name);
+      })
+      .map((user) => {
         return `
           <button class="demo-login" type="button" data-demo-login="${escapeHtml(user.email)}" data-demo-password="${escapeHtml(user.password)}">
-            <strong>${escapeHtml(roleDefinition(role).label)}</strong>
+            <strong>${escapeHtml(roleDefinition(user.role).label)} - ${escapeHtml(user.name)}</strong>
             <span>${escapeHtml(user.email)}</span>
           </button>
         `;

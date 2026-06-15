@@ -8,6 +8,8 @@ const seedOnlineOrderCreatedAtMs = seedNowMs - (22 * MINUTE_MS);
 const seedOnlineOrderSentAtMs = seedNowMs - (18 * MINUTE_MS);
 const seedOnlineOrderAssignedAtMs = seedNowMs - (11 * MINUTE_MS);
 const seedOnlineOrderUpdatedAtMs = seedNowMs - (4 * MINUTE_MS);
+const seedActiveShiftClockInMs = seedNowMs - (45 * MINUTE_MS);
+const seedActiveShiftClockIn = seedClockTime(seedActiveShiftClockInMs);
 
 function seedShiftTimestamp(date, time) {
   return new Date(`${date}T${time}:00`).getTime();
@@ -64,9 +66,33 @@ export const seedState = {
     {
       id: "samir",
       name: "Samir Driver",
-      email: "driver@libabite.nl",
+      email: "driver1@thatcanadian.dev",
       role: "driver",
-      password: "demo123",
+      password: "driver1",
+      status: "Active"
+    },
+    {
+      id: "omar",
+      name: "Omar Driver",
+      email: "driver2@thatcanadian.dev",
+      role: "driver",
+      password: "driver2",
+      status: "Active"
+    },
+    {
+      id: "nadia",
+      name: "Nadia Driver",
+      email: "driver3@thatcanadian.dev",
+      role: "driver",
+      password: "driver3",
+      status: "Active"
+    },
+    {
+      id: "yara",
+      name: "Yara Driver",
+      email: "driver4@thatcanadian.dev",
+      role: "driver",
+      password: "driver4",
       status: "Active"
     }
   ],
@@ -7497,7 +7523,10 @@ export const seedState = {
   staff: [
     { id: "amina", name: "Amina", role: "Kitchen", planned: "10:00-17:00", clocked: "10:02", status: "On shift" },
     { id: "yusuf", name: "Yusuf", role: "Front", planned: "12:00-21:00", clocked: "11:58", status: "On shift" },
-    { id: "samir", name: "Samir", role: "Driver", planned: "16:00-22:00", clocked: "15:57", status: "On shift" },
+    { id: "samir", name: "Samir", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "omar", name: "Omar", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "nadia", name: "Nadia", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
+    { id: "yara", name: "Yara", role: "Driver", planned: "09:00-23:00", clocked: seedActiveShiftClockIn, status: "On shift" },
     { id: "lina", name: "Lina", role: "Sweets", planned: "15:00-22:00", clocked: "-", status: "Starts soon" }
   ],
   staffShifts: [
@@ -7607,24 +7636,89 @@ export const seedState = {
       role: "Driver",
       station: "Delivery",
       date: seedToday,
-      startTime: "16:00",
-      endTime: "22:00",
-      notifiedAtMs: "",
-      notifiedAt: "",
-      clockInAtMs: "",
-      clockInAt: "",
+      startTime: "09:00",
+      endTime: "23:00",
+      notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
+      notifiedAt: "08:30",
+      clockInAtMs: seedActiveShiftClockInMs,
+      clockInAt: seedActiveShiftClockIn,
       clockOutAtMs: "",
       clockOutAt: "",
       breakStartedAtMs: "",
       breakStartedAt: "",
       breakMinutes: 0,
-      status: "Scheduled",
-      notes: "Delivery close."
+      status: "On shift",
+      notes: "Active delivery testing shift."
+    },
+    {
+      id: "shift-omar-today-driver",
+      staffId: "omar",
+      staffName: "Omar Driver",
+      role: "Driver",
+      station: "Delivery",
+      date: seedToday,
+      startTime: "09:00",
+      endTime: "23:00",
+      notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
+      notifiedAt: "08:30",
+      clockInAtMs: seedActiveShiftClockInMs,
+      clockInAt: seedActiveShiftClockIn,
+      clockOutAtMs: "",
+      clockOutAt: "",
+      breakStartedAtMs: "",
+      breakStartedAt: "",
+      breakMinutes: 0,
+      status: "On shift",
+      notes: "Active delivery testing shift."
+    },
+    {
+      id: "shift-nadia-today-driver",
+      staffId: "nadia",
+      staffName: "Nadia Driver",
+      role: "Driver",
+      station: "Delivery",
+      date: seedToday,
+      startTime: "09:00",
+      endTime: "23:00",
+      notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
+      notifiedAt: "08:30",
+      clockInAtMs: seedActiveShiftClockInMs,
+      clockInAt: seedActiveShiftClockIn,
+      clockOutAtMs: "",
+      clockOutAt: "",
+      breakStartedAtMs: "",
+      breakStartedAt: "",
+      breakMinutes: 0,
+      status: "On shift",
+      notes: "Active delivery testing shift."
+    },
+    {
+      id: "shift-yara-today-driver",
+      staffId: "yara",
+      staffName: "Yara Driver",
+      role: "Driver",
+      station: "Delivery",
+      date: seedToday,
+      startTime: "09:00",
+      endTime: "23:00",
+      notifiedAtMs: seedShiftTimestamp(seedToday, "08:30"),
+      notifiedAt: "08:30",
+      clockInAtMs: seedActiveShiftClockInMs,
+      clockInAt: seedActiveShiftClockIn,
+      clockOutAtMs: "",
+      clockOutAt: "",
+      breakStartedAtMs: "",
+      breakStartedAt: "",
+      breakMinutes: 0,
+      status: "On shift",
+      notes: "Active delivery testing shift."
     }
   ],
   drivers: [
     { id: "samir", name: "Samir", status: "Available", eta: "-", orderId: null, location: "Restaurant" },
-    { id: "omar", name: "Omar", status: "Available", eta: "-", orderId: null, location: "Restaurant" }
+    { id: "omar", name: "Omar", status: "Available", eta: "-", orderId: null, location: "Restaurant" },
+    { id: "nadia", name: "Nadia", status: "Available", eta: "-", orderId: null, location: "Restaurant" },
+    { id: "yara", name: "Yara", status: "Available", eta: "-", orderId: null, location: "Restaurant" }
   ],
   reservations: [
     { id: "RES-1", date: seedToday, name: "Van Dijk", guests: 5, time: "18:45", tableId: "table-5", phone: "+31 6 8765 1102", email: "", notes: "Window if possible.", source: "Google link", status: "Confirmed", createdAt: "10:30", updatedAt: "" },
