@@ -1505,6 +1505,9 @@ export function normalizeState(candidate) {
   next.customerUpsellProductId = productIds.has(candidate?.customerUpsellProductId)
     ? candidate.customerUpsellProductId
     : "";
+  next.customerUpsellStep = next.customerUpsellProductId
+    ? Math.max(0, Math.floor(Number(candidate?.customerUpsellStep) || 0))
+    : 0;
   next.websiteCart = Array.isArray(candidate?.websiteCart)
     ? candidate.websiteCart
       .map((item) => normalizeOrderLineItem(item, productIds))

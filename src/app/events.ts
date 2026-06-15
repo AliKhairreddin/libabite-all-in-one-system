@@ -86,6 +86,7 @@ export function bindAppEvents(handlers) {
     selectReservationForEdit,
     selectSupplierForEdit,
     setCustomerCartOpen,
+    setCustomerUpsellStep,
     setProcedureStepProgress,
     setView,
     setWebsiteFulfillment,
@@ -334,9 +335,12 @@ export function bindAppEvents(handlers) {
     const customerAdd = event.target.closest("[data-customer-add]");
     if (customerAdd) {
       addCustomerCartItem(customerAdd.dataset.customerAdd, {
-        keepUpsellOpen: Boolean(customerAdd.closest(".customer-inline-upsell"))
+        keepUpsellOpen: Boolean(customerAdd.closest(".customer-inline-upsell, .customer-upsell-flow"))
       });
     }
+
+    const customerUpsellStep = event.target.closest("[data-customer-upsell-step]");
+    if (customerUpsellStep) setCustomerUpsellStep(customerUpsellStep.dataset.customerUpsellStep);
 
     const customerUpsellClose = event.target.closest("[data-customer-upsell-close]");
     if (customerUpsellClose) closeCustomerUpsell();

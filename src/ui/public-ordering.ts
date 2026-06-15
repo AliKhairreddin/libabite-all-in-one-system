@@ -32,12 +32,42 @@ export function createPublicOrderingUi(deps) {
     orderLocationLabel,
     productById
   } = deps;
-  const INLINE_UPSELL_CATEGORIES = ["Frisdrank", "Extra voor erbij", "Sauzen", "LibaSweets"];
+  const CUSTOMER_UPSELL_FLOW_STEPS = [
+    {
+      category: "Extra voor erbij",
+      kicker: "Make it a meal",
+      title: "Add rice, bread, or an extra side?",
+      detail: "Small extras are easy wins with this item.",
+      nextLabel: "sauces"
+    },
+    {
+      category: "Sauzen",
+      kicker: "Sauce",
+      title: "Want a sauce with it?",
+      detail: "A quick sauce add-on makes the order feel complete.",
+      nextLabel: "drinks"
+    },
+    {
+      category: "Frisdrank",
+      kicker: "Drinks",
+      title: "Add a drink?",
+      detail: "Cold drinks are the easiest final add-on.",
+      nextLabel: "sweets"
+    },
+    {
+      category: "LibaSweets",
+      kicker: "Sweet finish",
+      title: "Something sweet after?",
+      detail: "Offer dessert last so the flow stays light.",
+      nextLabel: ""
+    }
+  ];
+  const INLINE_UPSELL_CATEGORIES = CUSTOMER_UPSELL_FLOW_STEPS.map((step) => step.category);
   const INLINE_UPSELL_CATEGORY_LIMITS = {
-    Frisdrank: 4,
-    "Extra voor erbij": 2,
-    Sauzen: 1,
-    LibaSweets: 1
+    Frisdrank: 6,
+    "Extra voor erbij": 5,
+    Sauzen: 4,
+    LibaSweets: 4
   };
   const INLINE_UPSELL_LIMIT = 8;
   const CART_DRINK_UPSELL_LIMIT = 6;
@@ -175,11 +205,6 @@ export function createPublicOrderingUi(deps) {
       .find((element: any) => element.dataset.customerProductCard === productId);
   }
 
-  function customerUpsellSlotElement(productId) {
-    return [...document.querySelectorAll("[data-customer-upsell-slot]")]
-      .find((element: any) => element.dataset.customerUpsellSlot === productId);
-  }
-
   function updateUpsellActionSurfaces(root, cartItems) {
     root.querySelectorAll("[data-customer-upsell-action]").forEach((action: any) => {
       const product = productById(action.dataset.customerUpsellAction);
@@ -244,8 +269,7 @@ export function createPublicOrderingUi(deps) {
   function updateCustomerProductSurfaces(cartItems, orderContext) {
     getOrderableProductsForContext(orderContext).forEach((product) => {
       const card: any = customerProductCardElement(product.id);
-      const slot: any = customerUpsellSlotElement(product.id);
-      if (!card || !slot) return;
+      if (!card) return;
       const availability = getProductAvailability(product, cartItems, orderContext);
       const disabled = availability.maxQuantity < 1 || !productCanBeOrderedForOrderContext(product, orderContext);
       const addButton: any = card.querySelector(".customer-add-btn");
@@ -255,18 +279,6 @@ export function createPublicOrderingUi(deps) {
       card.classList.toggle("is-upsell-open", isUpsellOpen);
       if (status) status.innerHTML = customerProductStatusHtml(product, cartItems, orderContext);
       if (addButton) addButton.disabled = disabled;
-
-      if (!isUpsellOpen) {
-        slot.innerHTML = "";
-        return;
-      }
-
-      if (!slot.querySelector(".customer-inline-upsell")) {
-        slot.innerHTML = instantUpsellHtml(product, cartItems, orderContext);
-        return;
-      }
-
-      updateUpsellActionSurfaces(slot, cartItems);
     });
   }
 
@@ -287,6 +299,16 @@ export function createPublicOrderingUi(deps) {
     return true;
   }
 
+  function renderCustomerUpsellFlowSurface(cartItems, orderContext) {
+    const host = document.querySelector("#customerUpsellFlow");
+    if (!host) return false;
+    const html = customerUpsellFlowHtml(cartItems, orderContext);
+    host.innerHTML = html;
+    document.body.classList.toggle("has-customer-upsell-flow", Boolean(html));
+    updateUpsellActionSurfaces(host, cartItems);
+    return true;
+  }
+
   function renderCustomerOrderingSurfaces() {
     const surface = activeCustomerOrderingSurface();
     if (!surface || !hasPatchableCustomerMenu(surface.orderContext)) return false;
@@ -296,26 +318,95 @@ export function createPublicOrderingUi(deps) {
     updateCustomerProductSurfaces(surface.cartItems, surface.orderContext);
     const cartRendered = renderCustomerCartPanelSurface(surface.cartItems, surface.mode, surface.orderContext);
     const mobileRendered = renderCustomerMobileControlsSurface(surface.cartItems, surface.mode);
+    const upsellFlowRendered = renderCustomerUpsellFlowSurface(surface.cartItems, surface.orderContext);
     document.body.classList.toggle("is-customer-ordering", true);
     window.scrollTo(scrollX, scrollY);
-    return cartRendered && mobileRendered;
+    return cartRendered && mobileRendered && upsellFlowRendered;
   }
 
-  function instantUpsellHtml(product, cartItems, orderContext) {
-    if (state.customerUpsellProductId !== product.id) return "";
-    const upsellProducts = getUpsellProducts(cartItems, orderContext, product.id);
-    if (!upsellProducts.length) return "";
+  function getUpsellFlowSteps(cartItems, orderContext, sourceProductId) {
+    return CUSTOMER_UPSELL_FLOW_STEPS
+      .map((step, index) => ({
+        ...step,
+        index,
+        products: getUpsellProducts(
+          cartItems,
+          orderContext,
+          sourceProductId,
+          [step.category],
+          INLINE_UPSELL_CATEGORY_LIMITS[step.category] || 4
+        )
+      }))
+      .filter((step) => step.products.length);
+  }
+
+  function getActiveUpsellFlow(cartItems, orderContext) {
+    const sourceProduct = productById(state.customerUpsellProductId);
+    if (!sourceProduct || !customerCartProductQuantity(cartItems, sourceProduct.id)) return null;
+    const steps = getUpsellFlowSteps(cartItems, orderContext, sourceProduct.id);
+    if (!steps.length) return null;
+    const requestedStep = Math.max(0, Math.floor(Number(state.customerUpsellStep) || 0));
+    const activePosition = steps.findIndex((step) => step.index >= requestedStep);
+    if (activePosition < 0) return null;
+    return {
+      sourceProduct,
+      steps,
+      activePosition,
+      activeStep: steps[activePosition],
+      nextStep: steps[activePosition + 1] || null
+    };
+  }
+
+  function upsellFlowDotsHtml(steps, activePosition) {
     return `
-      <section class="customer-inline-upsell" aria-label="Add-ons for ${escapeHtml(product.name)}">
-        <div class="customer-upsell-header">
-          <span class="customer-product-kicker">Added to cart</span>
-          <strong>Add a drink or extra?</strong>
-          <button class="icon-btn customer-upsell-close" type="button" data-customer-upsell-close aria-label="Hide suggestions">×</button>
-        </div>
-        <div class="customer-upsell-list compact">
-          ${upsellItemsHtml(upsellProducts, cartItems)}
-        </div>
-      </section>
+      <div class="customer-upsell-flow-dots" aria-hidden="true">
+        ${steps.map((_, index) => `
+          <span class="${index === activePosition ? "is-active" : index < activePosition ? "is-complete" : ""}"></span>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function customerUpsellFlowHtml(cartItems, orderContext) {
+    const flow = getActiveUpsellFlow(cartItems, orderContext);
+    if (!flow) return "";
+    const { sourceProduct, steps, activePosition, activeStep, nextStep } = flow;
+    const nextAction = nextStep
+      ? `data-customer-upsell-step="${escapeHtml(nextStep.index)}"`
+      : "data-customer-upsell-close";
+    const nextLabel = nextStep ? `Next: ${activeStep.nextLabel || nextStep.category}` : "Done";
+    return `
+      <div class="customer-upsell-flow" role="presentation">
+        <button class="customer-upsell-flow-backdrop" type="button" data-customer-upsell-close aria-label="Close add-on suggestions"></button>
+        <section class="customer-upsell-flow-card" role="dialog" aria-modal="true" aria-label="Add-ons for ${escapeHtml(sourceProduct.name)}">
+          <header>
+            <div>
+              <span class="customer-product-kicker">${escapeHtml(activeStep.kicker)}</span>
+              <h2>${escapeHtml(activeStep.title)}</h2>
+              <p>${escapeHtml(activeStep.detail)}</p>
+            </div>
+            <button class="icon-btn customer-upsell-close" type="button" data-customer-upsell-close aria-label="Close add-on suggestions">×</button>
+          </header>
+          <div class="customer-upsell-flow-source">
+            ${sourceProduct.imageUrl ? `<img src="${escapeHtml(sourceProduct.imageUrl)}" alt="" loading="lazy">` : `<span class="customer-upsell-thumb placeholder" aria-hidden="true">+</span>`}
+            <span>
+              <small>Added</small>
+              <strong>${escapeHtml(sourceProduct.name)}</strong>
+            </span>
+          </div>
+          <div class="customer-upsell-flow-progress" aria-label="Step ${escapeHtml(activePosition + 1)} of ${escapeHtml(steps.length)}">
+            <span>${escapeHtml(activePosition + 1)} of ${escapeHtml(steps.length)}</span>
+            ${upsellFlowDotsHtml(steps, activePosition)}
+          </div>
+          <div class="customer-upsell-list customer-upsell-flow-list">
+            ${upsellItemsHtml(activeStep.products, cartItems)}
+          </div>
+          <footer class="customer-upsell-flow-actions">
+            <button class="ghost-btn" type="button" ${nextAction}>No thanks</button>
+            <button class="primary-btn" type="button" ${nextAction}>${escapeHtml(nextLabel)}</button>
+          </footer>
+        </section>
+      </div>
     `;
   }
 
@@ -350,9 +441,6 @@ export function createPublicOrderingUi(deps) {
         <div class="customer-product-actions">
           <span class="customer-product-status" data-customer-product-status="${escapeHtml(product.id)}">${customerProductStatusHtml(product, cartItems, orderContext)}</span>
           <button class="icon-btn customer-add-btn" type="button" data-customer-add="${escapeHtml(product.id)}" aria-label="Add ${escapeHtml(product.name)}" ${disabled ? "disabled" : ""}>+</button>
-        </div>
-        <div class="customer-inline-upsell-slot" data-customer-upsell-slot="${escapeHtml(product.id)}">
-          ${instantUpsellHtml(product, cartItems, orderContext)}
         </div>
       </article>
     `;
@@ -599,6 +687,9 @@ export function createPublicOrderingUi(deps) {
       <div id="customerCartMobileControls">
         ${customerCartMobileControlsHtml(cartItems, "qr")}
       </div>
+      <div id="customerUpsellFlow">
+        ${customerUpsellFlowHtml(cartItems, CUSTOMER_QR_ORDER_CONTEXT)}
+      </div>
     `;
   }
   
@@ -660,6 +751,9 @@ export function createPublicOrderingUi(deps) {
       </main>
       <div id="customerCartMobileControls">
         ${customerCartMobileControlsHtml(cartItems, "website")}
+      </div>
+      <div id="customerUpsellFlow">
+        ${customerUpsellFlowHtml(cartItems, orderContext)}
       </div>
     `;
   }

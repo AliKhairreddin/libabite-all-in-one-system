@@ -616,6 +616,183 @@ button {
   font-weight: 900;
 }
 
+body.has-customer-upsell-flow {
+  overflow: hidden;
+}
+
+.customer-upsell-flow {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  pointer-events: none;
+}
+
+.customer-upsell-flow-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: rgba(23, 28, 24, 0.46);
+}
+
+.customer-upsell-flow-card {
+  width: min(500px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  position: relative;
+  z-index: 1;
+  overflow: auto;
+  pointer-events: auto;
+  display: grid;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid #e2d3a8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(24, 31, 34, 0.28);
+}
+
+.customer-upsell-flow-card header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.customer-upsell-flow-card h2,
+.customer-upsell-flow-card p {
+  margin: 0;
+}
+
+.customer-upsell-flow-card h2 {
+  margin-top: 3px;
+  font-size: 1.28rem;
+  line-height: 1.18;
+}
+
+.customer-upsell-flow-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.customer-upsell-flow-source {
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.customer-upsell-flow-source img,
+.customer-upsell-flow-source .customer-upsell-thumb {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.customer-upsell-flow-source span,
+.customer-upsell-flow-source strong,
+.customer-upsell-flow-source small {
+  min-width: 0;
+  display: block;
+}
+
+.customer-upsell-flow-source small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-upsell-flow-source strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.96rem;
+}
+
+.customer-upsell-flow-progress {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-upsell-flow-dots {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.customer-upsell-flow-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #dfe5dc;
+}
+
+.customer-upsell-flow-dots span.is-active {
+  width: 24px;
+  background: #d7bd76;
+}
+
+.customer-upsell-flow-dots span.is-complete {
+  background: var(--brand);
+}
+
+.customer-upsell-flow-list {
+  max-height: min(44vh, 360px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.customer-upsell-flow-list .customer-upsell-item {
+  min-height: 64px;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  padding: 9px;
+}
+
+.customer-upsell-flow-list .customer-upsell-item img,
+.customer-upsell-flow-list .customer-upsell-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+}
+
+.customer-upsell-flow-list .customer-upsell-item strong {
+  white-space: normal;
+}
+
+.customer-upsell-flow-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 10px;
+}
+
+.customer-upsell-flow-actions .ghost-btn,
+.customer-upsell-flow-actions .primary-btn {
+  min-width: 0;
+  min-height: 46px;
+  padding: 9px 12px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+}
+
 .customer-service-toggle {
   display: inline-flex;
   align-items: center;
@@ -5584,6 +5761,16 @@ textarea:focus {
     white-space: nowrap;
   }
 
+  .customer-upsell-flow {
+    place-items: end center;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .customer-upsell-flow-card {
+    width: min(520px, 100%);
+    max-height: calc(100vh - 24px);
+  }
+
   .dashboard-grid .wide-panel {
     grid-row: auto;
   }
@@ -5904,6 +6091,19 @@ textarea:focus {
     grid-template-columns: minmax(0, 1fr) minmax(126px, auto);
     padding-right: 10px;
     padding-left: 10px;
+  }
+
+  .customer-upsell-flow {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .customer-upsell-flow-card {
+    padding: 13px;
+  }
+
+  .customer-upsell-flow-actions {
+    grid-template-columns: 1fr;
   }
 
   .topbar {

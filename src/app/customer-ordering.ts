@@ -12,6 +12,8 @@ import { flushRemoteState, saveState, state } from "./state.js";
 import { recordPendingOnlinePayment } from "./payment-ledger.js";
 import { timeNow } from "../shared/dates.js";
 
+const CUSTOMER_UPSELL_FLOW_CATEGORIES = ["Extra voor erbij", "Sauzen", "Frisdrank", "LibaSweets"];
+
 export function createCustomerOrderingRuntime(deps) {
   const {
     getCustomerOrderingSession,
@@ -67,7 +69,7 @@ export function createCustomerOrderingRuntime(deps) {
   }
 
   function shouldOpenCustomerUpsell(product) {
-    return product && !["Frisdrank", "Extra voor erbij", "Sauzen"].includes(product.category);
+    return product && !CUSTOMER_UPSELL_FLOW_CATEGORIES.includes(product.category);
   }
 
   function renderCustomerOrderingUpdate() {
@@ -92,8 +94,10 @@ export function createCustomerOrderingRuntime(deps) {
       return;
     }
 
+    const shouldOpenUpsell = shouldOpenCustomerUpsell(product);
     state[getCustomerCartStateKey(session.mode)] = normalizeOrderItems([...cartItems, { productId: product.id, quantity: 1, note: "", modifiers: [] }]);
-    state.customerUpsellProductId = options.keepUpsellOpen ? state.customerUpsellProductId : shouldOpenCustomerUpsell(product) ? product.id : "";
+    state.customerUpsellProductId = options.keepUpsellOpen ? state.customerUpsellProductId : shouldOpenUpsell ? product.id : "";
+    state.customerUpsellStep = options.keepUpsellOpen ? state.customerUpsellStep : 0;
     state[getCustomerLastOrderStateKey(session.mode)] = "";
     saveState();
     renderCustomerOrderingUpdate();
@@ -119,7 +123,12 @@ export function createCustomerOrderingRuntime(deps) {
     }
 
     item.quantity += delta;
-    state[getCustomerCartStateKey(getCustomerModeFromContext(orderContext))] = normalizeOrderItems(cartItems.filter((line) => line.quantity > 0));
+    const nextCartItems = normalizeOrderItems(cartItems.filter((line) => line.quantity > 0));
+    if (state.customerUpsellProductId === product.id && !nextCartItems.some((line) => line.productId === product.id)) {
+      state.customerUpsellProductId = "";
+      state.customerUpsellStep = 0;
+    }
+    state[getCustomerCartStateKey(getCustomerModeFromContext(orderContext))] = nextCartItems;
     saveState();
     renderCustomerOrderingUpdate();
   }
@@ -127,7 +136,13 @@ export function createCustomerOrderingRuntime(deps) {
   function removeCustomerCartItem(index) {
     const session = getCustomerOrderingSession();
     const orderContext = getCustomerOrderContext(session?.mode || "qr");
-    state[getCustomerCartStateKey(getCustomerModeFromContext(orderContext))] = getCustomerCartItems(orderContext).filter((_, itemIndex) => itemIndex !== Number(index));
+    const removedItem = getCustomerCartItems(orderContext)[Number(index)];
+    const nextCartItems = getCustomerCartItems(orderContext).filter((_, itemIndex) => itemIndex !== Number(index));
+    if (removedItem?.productId === state.customerUpsellProductId && !nextCartItems.some((line) => line.productId === state.customerUpsellProductId)) {
+      state.customerUpsellProductId = "";
+      state.customerUpsellStep = 0;
+    }
+    state[getCustomerCartStateKey(getCustomerModeFromContext(orderContext))] = nextCartItems;
     saveState();
     renderCustomerOrderingUpdate();
   }
@@ -138,6 +153,7 @@ export function createCustomerOrderingRuntime(deps) {
     state[getCustomerCartStateKey(mode)] = [];
     state.customerCartOpen = false;
     state.customerUpsellProductId = "";
+    state.customerUpsellStep = 0;
     state[getCustomerLastOrderStateKey(mode)] = "";
     saveState();
     render();
@@ -145,6 +161,19 @@ export function createCustomerOrderingRuntime(deps) {
 
   function closeCustomerUpsell() {
     state.customerUpsellProductId = "";
+    state.customerUpsellStep = 0;
+    saveState();
+    renderCustomerOrderingUpdate();
+  }
+
+  function setCustomerUpsellStep(step = 0) {
+    const nextStep = Math.max(0, Math.floor(Number(step) || 0));
+    if (!state.customerUpsellProductId || nextStep >= CUSTOMER_UPSELL_FLOW_CATEGORIES.length) {
+      state.customerUpsellProductId = "";
+      state.customerUpsellStep = 0;
+    } else {
+      state.customerUpsellStep = nextStep;
+    }
     saveState();
     renderCustomerOrderingUpdate();
   }
@@ -160,6 +189,7 @@ export function createCustomerOrderingRuntime(deps) {
     state.websiteCart = getCustomerCartItems(getCustomerOrderContext("website"));
     state.websiteLastOrderId = "";
     state.customerUpsellProductId = "";
+    state.customerUpsellStep = 0;
     saveState();
     renderCustomerOrderingUpdate();
   }
@@ -375,6 +405,7 @@ export function createCustomerOrderingRuntime(deps) {
     getCustomerOrderContext,
     removeCustomerCartItem,
     setCustomerCartOpen,
+    setCustomerUpsellStep,
     setWebsiteFulfillment,
     startNewCustomerOrder,
     submitCustomerQrOrder,
