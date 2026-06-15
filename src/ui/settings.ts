@@ -11,9 +11,9 @@ export function createSettingsUi(deps) {
   const {
     can,
     emptyState,
-    getAvailableReservationTable,
     getQrOrderUrl,
     getReservationIssues,
+    getReservationSeatingRecommendation,
     getReservationValidation,
     getReservationWindowLabel,
     getWebsiteReservationUrl,
@@ -165,6 +165,35 @@ export function createSettingsUi(deps) {
       }).join("")
       : emptyState("Create table QR codes to enable customer ordering.");
   }
+
+  function reservationRecommendationHtml(recommendation, selectedTableId) {
+    if (!recommendation || recommendation.kind === "none") {
+      return `
+        <div class="reservation-recommendation is-empty">
+          <span class="pill warning">Planning</span>
+          <p>${escapeHtml(recommendation?.detail || "Choose a table manually once the guest count and time are set.")}</p>
+        </div>
+      `;
+    }
+
+    const recommendedTableIds = (recommendation.tables || []).map((table) => table.id);
+    const selectedRecommended = Boolean(selectedTableId && recommendedTableIds.includes(selectedTableId));
+    const pillText = recommendation.kind === "merge"
+      ? "Merge"
+      : selectedRecommended
+        ? "Selected"
+        : "Suggested";
+
+    return `
+      <div class="reservation-recommendation ${selectedRecommended ? "is-selected" : ""}">
+        <span class="pill ${recommendation.kind === "merge" ? "info" : "ok"}">${escapeHtml(pillText)}</span>
+        <div>
+          <strong>${escapeHtml(recommendation.title)}</strong>
+          <p>${escapeHtml(recommendation.detail)}</p>
+        </div>
+      </div>
+    `;
+  }
   
   function renderReservationPlanner() {
     const form = document.querySelector("#reservationForm");
@@ -224,22 +253,25 @@ export function createSettingsUi(deps) {
     const guests = Math.max(1, Math.floor(Number(form.elements.guests.value) || 1));
     const time = form.elements.time.value || "";
     const date = form.elements.date.value || today;
+    const status = form.elements.status.value || editingReservation?.status || "Confirmed";
     const currentTable = tableById(tableSelect.value);
     const editingTable = tableById(editingReservation?.tableId);
-    const preferredTable = editingChanged
-      ? editingTable || getAvailableReservationTable({ id: editingReservation?.id, date, guests, time }) || state.tables[0]
-      : currentTable || editingTable || getAvailableReservationTable({ id: editingReservation?.id, date, guests, time }) || state.tables[0];
+    const selectedTableId = editingChanged
+      ? editingTable?.id || ""
+      : currentTable?.id || editingTable?.id || "";
+    const recommendation = getReservationSeatingRecommendation({ id: editingReservation?.id, date, guests, time, status });
   
-    tableSelect.innerHTML = state.tables
+    tableSelect.innerHTML = `<option value="">Select table manually</option>` + state.tables
       .map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)} - ${table.capacity} seats - ${escapeHtml(table.zone)}</option>`)
       .join("");
-    tableSelect.value = preferredTable?.id || "";
+    tableSelect.value = selectedTableId;
   
-    const validation = getReservationValidation({ id: editingReservation?.id, date, guests, time, tableId: tableSelect.value });
+    const validation = getReservationValidation({ id: editingReservation?.id, date, guests, time, tableId: tableSelect.value, status });
     if (tableMap) {
       tableMap.innerHTML = reservationTableMapHtml({
         tables: state.tables,
         selectedTableId: tableSelect.value,
+        recommendedTableIds: (recommendation.tables || []).map((table) => table.id),
         title: "Select dining table",
         getTableValidation: (table) => getReservationValidation({
           id: editingReservation?.id,
@@ -247,7 +279,7 @@ export function createSettingsUi(deps) {
           guests,
           time,
           tableId: table.id,
-          status: form.elements.status.value || editingReservation?.status || "Confirmed"
+          status
         })
       });
     }
@@ -258,6 +290,7 @@ export function createSettingsUi(deps) {
         <span class="pill ${validation.pillClass}">${escapeHtml(validation.pillText)}</span>
       </header>
       <p>${escapeHtml(validation.detail)}</p>
+      ${reservationRecommendationHtml(recommendation, tableSelect.value)}
     `;
     const editable = can("canManageReservations");
     form.querySelectorAll("input, select, textarea, button").forEach((element) => {

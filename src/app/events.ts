@@ -295,18 +295,6 @@ export function bindAppEvents(handlers) {
     const cancelReservation = event.target.closest("[data-cancel-reservation-edit]");
     if (cancelReservation) cancelReservationEdit();
 
-    const reservationMapView = event.target.closest("[data-reservation-map-view]");
-    if (reservationMapView) {
-      const map = reservationMapView.closest(".reservation-table-map");
-      if (map) {
-        map.dataset.viewMode = reservationMapView.dataset.reservationMapView;
-        map.querySelectorAll("[data-reservation-map-view]").forEach((button: any) => {
-          button.classList.toggle("is-selected", button === reservationMapView);
-        });
-      }
-      return;
-    }
-
     const reservationMapTable = event.target.closest("[data-reservation-map-table]");
     if (reservationMapTable) {
       const tableId = reservationMapTable.dataset.reservationMapTable;

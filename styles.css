@@ -2131,6 +2131,25 @@ textarea {
   font-size: 0.84rem;
 }
 
+.reservation-recommendation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(31, 61, 45, 0.12);
+}
+
+.reservation-recommendation strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.reservation-recommendation p {
+  margin-top: 3px;
+}
+
 .table-capacity-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
@@ -2251,8 +2270,19 @@ textarea {
   font-size: 0.84rem;
 }
 
-.reservation-map-toggle button {
-  min-width: 42px;
+.floor-plan-mode {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid #ccd8d0;
+  border-radius: 8px;
+  background: #edf2ef;
+  color: #315765;
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .reservation-floor-plan {
@@ -2266,7 +2296,6 @@ textarea {
     linear-gradient(0deg, rgba(15, 95, 70, 0.06) 0 1px, transparent 1px 100%),
     #f4f2eb;
   background-size: 28px 28px;
-  perspective: 720px;
 }
 
 .floor-zone,
@@ -2336,7 +2365,6 @@ textarea {
   overflow: visible;
   background: transparent;
   color: var(--ink);
-  transform-style: preserve-3d;
   transition: transform 160ms ease, opacity 160ms ease;
 }
 
@@ -2344,20 +2372,12 @@ textarea {
   transform: translateY(-2px);
 }
 
-.reservation-table-map[data-view-mode="3d"] .floor-table {
-  transform: rotateX(50deg) rotateZ(-7deg);
-}
-
-.reservation-table-map[data-view-mode="3d"] .floor-table:hover {
-  transform: rotateX(50deg) rotateZ(-7deg) translateZ(8px);
-}
-
 .floor-table-shadow {
   position: absolute;
-  inset: 13px 8px -7px;
+  inset: 18px 13px 8px;
   border-radius: 999px;
-  background: rgba(23, 28, 24, 0.16);
-  filter: blur(7px);
+  background: rgba(23, 28, 24, 0.09);
+  filter: blur(4px);
 }
 
 .floor-table-top {
@@ -2467,6 +2487,17 @@ textarea {
   right: 13%;
 }
 
+.floor-table.is-recommended .floor-table-top {
+  border-color: #d6a21d;
+  box-shadow: inset 0 -7px 0 rgba(214, 162, 29, 0.13), 0 5px 12px rgba(120, 82, 14, 0.14);
+}
+
+.floor-table.is-recommended .floor-seat,
+.floor-table.is-recommended .floor-couch {
+  border-color: rgba(214, 162, 29, 0.52);
+  background: #f4e3aa;
+}
+
 .floor-table.is-selected .floor-table-top {
   border-color: var(--brand);
   background: var(--brand);
@@ -2514,6 +2545,10 @@ textarea {
 
 .map-key-available::before {
   background: var(--ok);
+}
+
+.map-key-recommended::before {
+  background: #d6a21d;
 }
 
 .map-key-unavailable::before {

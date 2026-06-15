@@ -39,7 +39,9 @@ import {
   getReservationCapacityIssue,
   getReservationConflicts,
   getReservationIssues,
+  getReservationMergeOptions,
   getReservationRequestValidation,
+  getReservationSeatingRecommendation,
   getReservationValidation
 } from "../dist/domain/reservations.js";
 import { formatShiftHours, getShiftMetrics, getWeekDates, getWeekStartDate } from "../dist/domain/scheduling.js";
@@ -341,6 +343,29 @@ test("reservation conflicts respect table, status, and turnover window", () => {
     "Overlaps 19:00 Nour"
   ]);
   assert.equal(getReservationValidation({ date: "2026-06-01", tableId: "table-3", guests: 4, time: "19:30" }, tables, reservations).ok, true);
+});
+
+test("reservation seating recommendations prefer two-tops and joined tables", () => {
+  const date = "2026-06-01";
+  const time = "18:00";
+  const tables = [
+    { id: "table-1", name: "Table 1", capacity: 4, zone: "Dining room" },
+    { id: "table-2", name: "Table 2", capacity: 2, zone: "Window" },
+    { id: "table-3", name: "Table 3", capacity: 4, zone: "Dining room" },
+    { id: "table-4", name: "Table 4", capacity: 4, zone: "Dining room" }
+  ];
+
+  assert.equal(getAvailableReservationTable({ date, guests: 2, time }, tables, []).id, "table-2");
+  assert.equal(getAvailableReservationTable({ date, guests: 2, time }, tables, [
+    { id: "r1", date, tableId: "table-2", time, status: "Confirmed", name: "Sofia" }
+  ]).id, "table-1");
+
+  const mergeOptions = getReservationMergeOptions({ date, guests: 5, time }, tables.slice(1), []);
+  assert.deepEqual(mergeOptions[0].tables.map((table) => table.id), ["table-3", "table-4"]);
+
+  const recommendation = getReservationSeatingRecommendation({ date, guests: 5, time }, tables.slice(1), []);
+  assert.equal(recommendation.kind, "merge");
+  assert.equal(recommendation.capacity, 8);
 });
 
 test("reservation requests honor blocked windows and capacity rules", () => {

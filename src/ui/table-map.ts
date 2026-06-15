@@ -72,25 +72,28 @@ function statusForTable(table, getTableValidation) {
 export function reservationTableMapHtml({
   tables,
   selectedTableId = "",
+  recommendedTableIds = [],
   getTableValidation,
   title = "Choose a table",
   kicker = "Floor map",
   mapId = "reservation-table-map"
 }) {
-  const selectedTable = tables.find((table) => table.id === selectedTableId) || tables[0];
+  const selectedTable = tables.find((table) => table.id === selectedTableId) || null;
+  const recommendedTableIdSet = new Set(recommendedTableIds);
   const tableButtons = tables.map((table, index) => {
     const layout = tableLayout(table, index);
     const status = statusForTable(table, getTableValidation);
     const selected = table.id === selectedTable?.id;
+    const recommended = recommendedTableIdSet.has(table.id);
     const tableLabel = `${table.name}, ${table.capacity} seats, ${table.zone}`;
 
     return `
       <button
-        class="floor-table floor-table-${escapeHtml(layout.shape)} floor-feature-${escapeHtml(layout.feature)} ${status.className} ${selected ? "is-selected" : ""}"
+        class="floor-table floor-table-${escapeHtml(layout.shape)} floor-feature-${escapeHtml(layout.feature)} ${status.className} ${recommended ? "is-recommended" : ""} ${selected ? "is-selected" : ""}"
         type="button"
         data-reservation-map-table="${escapeHtml(table.id)}"
         aria-pressed="${selected ? "true" : "false"}"
-        aria-label="${escapeHtml(`${tableLabel}. ${status.label}`)}"
+        aria-label="${escapeHtml(`${tableLabel}. ${status.label}${recommended ? ". Recommended" : ""}`)}"
         style="--x: ${layout.x}%; --y: ${layout.y}%; --w: ${layout.w}%; --h: ${layout.h}%"
       >
         <span class="floor-table-shadow" aria-hidden="true"></span>
@@ -104,16 +107,13 @@ export function reservationTableMapHtml({
   }).join("");
 
   return `
-    <section class="reservation-table-map" id="${escapeHtml(mapId)}" data-view-mode="3d" aria-label="${escapeHtml(title)}">
+    <section class="reservation-table-map" id="${escapeHtml(mapId)}" data-view-mode="2d" aria-label="${escapeHtml(title)}">
       <header>
         <div>
           <p class="eyebrow">${escapeHtml(kicker)}</p>
           <h3>${escapeHtml(title)}</h3>
         </div>
-        <div class="segmented reservation-map-toggle" role="group" aria-label="Map view">
-          <button type="button" data-reservation-map-view="2d">2D</button>
-          <button class="is-selected" type="button" data-reservation-map-view="3d">3D</button>
-        </div>
+        <span class="floor-plan-mode">2D floor plan</span>
       </header>
       <div class="reservation-floor-plan">
         <div class="floor-zone floor-window" aria-hidden="true">Window</div>
@@ -124,9 +124,10 @@ export function reservationTableMapHtml({
       </div>
       <footer>
         <span class="map-key map-key-selected">Selected</span>
+        ${recommendedTableIds.length ? `<span class="map-key map-key-recommended">Recommended</span>` : ""}
         <span class="map-key map-key-available">Available</span>
         <span class="map-key map-key-unavailable">Unavailable</span>
-        ${selectedTable ? `<strong>${escapeHtml(`${selectedTable.name} · ${selectedTable.capacity} seats · ${selectedTable.zone}`)}</strong>` : ""}
+        <strong>${selectedTable ? escapeHtml(`${selectedTable.name} · ${selectedTable.capacity} seats · ${selectedTable.zone}`) : "No table selected"}</strong>
       </footer>
     </section>
   `;

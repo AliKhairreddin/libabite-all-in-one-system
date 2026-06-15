@@ -99,13 +99,126 @@ export function getReservationConflicts(candidate, reservations, turnoverMinutes
   });
 }
 
-export function getAvailableReservationTable(candidate, tables, reservations, turnoverMinutes = RESERVATION_TURNOVER_MINUTES) {
-  const guests = Math.max(1, Math.floor(Number(candidate.guests) || 1));
+function getGuestCount(value) {
+  return Math.max(1, Math.floor(Number(value) || 1));
+}
+
+function getTableCapacity(table) {
+  return Math.max(0, Math.floor(Number(table?.capacity) || 0));
+}
+
+function getTableZone(table) {
+  return String(table?.zone || "").trim().toLowerCase();
+}
+
+function getTableName(table) {
+  return String(table?.name || table?.id || "Table").trim();
+}
+
+function tableHasAvailability(candidate, table, reservations, turnoverMinutes) {
+  return Boolean(table?.id)
+    && !getReservationConflicts({ ...candidate, tableId: table.id }, reservations, turnoverMinutes).length;
+}
+
+function compareTablesForParty(guests) {
+  return (first, second) => {
+    const firstCapacity = getTableCapacity(first);
+    const secondCapacity = getTableCapacity(second);
+
+    if (guests <= 2) {
+      const firstTwoTop = firstCapacity === 2 ? 0 : 1;
+      const secondTwoTop = secondCapacity === 2 ? 0 : 1;
+      if (firstTwoTop !== secondTwoTop) return firstTwoTop - secondTwoTop;
+    }
+
+    return firstCapacity - secondCapacity || getTableName(first).localeCompare(getTableName(second));
+  };
+}
+
+export function getAvailableReservationTables(candidate, tables, reservations, turnoverMinutes = RESERVATION_TURNOVER_MINUTES) {
+  const guests = getGuestCount(candidate.guests);
   return tables
-    .filter((table) => table.capacity >= guests)
+    .filter((table) => getTableCapacity(table) >= guests)
+    .filter((table) => tableHasAvailability({ ...candidate, guests }, table, reservations, turnoverMinutes))
     .slice()
-    .sort((a, b) => a.capacity - b.capacity || a.name.localeCompare(b.name))
-    .find((table) => !getReservationConflicts({ ...candidate, guests, tableId: table.id }, reservations, turnoverMinutes).length) || null;
+    .sort(compareTablesForParty(guests));
+}
+
+export function getAvailableReservationTable(candidate, tables, reservations, turnoverMinutes = RESERVATION_TURNOVER_MINUTES) {
+  return getAvailableReservationTables(candidate, tables, reservations, turnoverMinutes)[0] || null;
+}
+
+export function getReservationMergeOptions(candidate, tables, reservations, turnoverMinutes = RESERVATION_TURNOVER_MINUTES) {
+  const guests = getGuestCount(candidate.guests);
+  if (guests < 5) return [];
+
+  const availableTables = tables
+    .filter((table) => tableHasAvailability({ ...candidate, guests }, table, reservations, turnoverMinutes))
+    .slice()
+    .sort(compareTablesForParty(guests));
+
+  const options = [];
+  for (let firstIndex = 0; firstIndex < availableTables.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < availableTables.length; secondIndex += 1) {
+      const firstTable = availableTables[firstIndex];
+      const secondTable = availableTables[secondIndex];
+      const capacity = getTableCapacity(firstTable) + getTableCapacity(secondTable);
+      if (capacity < guests) continue;
+      options.push({
+        kind: "merge",
+        tables: [firstTable, secondTable],
+        capacity,
+        sameZone: Boolean(getTableZone(firstTable) && getTableZone(firstTable) === getTableZone(secondTable))
+      });
+    }
+  }
+
+  return options.sort((first, second) => {
+    if (first.sameZone !== second.sameZone) return first.sameZone ? -1 : 1;
+    return first.capacity - second.capacity
+      || getTableCapacity(second.tables[0]) - getTableCapacity(first.tables[0])
+      || getTableName(first.tables[0]).localeCompare(getTableName(second.tables[0]));
+  });
+}
+
+export function getReservationSeatingRecommendation(candidate, tables, reservations, turnoverMinutes = RESERVATION_TURNOVER_MINUTES) {
+  const guests = getGuestCount(candidate.guests);
+  const singleTable = getAvailableReservationTable({ ...candidate, guests }, tables, reservations, turnoverMinutes);
+  const mergeOption = getReservationMergeOptions({ ...candidate, guests }, tables, reservations, turnoverMinutes)[0] || null;
+
+  if (singleTable) {
+    const detail = guests <= 2
+      ? `${getTableName(singleTable)} keeps two-person parties on a two-seater first when one is free.`
+      : `${getTableName(singleTable)} is the smallest available table that seats ${guests}.`;
+    return {
+      kind: "single",
+      title: `${getTableName(singleTable)} recommended`,
+      detail: mergeOption
+        ? `${detail} For a joined setup, merge ${mergeOption.tables.map(getTableName).join(" + ")}.`
+        : detail,
+      table: singleTable,
+      tables: [singleTable],
+      capacity: getTableCapacity(singleTable)
+    };
+  }
+
+  if (mergeOption) {
+    return {
+      kind: "merge",
+      title: `Merge ${mergeOption.tables.map(getTableName).join(" + ")}`,
+      detail: `Combined capacity ${mergeOption.capacity} for ${guests} guests. Staff can record the booking manually and note the joined setup.`,
+      tables: mergeOption.tables,
+      capacity: mergeOption.capacity
+    };
+  }
+
+  return {
+    kind: "none",
+    title: "No seating recommendation",
+    detail: `No available table setup seats ${guests} guests for this time.`,
+    tables: [],
+    capacity: 0
+  };
 }
 
 export function getReservationBlockConflicts(candidate, blocks, turnoverMinutes = RESERVATION_TURNOVER_MINUTES) {

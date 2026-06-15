@@ -7,6 +7,7 @@ import {
   getReservationConflicts as getReservationConflictsFromList,
   getReservationIssues as getReservationIssuesFromList,
   getReservationRequestValidation as getReservationRequestValidationFromList,
+  getReservationSeatingRecommendation as getReservationSeatingRecommendationFromList,
   getReservationValidation as getReservationValidationFromList
 } from "../domain/reservations.js";
 import { RESERVATION_TURNOVER_MINUTES } from "../shared/constants.js";
@@ -17,6 +18,10 @@ export function getReservationConflicts(candidate, reservations = state.reservat
 
 export function getAvailableReservationTable(candidate, tables = state.tables, reservations = state.reservations) {
   return getAvailableReservationTableFromList(candidate, tables, reservations);
+}
+
+export function getReservationSeatingRecommendation(candidate, tables = state.tables, reservations = state.reservations) {
+  return getReservationSeatingRecommendationFromList(candidate, tables, reservations);
 }
 
 export function getReservationIssues(reservation) {

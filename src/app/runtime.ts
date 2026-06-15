@@ -83,6 +83,7 @@ import {
   getAvailableReservationTable,
   getReservationIssues,
   getReservationRequestValidation,
+  getReservationSeatingRecommendation,
   getReservationValidation
 } from "./reservation-selectors.js";
 import {
@@ -736,9 +737,9 @@ const {
 } = createSettingsUi({
   can,
   emptyState,
-  getAvailableReservationTable,
   getQrOrderUrl,
   getReservationIssues,
+  getReservationSeatingRecommendation,
   getReservationValidation,
   getReservationWindowLabel,
   getWebsiteReservationUrl,
