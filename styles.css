@@ -1169,11 +1169,13 @@ body.has-customer-upsell-flow {
 }
 
 .topbar-actions {
-  flex-wrap: wrap;
+  min-width: 0;
+  flex-wrap: nowrap;
   justify-content: flex-end;
 }
 
 .topbar-scan-form {
+  width: clamp(260px, 32vw, 460px);
   min-width: min(100%, 300px);
   min-height: 44px;
   padding: 4px;
@@ -1187,6 +1189,7 @@ body.has-customer-upsell-flow {
 }
 
 .topbar-scan-form input {
+  min-width: 0;
   min-height: 34px;
   border: 0;
   background: transparent;
@@ -1202,6 +1205,7 @@ body.has-customer-upsell-flow {
 }
 
 .sync-status {
+  flex: 0 0 auto;
   min-height: 34px;
   padding: 0 10px;
   display: inline-flex;
@@ -1249,6 +1253,8 @@ body.has-customer-upsell-flow {
 }
 
 .user-menu {
+  max-width: 280px;
+  flex: 0 0 auto;
   min-height: 44px;
   padding: 5px 5px 5px 12px;
   display: flex;
@@ -1259,9 +1265,16 @@ body.has-customer-upsell-flow {
   border-radius: 8px;
 }
 
+.user-menu > div {
+  min-width: 0;
+}
+
 .user-menu strong,
 .user-menu span {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-menu span {
@@ -5815,6 +5828,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+  flex-wrap: nowrap;
 }
 
 .topbar h1 {
@@ -6297,6 +6311,7 @@ textarea:focus {
 
   .topbar-actions {
     width: 100%;
+    flex-wrap: wrap;
     justify-content: stretch;
   }
 
@@ -6318,6 +6333,7 @@ textarea:focus {
 
   .topbar-actions {
     width: 100%;
+    flex-wrap: wrap;
     justify-content: stretch;
   }
 
