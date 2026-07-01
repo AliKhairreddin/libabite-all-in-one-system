@@ -16,6 +16,9 @@ export function initApp(): void {
   registerRemoteStateSaver((nextState) => convexSync.queueSave(nextState));
   registerRemoteStateFlusher(() => convexSync.flushNow());
   convexSync.start();
+  document.querySelector("#convexSyncStatus")?.addEventListener("click", () => {
+    void convexSync.refreshNow();
+  });
   bindAppEvents(runtime.handlers);
   runtime.render();
   void runtime.handleWebsitePaymentReturn();
