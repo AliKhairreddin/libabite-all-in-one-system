@@ -146,6 +146,19 @@ export function bindAppEvents(handlers) {
 
     if (!event.target.closest("[data-address-combobox]")) closeAddressSuggestions();
 
+    const sidebarToggle = event.target.closest("#sidebarToggle");
+    if (sidebarToggle) {
+      const collapsed = !document.body.classList.contains("is-sidebar-collapsed");
+      try {
+        localStorage.setItem("libabite-sidebar-collapsed", collapsed ? "true" : "false");
+      } catch {
+        // Ignore storage failures; the visual state can still update for this render.
+      }
+      document.body.classList.toggle("is-sidebar-collapsed", collapsed);
+      render();
+      return;
+    }
+
     const demoLogin = event.target.closest("[data-demo-login]");
     if (demoLogin) {
       const loginForm = document.querySelector("#loginForm");

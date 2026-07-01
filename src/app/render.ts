@@ -79,6 +79,16 @@ const NAV_ICONS = {
   `
 };
 
+const SIDEBAR_COLLAPSED_KEY = "libabite-sidebar-collapsed";
+
+function getStoredSidebarCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function createAppRenderer(deps) {
   const document: any = window.document;
   const {
@@ -129,18 +139,29 @@ export function createAppRenderer(deps) {
     const currentUserRole = document.querySelector("#currentUserRole");
     const quickOrderButton = document.querySelector("#quickOrderBtn");
     const resetDemoButton = document.querySelector("#resetDemoBtn");
+    const sidebarToggle = document.querySelector("#sidebarToggle");
     const publicOrderLink = document.querySelector('[data-public-link="order"]');
     const publicReservationLink = document.querySelector('[data-public-link="reservation"]');
+    const isDriverApp = Boolean(user) && user?.role === "driver" && !customerSession;
+    const isKitchenStationApp = Boolean(user) && user?.role === "kitchen_staff" && !customerSession;
+    const sidebarCollapsed = Boolean(user) && !isDriverApp && !isKitchenStationApp && getStoredSidebarCollapsed();
   
     renderDemoLogins();
     if (publicOrderLink) publicOrderLink.href = getWebsiteOrderingUrl();
     if (publicReservationLink) publicReservationLink.href = getWebsiteReservationUrl();
     document.body.classList.toggle("is-authenticated", Boolean(user) && !customerSession);
     document.body.classList.toggle("is-customer-ordering", Boolean(customerSession));
-    document.body.classList.toggle("is-driver-app", Boolean(user) && user?.role === "driver" && !customerSession);
+    document.body.classList.toggle("is-driver-app", isDriverApp);
+    document.body.classList.toggle("is-kitchen-station-app", isKitchenStationApp);
+    document.body.classList.toggle("is-sidebar-collapsed", sidebarCollapsed);
     customerScreen.hidden = !customerSession;
     loginScreen.classList.toggle("is-hidden", Boolean(user) || Boolean(customerSession));
     appShell.classList.toggle("is-hidden", !user || Boolean(customerSession));
+    if (sidebarToggle) {
+      sidebarToggle.hidden = isDriverApp || isKitchenStationApp || !user || Boolean(customerSession);
+      sidebarToggle.setAttribute("aria-label", sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
+      sidebarToggle.setAttribute("title", sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
+    }
   
     if (loginForm && !user && !customerSession) {
       loginForm.elements.email.value = loginForm.elements.email.value || "owner@libabite.nl";
