@@ -1,10 +1,11 @@
 import {
   DEFAULT_RECEIPT_PRINTER_SETTINGS,
   DEFAULT_RESTAURANT_SETTINGS,
+  KITCHEN_STATIONS,
   LANGUAGE_OPTIONS,
   ROLE_DEFINITIONS
 } from "../shared/constants.js";
-import { normalizeReceiptPrinterSettings, normalizeRestaurantSettings } from "../data/normalize.js";
+import { normalizeKitchenStation, normalizeReceiptPrinterSettings, normalizeRestaurantSettings } from "../data/normalize.js";
 import { enqueueReceiptPrintJob } from "./receipt-printing.js";
 import { uniqueRecordId } from "../shared/ids.js";
 import { saveState, state } from "./state.js";
@@ -28,6 +29,7 @@ export function createAdminActionsRuntime(deps) {
     const role = String(formData.get("role") || "");
     const password = String(formData.get("password") || "").trim();
     const planned = String(formData.get("planned") || "12:00-20:00").trim();
+    const station = normalizeKitchenStation(formData.get("station"));
 
     if (!name || !email || !ROLE_DEFINITIONS[role] || role === "owner_admin" || password.length < 4) {
       showToast("Add a name, email, staff role, and password of at least 4 characters.");
@@ -41,7 +43,15 @@ export function createAdminActionsRuntime(deps) {
 
     const id = uniqueRecordId(email.split("@")[0], [state.users, state.staff, state.drivers]);
     const roleInfo = roleDefinition(role);
-    state.users.push({ id, name, email, role, password, status: "Active" });
+    state.users.push({
+      id,
+      name,
+      email,
+      role,
+      station: role === "kitchen_staff" && KITCHEN_STATIONS.includes(station) ? station : "",
+      password,
+      status: "Active"
+    });
     state.staff.push({
       id,
       name,

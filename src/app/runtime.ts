@@ -52,7 +52,10 @@ import { formatActualUsageLabel, formatSignedAmount, formatStockAmount } from ".
 import { createNode, emptyState, showToast } from "./dom.js";
 import {
   can,
+  canManageKitchenScreens,
+  canUpdateKitchenTicket,
   canView,
+  currentKitchenStation,
   currentRole,
   currentRoleKey,
   currentUser,
@@ -169,6 +172,13 @@ import {
 } from "./order-selectors.js";
 import { getOrderCompletionToast } from "./order-toasts.js";
 import { getManagementDashboardData } from "./reporting-selectors.js";
+
+function getOpenTicketsForCurrentUser() {
+  const tickets = getOpenTickets();
+  if (canManageKitchenScreens()) return tickets;
+  const station = currentKitchenStation();
+  return station ? tickets.filter((ticket) => normalizeKitchenStation(ticket.station) === station) : [];
+}
 
 const {
   assignQrCode,
@@ -311,6 +321,7 @@ const {
 } = createStaffOrderRuntime({
   assignDriverToDeliveryOrder,
   can,
+  canUpdateKitchenTicket,
   canView,
   currentUser,
   deductInventoryForItems,
@@ -517,6 +528,8 @@ const { renderOrders, renderReceipt } = createOrdersUi({
 
 const { renderKitchen, renderKitchenOrderProgress } = createKitchenUi({
   can,
+  canManageKitchenScreens,
+  currentKitchenStation,
   emptyState,
   getKitchenSlaSummary,
   getOpenTickets,
@@ -838,6 +851,7 @@ const { render, renderNav, updateView } = createAppRenderer({
   getWebsiteReservationUrl,
   getLowStockIngredients,
   getOpenTickets,
+  getOpenTicketsForCurrentUser,
   isActiveDelivery,
   procedurePeriodStatus,
   renderCustomerQrScreen,

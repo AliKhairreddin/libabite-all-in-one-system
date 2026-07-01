@@ -1,4 +1,5 @@
 import { state } from "../app/state.js";
+import { normalizeKitchenStation } from "../data/normalize.js";
 import { getOrderProgressSummary as summarizeOrderProgress } from "../domain/kitchen.js";
 import { formatDuration } from "../shared/dates.js";
 import { escapeHtml } from "../shared/html.js";
@@ -8,6 +9,8 @@ export function createKitchenUi(deps) {
   const document: any = window.document;
   const {
     can,
+    canManageKitchenScreens,
+    currentKitchenStation,
     emptyState,
     getKitchenSlaSummary,
     getOpenTickets,
@@ -23,29 +26,54 @@ export function createKitchenUi(deps) {
     ticketStatusClass
   } = deps;
 
+  function ticketMatchesStation(ticket, station) {
+    return normalizeKitchenStation(ticket.station) === station;
+  }
+
+  function activeKitchenStation() {
+    if (!canManageKitchenScreens()) return currentKitchenStation();
+    return getStationNames().includes(state.activeStation) ? state.activeStation : "All";
+  }
+
+  function stationTickets(station) {
+    const openTickets = getOpenTickets();
+    return station === "All" ? openTickets : openTickets.filter((ticket) => ticketMatchesStation(ticket, station));
+  }
+
+  function renderStationControl(activeStation) {
+    if (!canManageKitchenScreens()) {
+      return `
+        <span class="station-compact-lock" title="Assigned kitchen station">
+          ${escapeHtml(activeStation)}
+        </span>
+      `;
+    }
+
+    return `
+      <label class="station-compact-control">
+        <span>Station</span>
+        <select data-station-select aria-label="Kitchen station">
+          ${getStationNames().map((station) => {
+            const count = stationTickets(station).length;
+            const label = count ? `${station} (${count})` : station;
+            return `<option value="${escapeHtml(station)}" ${station === activeStation ? "selected" : ""}>${escapeHtml(label)}</option>`;
+          }).join("")}
+        </select>
+      </label>
+    `;
+  }
+
   function renderKitchen() {
-    const tabs = document.querySelector("#stationTabs");
+    const stationControl = document.querySelector("#stationTabs");
     const stationSummary = document.querySelector("#kitchenStationSummary");
-    const activeStation = getStationNames().includes(state.activeStation) ? state.activeStation : "All";
+    const progressPanel = document.querySelector("#kitchenProgressPanel");
+    const activeStation = activeKitchenStation();
     state.activeStation = activeStation;
-  
-    tabs.innerHTML = getStationNames()
-      .map((station) => {
-        const count = station === "All"
-          ? getOpenTickets().length
-          : getOpenTickets().filter((ticket) => ticket.station === station).length;
-        return `
-          <button type="button" class="${state.activeStation === station ? "is-selected" : ""}" data-station="${escapeHtml(station)}">
-            ${escapeHtml(station)}
-            ${count ? `<span class="tab-count">${count}</span>` : ""}
-          </button>
-        `;
-      })
-      .join("");
-  
-    const tickets = state.activeStation === "All"
-      ? getOpenTickets()
-      : getOpenTickets().filter((ticket) => ticket.station === state.activeStation);
+
+    if (stationControl) stationControl.innerHTML = renderStationControl(activeStation);
+    if (progressPanel) progressPanel.hidden = !canManageKitchenScreens();
+
+    const tickets = stationTickets(activeStation);
     const sortedTickets = sortKitchenTickets(tickets);
   
     if (stationSummary) {
@@ -56,7 +84,7 @@ export function createKitchenUi(deps) {
       ? sortedTickets.map(ticketCard).join("")
       : emptyState("This screen is clear.");
   
-    renderKitchenOrderProgress();
+    if (canManageKitchenScreens()) renderKitchenOrderProgress();
   }
   
   function sortKitchenTickets(tickets) {
@@ -238,6 +266,10 @@ export function createKitchenUi(deps) {
   function renderKitchenOrderProgress() {
     const container = document.querySelector("#kitchenOrderProgress");
     if (!container) return;
+    if (!canManageKitchenScreens()) {
+      container.innerHTML = "";
+      return;
+    }
   
     const kitchenOrders = state.orders
       .filter((order) => ["Sent to kitchen", "Preparing", "Delayed", "Ready", "Served"].includes(order.status))

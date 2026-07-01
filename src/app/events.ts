@@ -619,6 +619,14 @@ export function bindAppEvents(handlers) {
     event.preventDefault();
     saveReservationCapacityRule(new FormData(event.currentTarget));
   });
+
+  document.addEventListener("change", (event: any) => {
+    const stationSelect = event.target.closest("[data-station-select]");
+    if (!stationSelect) return;
+    state.activeStation = stationSelect.value;
+    saveState();
+    render();
+  });
   
   document.querySelector("#staffUserForm").addEventListener("submit", (event: any) => {
     event.preventDefault();

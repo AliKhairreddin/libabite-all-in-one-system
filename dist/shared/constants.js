@@ -305,7 +305,7 @@ export const ROLE_DEFINITIONS = {
         label: "Waiter/Cashier",
         icon: "WC",
         homeView: "orders",
-        views: ["orders", "procedures", "team", "reservations"],
+        views: ["orders", "reservations"],
         canCreateOrders: true,
         canRecordWaste: true,
         canCompleteProcedures: true,
@@ -316,7 +316,7 @@ export const ROLE_DEFINITIONS = {
         label: "Kitchen staff",
         icon: "KS",
         homeView: "kitchen",
-        views: ["kitchen", "procedures", "team"],
+        views: ["kitchen"],
         canAdvanceTickets: true,
         canRecordWaste: true,
         canManageProcedures: true,
@@ -327,7 +327,7 @@ export const ROLE_DEFINITIONS = {
         label: "Driver",
         icon: "DR",
         homeView: "team",
-        views: ["procedures", "team"],
+        views: ["team"],
         canCompleteProcedures: true,
         operationalRole: "Driver"
     }

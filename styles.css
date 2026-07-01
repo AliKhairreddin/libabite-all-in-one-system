@@ -2005,6 +2005,55 @@ textarea {
   box-shadow: 0 1px 4px rgba(29, 36, 38, 0.08);
 }
 
+.station-compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 170px;
+}
+
+.station-compact-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.station-compact-control select {
+  width: clamp(130px, 12vw, 180px);
+  min-height: 30px;
+  padding: 3px 30px 3px 10px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.station-compact-lock {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f5faf7;
+  color: var(--brand);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
 .tab-count {
   min-width: 20px;
   height: 20px;

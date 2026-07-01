@@ -112,9 +112,9 @@ test("staff role matrix keeps command access to management roles", () => {
     .map(([role]) => role);
 
   assert.deepEqual(rolesWithCommand, ["owner_admin", "manager"]);
-  assert.deepEqual(ROLE_DEFINITIONS.waiter_cashier.views, ["orders", "procedures", "team", "reservations"]);
-  assert.deepEqual(ROLE_DEFINITIONS.kitchen_staff.views, ["kitchen", "procedures", "team"]);
-  assert.deepEqual(ROLE_DEFINITIONS.driver.views, ["procedures", "team"]);
+  assert.deepEqual(ROLE_DEFINITIONS.waiter_cashier.views, ["orders", "reservations"]);
+  assert.deepEqual(ROLE_DEFINITIONS.kitchen_staff.views, ["kitchen"]);
+  assert.deepEqual(ROLE_DEFINITIONS.driver.views, ["team"]);
   assert.equal(ROLE_DEFINITIONS.driver.canCreateOrders, undefined);
 });
 

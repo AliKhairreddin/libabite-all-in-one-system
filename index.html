@@ -428,12 +428,12 @@
                 <p class="eyebrow">Screen routing</p>
                 <h2>Station tickets</h2>
               </div>
-              <div class="tabs" id="stationTabs" role="tablist" aria-label="Kitchen stations"></div>
+              <div class="station-compact" id="stationTabs" aria-label="Kitchen stations"></div>
             </div>
             <div class="kds-summary-grid" id="kitchenStationSummary" aria-live="polite"></div>
             <div class="ticket-board" id="ticketBoard"></div>
           </div>
-          <div class="panel">
+          <div class="panel" id="kitchenProgressPanel">
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">Kitchen flow</p>
@@ -1211,6 +1211,10 @@ Switch off signs and lock the restaurant.</textarea>
                     <input name="password" type="password" value="demo123" autocomplete="new-password" required>
                   </label>
                 </div>
+                <label>
+                  Kitchen station
+                  <select name="station" id="staffKitchenStationSelect"></select>
+                </label>
                 <label>
                   Planned shift
                   <input name="planned" type="text" value="12:00-20:00" autocomplete="off" required>

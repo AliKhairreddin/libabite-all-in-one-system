@@ -2,7 +2,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { state } from "../app/state.js";
-import { DRIVER_IDLE_STATUS, ROLE_ORDER, SCHEDULE_ROLES, SCHEDULE_STATIONS } from "../shared/constants.js";
+import { DRIVER_IDLE_STATUS, KITCHEN_STATIONS, ROLE_ORDER, SCHEDULE_ROLES, SCHEDULE_STATIONS } from "../shared/constants.js";
 import { formatDateTime, formatDuration } from "../shared/dates.js";
 import { escapeHtml } from "../shared/html.js";
 import {
@@ -978,6 +978,7 @@ export function createTeamUi(deps) {
   
   function renderTeam() {
     const staffRoleSelect = document.querySelector("#staffRoleSelect");
+    const staffKitchenStationSelect = document.querySelector("#staffKitchenStationSelect");
     const userList = document.querySelector("#userList");
     const driversPanel = document.querySelector("#driversPanel");
     const timeClockPanel = document.querySelector("#timeClockPanel");
@@ -1001,6 +1002,13 @@ export function createTeamUi(deps) {
         .map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(roleDefinition(role).label)}</option>`)
         .join("");
     }
+
+    if (staffKitchenStationSelect) {
+      staffKitchenStationSelect.innerHTML = KITCHEN_STATIONS
+        .filter((station) => station !== "All")
+        .map((station) => `<option value="${escapeHtml(station)}">${escapeHtml(station)}</option>`)
+        .join("");
+    }
   
     if (userList) {
       userList.innerHTML = state.users
@@ -1009,6 +1017,7 @@ export function createTeamUi(deps) {
             <div>
               <strong>${escapeHtml(account.name)}</strong>
               <p>${escapeHtml(account.email)}</p>
+              ${account.role === "kitchen_staff" && account.station ? `<p>${escapeHtml(account.station)}</p>` : ""}
             </div>
             <span class="pill ${account.status === "Active" ? "ok" : "warning"}">${escapeHtml(roleDefinition(account.role).label)}</span>
           </article>

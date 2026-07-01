@@ -895,6 +895,7 @@ export function normalizeUsers(users) {
     .map((user, index) => {
       const email = String(user.email || "").trim().toLowerCase();
       const role = ROLE_DEFINITIONS[user.role] ? user.role : "waiter_cashier";
+      const assignedStation = String(user.station || user.kitchenStation || "").trim();
       if (!email || seenEmails.has(email)) return null;
       seenEmails.add(email);
       return {
@@ -902,6 +903,7 @@ export function normalizeUsers(users) {
         name: user.name || email,
         email,
         role,
+        station: role === "kitchen_staff" && assignedStation ? normalizeKitchenStation(assignedStation) : "",
         password: String(user.password || "demo123"),
         status: user.status === "Inactive" ? "Inactive" : "Active"
       };

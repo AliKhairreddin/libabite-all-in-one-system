@@ -92,6 +92,7 @@ export function createAppRenderer(deps) {
     getWebsiteReservationUrl,
     getLowStockIngredients,
     getOpenTickets,
+    getOpenTicketsForCurrentUser,
     isActiveDelivery,
     procedurePeriodStatus,
     renderCustomerQrScreen,
@@ -225,7 +226,7 @@ export function createAppRenderer(deps) {
     const canSeeDeliveryOperations = ["owner_admin", "manager"].includes(user?.role);
     const counts = {
       orders: state.orders.filter((order) => order.status !== "Paid" && order.status !== "Cancelled").length,
-      kitchen: getOpenTickets().length,
+      kitchen: getOpenTicketsForCurrentUser?.().length ?? getOpenTickets().length,
       inventory: getLowStockIngredients().length,
       procedures: getCurrentUserProcedures().filter((procedure) => procedurePeriodStatus(procedure).status !== "Completed").length,
       team: canSeeDeliveryOperations ? state.orders.filter(isActiveDelivery).length : 0,
@@ -234,10 +235,11 @@ export function createAppRenderer(deps) {
   
     navList.innerHTML = "";
     visibleViews().forEach((view) => {
+      const label = user?.role === "driver" && view.id === "team" ? "Delivery" : view.label;
       const button = createNode(`
         <button class="nav-item ${state.activeView === view.id ? "is-active" : ""}" type="button" data-view="${escapeHtml(view.id)}">
           <span class="nav-icon" aria-hidden="true">${NAV_ICONS[view.icon] || NAV_ICONS[view.id] || ""}</span>
-          <span>${escapeHtml(view.label)}</span>
+          <span>${escapeHtml(label)}</span>
           ${counts[view.id] ? `<span class="nav-count">${counts[view.id]}</span>` : ""}
         </button>
       `);
@@ -255,7 +257,13 @@ export function createAppRenderer(deps) {
       view.setAttribute("aria-hidden", active ? "false" : "true");
     });
     const currentView = document.querySelector(`#view-${state.activeView}`);
-    document.querySelector("#viewTitle").textContent = currentView?.dataset.title || "Dashboard";
+    const user = currentUser();
+    const scopedTitle = user?.role === "driver" && state.activeView === "team"
+      ? "My Deliveries"
+      : user?.role === "kitchen_staff" && state.activeView === "kitchen"
+        ? "Kitchen Station"
+        : "";
+    document.querySelector("#viewTitle").textContent = scopedTitle || currentView?.dataset.title || "Dashboard";
     document.querySelectorAll(".nav-item").forEach((item) => {
       item.classList.toggle("is-active", item.dataset.view === state.activeView);
     });

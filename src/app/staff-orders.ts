@@ -25,6 +25,7 @@ export function createStaffOrderRuntime(deps) {
   const {
     assignDriverToDeliveryOrder,
     can,
+    canUpdateKitchenTicket,
     canView,
     currentUser,
     deductInventoryForItems,
@@ -59,6 +60,15 @@ export function createStaffOrderRuntime(deps) {
     tableById,
     upsertCustomerFromOrderDetails
   } = deps;
+
+  function canModifyTicket(ticket) {
+    if (!ticket) return false;
+    if (canUpdateKitchenTicket && !canUpdateKitchenTicket(ticket)) {
+      showToast("This kitchen login can only update its assigned station.");
+      return false;
+    }
+    return true;
+  }
 
   function getSelectedLineModifiers() {
     const checked = Array.from(document.querySelectorAll("input[name='lineModifier']:checked") as NodeListOf<HTMLInputElement>)
@@ -442,6 +452,7 @@ export function createStaffOrderRuntime(deps) {
 
     const ticket = state.tickets.find((item) => item.id === ticketId);
     if (!ticket) return;
+    if (!canModifyTicket(ticket)) return;
     setTicketStatus(ticket, advanceStatus(ticket.status));
     syncOrderStatus(ticket.orderId);
     saveState();
@@ -457,6 +468,7 @@ export function createStaffOrderRuntime(deps) {
 
     const ticket = state.tickets.find((item) => item.id === ticketId);
     if (!ticket || !TICKET_STATUSES.includes(status)) return;
+    if (!canModifyTicket(ticket)) return;
     setTicketStatus(ticket, status);
     syncOrderStatus(ticket.orderId);
     saveState();
@@ -472,6 +484,7 @@ export function createStaffOrderRuntime(deps) {
 
     const ticket = state.tickets.find((item) => item.id === ticketId);
     if (!ticket) return;
+    if (!canModifyTicket(ticket)) return;
     const issueNote = window.prompt("Issue note for the delay", ticket.issueNote || "");
     if (issueNote === null) return;
     ticket.issueNote = String(issueNote || "").trim();
@@ -490,6 +503,7 @@ export function createStaffOrderRuntime(deps) {
 
     const ticket = state.tickets.find((item) => item.id === ticketId);
     if (!ticket) return;
+    if (!canModifyTicket(ticket)) return;
     const issueNote = window.prompt("Issue note", ticket.issueNote || "");
     if (issueNote === null) return;
     ticket.issueNote = String(issueNote || "").trim();
