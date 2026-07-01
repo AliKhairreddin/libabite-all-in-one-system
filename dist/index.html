@@ -10,8 +10,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/webp" href="https://inch-digital.com/libabiteimg/logo.webp">
     <link rel="apple-touch-icon" href="https://inch-digital.com/libabiteimg/logo.webp">
-    <script type="module" crossorigin src="/assets/app-BjFFn1JC.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/app-C964Z62X.css">
+    <script type="module" crossorigin src="/assets/app-C1lw_TqT.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/app-BEXhfDYa.css">
   </head>
   <body>
     <section class="customer-qr-screen" id="customerQrScreen" aria-label="Customer ordering" hidden></section>
@@ -72,7 +72,6 @@
               <button class="ghost-btn" type="submit">Scan</button>
             </form>
             <button class="sync-status is-disabled" id="convexSyncStatus" type="button" title="Set VITE_CONVEX_URL to enable Convex sync." aria-label="Refresh Convex sync">Local data</button>
-            <button class="icon-btn" id="resetDemoBtn" type="button" title="Reset demo data" aria-label="Reset demo data">R</button>
             <button class="primary-btn" id="quickOrderBtn" type="button">
               <span aria-hidden="true">+</span>
               New Order
@@ -1380,6 +1379,17 @@ Switch off signs and lock the restaurant.</textarea>
                 </div>
                 <button class="primary-btn" type="submit">Save Settings</button>
               </form>
+            </section>
+
+            <section class="panel settings-danger-panel">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">Danger zone</p>
+                  <h2>Reset demo data</h2>
+                </div>
+              </div>
+              <p class="danger-panel-copy">This resets the demo restaurant data, clears bookings and reservation rules, saves the reset in this browser, and syncs that reset to Convex.</p>
+              <button class="danger-action reset-demo-action" id="resetDemoBtn" type="button" title="Reset demo data" aria-label="Reset demo data">Reset demo data</button>
             </section>
 
             <section class="panel">

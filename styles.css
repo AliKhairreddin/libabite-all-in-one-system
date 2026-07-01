@@ -2230,6 +2230,25 @@ textarea {
   padding-block: 6px;
 }
 
+.settings-danger-panel {
+  grid-column: 1;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.danger-panel-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.reset-demo-action {
+  justify-self: start;
+  padding: 0 14px;
+}
+
 .inline-panel-header {
   margin-bottom: 0;
 }
