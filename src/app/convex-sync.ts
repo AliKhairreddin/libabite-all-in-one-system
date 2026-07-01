@@ -109,9 +109,6 @@ export function renderConvexSyncStatus(status: ConvexSyncStatus) {
   element.className = `sync-status is-${status.state}`;
   element.textContent = status.label;
   element.setAttribute("title", statusDetail(status));
-  element.setAttribute("aria-label", `Refresh Convex sync: ${status.label}`);
-  element.setAttribute("aria-busy", status.state === "syncing" || status.state === "connecting" ? "true" : "false");
-  element.setAttribute("aria-disabled", status.state === "disabled" ? "true" : "false");
 }
 
 export function createConvexStateSync(options: ConvexStateSyncOptions) {
@@ -126,7 +123,6 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
   let pendingState: any = null;
   let saveTimer: number | null = null;
   let flushPromise: Promise<void> | null = null;
-  let refreshPromise: Promise<void> | null = null;
   let bootstrapping = false;
   let lastQueuedSnapshotJson = "";
   let status: ConvexSyncStatus = {
@@ -309,47 +305,6 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
     await flush();
   }
 
-  async function refreshNow() {
-    if (!enabled) return;
-    if (refreshPromise) {
-      await refreshPromise;
-      return;
-    }
-
-    refreshPromise = (async () => {
-      try {
-        if (saveTimer) {
-          window.clearTimeout(saveTimer);
-          saveTimer = null;
-        }
-        await flush();
-
-        client = client || getSharedConvexClient();
-        if (!client) return;
-        emit({
-          state: "syncing",
-          label: "Convex refreshing",
-          detail: "Refreshing the latest Convex state.",
-          version: knownRemoteVersion,
-          error: undefined
-        });
-        const remoteDocument = await client.query(anyApi.appState.get as any, { key: stateKey });
-        applyRemoteDocument(remoteDocument);
-      } catch (error) {
-        emit({
-          state: "error",
-          label: "Convex error",
-          detail: "Could not refresh the Convex state snapshot.",
-          error: error instanceof Error ? error.message : String(error)
-        });
-      } finally {
-        refreshPromise = null;
-      }
-    })();
-
-    await refreshPromise;
-  }
-
   function start() {
     renderConvexSyncStatus(status);
     if (!enabled) return;
@@ -415,7 +370,6 @@ export function createConvexStateSync(options: ConvexStateSyncOptions) {
   return {
     getStatus: () => status,
     flushNow,
-    refreshNow,
     queueSave,
     start,
     stop,
