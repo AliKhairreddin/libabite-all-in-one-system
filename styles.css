@@ -5857,8 +5857,8 @@ body {
 
 .sidebar .brand {
   min-height: 52px;
-  justify-content: flex-start;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   padding: 0 6px 10px;
 }
 
@@ -5878,7 +5878,7 @@ body {
   height: 34px;
   display: grid;
   place-items: center;
-  align-self: flex-end;
+  flex: 0 0 auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
@@ -5945,17 +5945,21 @@ body.is-sidebar-collapsed .sidebar {
 }
 
 body.is-sidebar-collapsed .sidebar .brand {
-  justify-content: center;
+  width: 100%;
+  justify-content: space-between;
+  gap: 4px;
   padding-right: 0;
   padding-left: 0;
 }
 
-body.is-sidebar-collapsed .sidebar .brand div {
-  display: none;
+body.is-sidebar-collapsed .sidebar .brand-logo {
+  width: 24px;
+  height: 24px;
 }
 
 body.is-sidebar-collapsed .sidebar-toggle {
-  align-self: center;
+  width: 28px;
+  height: 28px;
 }
 
 body.is-sidebar-collapsed .sidebar-toggle svg {
