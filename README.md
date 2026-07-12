@@ -1,102 +1,133 @@
-# Libabite All-in-One System
+# LibaBite Restaurant Operations Prototype
 
-A connected restaurant operations system for Libabite. The full app is still
-present: login, orders, kitchen, inventory, procedures, team, settings,
-bookings, QR ordering, website ordering, external delivery imports, scanning,
-and the underlying domain logic.
+[![Deploy](https://github.com/AliKhairreddin/libabite-all-in-one-system/actions/workflows/deploy.yml/badge.svg)](https://github.com/AliKhairreddin/libabite-all-in-one-system/actions/workflows/deploy.yml)
 
-The UI is being overhauled with a shadcn-style design system while preserving
-the useful parts of the existing app experience.
+LibaBite is a full-stack prototype for connecting restaurant ordering, kitchen execution, inventory, reservations, delivery, staff workflows, payments, and reporting in one operational system.
 
-## Working Preference
+- **Customer surface:** [thatcanadian.dev](https://thatcanadian.dev)
+- **Staff surface:** [app.thatcanadian.dev](https://app.thatcanadian.dev)
 
-When requesting new features, additions, redesigns, or other changes, the user
-does not expect old behavior, layout, structure, or implementation details to be
-preserved by default. It is okay to rethink or replace existing pieces when that
-better serves the new direction.
+> **Status:** Functional prototype, not a production POS. Domain workflows, cloud sync, checkout plumbing, receipt queues, and deployment are implemented; production authentication, live payment credentials, external marketplace approvals, and physical printer validation still require operational rollout work.
 
-## Stack
+## Product Scope
 
-- TypeScript
-- Vite
-- Tailwind CSS and shadcn/ui dependencies
-- shadcn-compatible design tokens and component primitives
-- Existing domain/data/shared restaurant modules
+The project models the restaurant as one connected workflow rather than a collection of isolated screens:
 
-## Development
+- website, QR, takeaway, delivery, and dine-in order entry;
+- kitchen tickets, station-specific views, preparation progress, and waiter handoff;
+- products, recipes, ingredients, locations, inventory movements, waste, and supplier reorders;
+- reservations, blocked windows, table conflicts, floor-plan selection, and seating recommendations;
+- customer history, favorites, addresses, delivery assignment, and route progress;
+- staff roles, permissions, shifts, punches, procedures, and operational reporting;
+- explicit payment records, provider references, refunds, deposits, and order-level display state;
+- receipt generation plus queued local-network printing.
 
-Install dependencies:
+## Architecture
 
-```sh
-npm install
+```mermaid
+flowchart LR
+    CU["Customer website / QR ordering"] --> APP["Vite application"]
+    ST["Staff, kitchen, driver, manager"] --> APP
+    APP --> DOM["Typed domain modules"]
+    DOM <--> STATE["Application state and selectors"]
+    STATE <--> C["Convex shared snapshot"]
+    APP --> PAY["Stripe / Mollie checkout actions"]
+    PAY --> LEDGER["Explicit payment ledger"]
+    APP --> Q["Convex receipt print queue"]
+    Q --> PA["Local printer agent"]
+    EDGE["Cloudflare edge Worker"] --> APP
 ```
 
-Run the app:
+## Engineering Highlights
 
-```sh
+### Shared State Without Cross-Device Session Collisions
+
+Restaurant data is synced through Convex, while browser-specific state—current login, filters, carts, and in-progress drafts—remains local. This prevents one device from taking over another device's active workspace.
+
+When Convex is not configured, the prototype can run from browser storage for local evaluation. The top-bar sync indicator exposes connecting, saving, synced, and error states.
+
+### Domain Logic Outside the UI
+
+Payments, orders, reservations, inventory, recipes, scheduling, scanning, delivery, customers, and suppliers live in reusable TypeScript modules under `src/domain`. UI renderers call domain helpers instead of duplicating business rules in event handlers.
+
+### Explicit Payment Ledger
+
+Orders and reservations retain convenient display fields, but provider identifiers, checkout sessions, terminal references, refund timestamps, and deposits are modeled as payment records. This keeps payment history separate from mutable order presentation.
+
+### Queue-Based Receipt Printing
+
+The browser creates a print job in Convex. A local Node.js agent claims jobs and sends rendered receipts to a network printer, avoiding browser print dialogs and keeping hardware access off the public web surface. A dry-run mode validates queue behavior without contacting a printer.
+
+### Role-Aware Workspaces
+
+The application maps staff roles to relevant views and actions. The current prototype demonstrates the workflow, but the role model is not a substitute for production-grade identity and authorization enforcement.
+
+### Regression Coverage
+
+The domain suite currently contains 28 tests covering payment normalization, VAT/allergen metadata, staff permissions, order totals, kitchen transitions, receipt generation, external imports, scanning, delivery progress, reservations, shifts, inventory, suppliers, recipes, production cost, and margin helpers.
+
+## Technology
+
+| Layer | Technologies |
+| --- | --- |
+| Application | TypeScript, Vite, React migration surface |
+| UI | Tailwind CSS, shadcn/ui primitives, Leaflet |
+| Domain | Framework-independent TypeScript modules |
+| State | Convex shared snapshot plus browser-local session state |
+| Payments | Stripe Checkout/iDEAL flow, Mollie-ready actions |
+| Edge | Cloudflare Pages and Workers |
+| Delivery | GitHub Actions, Wrangler |
+
+## Repository Layout
+
+```text
+src/domain/             Business rules for orders, inventory, payments, staff, etc.
+src/app/                Runtime wiring, actions, selectors, sync, and event handling
+src/ui/                 Screen renderers for operational workspaces
+src/data/               Seed/normalization/storage helpers
+src/shared/             Types, IDs, money, dates, QR, and formatting helpers
+src/react/              React migration entry point
+convex/                 Shared state, payments, sync log, and print jobs
+scripts/                Local receipt printer agent
+tests/                  Domain regression suite
+worker/                 Edge health checks and short redirects
+```
+
+## Local Development
+
+```bash
+npm install
+cp .env.example .env.local
+npm run convex:dev
 npm run dev
 ```
 
-Build the app:
+Relevant client configuration:
 
-```sh
-npm run build
-```
-
-Run checks:
-
-```sh
-npm run check
-```
-
-Run domain tests:
-
-```sh
-npm test
-```
-
-## Convex Connection
-
-The app now supports Convex-backed state sync while keeping browser storage as
-the local fallback. Copy `.env.example` to `.env.local` and fill in:
-
-```sh
+```text
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 VITE_CONVEX_STATE_KEY=libabite-main
 VITE_CUSTOMER_SITE_URL=https://thatcanadian.dev
 VITE_STAFF_APP_URL=https://app.thatcanadian.dev
 ```
 
-Start the Convex backend in one terminal:
+Without `VITE_CONVEX_URL`, the app stays in browser-local prototype mode.
 
-```sh
-npm run convex:dev
+## Payments
+
+Website checkout is implemented through Convex actions. Configure backend secrets interactively rather than committing them:
+
+```bash
+npx convex env set STRIPE_SECRET_KEY
 ```
 
-Start the Vite app in another terminal:
+The Stripe path supports card and iDEAL configuration for the Netherlands and verifies successful returns before marking an order paid. Mollie actions remain inactive until a Mollie API key is configured.
 
-```sh
-npm run dev
-```
+This repository does not claim live transaction volume; checkout must be validated with the intended provider account before production use.
 
-Until `VITE_CONVEX_URL` is set, the app stays in local browser-storage mode.
-When Convex is configured, the topbar status pill shows whether it is
-connecting, saving, synced, or in an error state.
+## Receipt Printer Agent
 
-The Convex snapshot stores shared restaurant data. Per-browser session fields
-like the current login, active view, filters, carts, and in-progress drafts stay
-local so one device does not take over another device's workspace.
-
-## Automatic Receipt Printing
-
-Receipt printing is handled by queued jobs in Convex plus a local printer agent
-running on the POS machine or a device on the same network as the receipt
-printer. The browser queues jobs automatically; it does not open the browser
-print dialog.
-
-Configure the printer in Settings, then run the agent:
-
-```sh
+```bash
 CONVEX_URL=https://your-deployment.convex.cloud \
 CONVEX_STATE_KEY=libabite-main \
 RECEIPT_PRINTER_HOST=192.168.1.50 \
@@ -104,91 +135,52 @@ RECEIPT_PRINTER_PORT=9100 \
 npm run printer:agent
 ```
 
-Use `RECEIPT_DRY_RUN=true npm run printer:agent -- --once` to claim one queued
-job and print the rendered receipt to the terminal without contacting hardware.
+Validate without printer hardware:
 
-Website checkout uses Stripe Checkout through Convex. Set the backend secret
-before deploying live checkout:
-
-```sh
-npx convex env set STRIPE_SECRET_KEY sk_live_...
+```bash
+RECEIPT_DRY_RUN=true npm run printer:agent -- --once
 ```
 
-Stripe Checkout is configured for the Netherlands with iDEAL and card payment
-method types. Successful Stripe returns are verified by Convex before the
-browser marks the website order paid and sends it to the kitchen.
+## External Delivery
 
-Mollie checkout infrastructure is also present, but stays inactive until a
-Mollie API key is configured:
+Uber Eats and Just Eat Takeaway/Thuisbezorgd are modeled as marketplace-owned payment channels, but live API access requires provider approval and credentials. Until then, the external-delivery workspace supports manual, email, CSV, and staff-entered imports.
 
-```sh
-npx convex env set MOLLIE_API_KEY live_...
+Prepared configuration includes:
+
+- Uber Eats client/store identifiers;
+- Just Eat Takeaway connection/location identifiers;
+- webhook and adapter metadata;
+- commission separation from direct restaurant payments.
+
+## Verification
+
+```bash
+npm run check
+npm test
+npm run build
 ```
 
-The app keeps an explicit payment ledger in `state.payments` and mirrors it to
-Convex `payments`. Orders and reservations still carry quick display fields
-such as `paymentStatus`, `paymentMethod`, and `paymentReference`, but provider
-references, checkout sessions, terminal reader ids, refund timestamps, and
-reservation deposits belong in the ledger.
+- `check` validates the main TypeScript project.
+- `test` compiles the domain project and runs 28 Node tests.
+- `build` performs a production Vite build after TypeScript validation.
 
-External delivery integrations are modeled as marketplace-owned payment
-channels. Uber Eats and Thuisbezorgd orders should enter as paid external
-platform orders, with commission tracked separately from the restaurant's direct
-payments. API adapter metadata is included for the credentials and webhook
-events needed later:
+## Deployment
 
-```sh
-# Uber Eats
-UBER_EATS_CLIENT_ID=...
-UBER_EATS_CLIENT_SECRET=...
-UBER_EATS_STORE_ID=...
+The deployment workflow runs on pushes to `main`:
 
-# Just Eat Takeaway / Thuisbezorgd
-JET_CONNECT_CLIENT_ID=...
-JET_CONNECT_CLIENT_SECRET=...
-JET_CONNECT_LOCATION_ID=...
-```
+1. deploy Convex functions;
+2. deploy the `libabite-edge` Worker;
+3. build and publish the Pages application.
 
-Until those approvals and secrets exist, the external delivery area supports
-manual, email, CSV, and staff-entered imports.
+The Worker provides `/health`, `/staff`, `/order`, and `/reserve` routes. Hostname-aware application startup sends the customer domain to the public ordering entry and the staff domain to the internal workspace.
 
-## Temporary Domains
+## Production Readiness Gaps
 
-Until `libabite.nl` is ready, use these Cloudflare Pages custom domains:
+Before treating this as a real restaurant operating system:
 
-- `thatcanadian.dev` for the customer website, online ordering, reservations,
-  and table QR links.
-- `app.thatcanadian.dev` for staff, kitchen, manager, owner/admin, inventory,
-  reservations desk, and settings access.
-
-Both domains can point to the same Cloudflare Pages project. The app detects
-the hostname and shows the customer entry screen on `thatcanadian.dev`, while
-`app.thatcanadian.dev` opens the staff login/workspace.
-
-The repo also deploys a small Cloudflare Worker named `libabite-edge` for edge
-health checks and short redirects (`/health`, `/staff`, `/order`, `/reserve`).
-GitHub Actions deploys Convex first, then the Worker, then Pages.
-
-Convex backend files:
-
-- `convex/schema.ts` defines the shared app snapshot, sync event log, and
-  integration config tables.
-- `convex/appState.ts` exposes `get`, `bootstrap`, `saveSnapshot`, and
-  `logEvent` functions for the browser sync adapter.
-
-## Project Shape
-
-- `index.html` is the Vite entry point for the full restored app.
-- `styles.css` contains the current shadcn-style overhaul layer for the existing
-  screens.
-- `src/main.ts` starts the application.
-- `src/app/` contains runtime wiring, actions, state-backed selectors, and event
-  binding.
-- `src/ui/` contains the current screen renderers.
-- `src/domain/`, `src/data/`, and `src/shared/` contain reusable business logic,
-  seed data, and utilities.
-- `src/components/ui/` and `components.json` provide the shadcn/ui foundation for
-  continued React component migration.
-
-New UI work may rethink the existing app behavior and migrate screens into
-shadcn-style components incrementally when that fits the requested direction.
+- replace prototype login state with secure server-enforced identity and authorization;
+- validate Stripe/Mollie webhooks, refunds, and failure recovery with live provider accounts;
+- test the printer agent against the exact receipt printer and network environment;
+- complete marketplace certification and webhook verification;
+- define backups, audit retention, monitoring, incident response, and offline behavior;
+- remove seed/demo data and complete an operational acceptance test with restaurant staff.
