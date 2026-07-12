@@ -7,8 +7,6 @@ LibaBite is a full-stack prototype for connecting restaurant ordering, kitchen e
 - **Customer surface:** [libabite-order.thatcanadian.dev](https://libabite-order.thatcanadian.dev)
 - **Staff surface:** [libabite-work.thatcanadian.dev](https://libabite-work.thatcanadian.dev)
 
-The apex domain `thatcanadian.dev` is intentionally not attached to this project. Keep it available for a separate site; Libabite deployments should use only the two subdomains above.
-
 > **Status:** Functional prototype, not a production POS. Domain workflows, cloud sync, checkout plumbing, receipt queues, and deployment are implemented; production authentication, live payment credentials, external marketplace approvals, and physical printer validation still require operational rollout work.
 
 ## Product Scope
@@ -180,8 +178,7 @@ Cloudflare Pages domain assignments:
 
 - `libabite-order.thatcanadian.dev` routes customers to public ordering;
 - `libabite-work.thatcanadian.dev` routes staff to the internal workspace;
-- `libabite.pages.dev` remains the Cloudflare-provided project hostname;
-- `thatcanadian.dev` and `app.thatcanadian.dev` must not be assigned to Libabite.
+- `libabite.pages.dev` remains the Cloudflare-provided project hostname.
 
 ## Production Readiness Gaps
 
