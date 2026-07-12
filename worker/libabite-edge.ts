@@ -1,5 +1,5 @@
-const CUSTOMER_SITE_URL = "https://thatcanadian.dev";
-const STAFF_APP_URL = "https://app.thatcanadian.dev";
+const CUSTOMER_SITE_URL = "https://libabite-order.thatcanadian.dev";
+const STAFF_APP_URL = "https://libabite-work.thatcanadian.dev";
 const CONVEX_URL = "https://useful-anaconda-961.convex.cloud";
 
 function json(data: unknown, init: ResponseInit = {}) {

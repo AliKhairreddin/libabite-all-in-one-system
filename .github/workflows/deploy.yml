@@ -13,8 +13,8 @@ jobs:
       VITE_CONVEX_URL: https://useful-anaconda-961.convex.cloud
       VITE_CONVEX_STATE_KEY: libabite-main
       VITE_CONVEX_DISABLED: "false"
-      VITE_CUSTOMER_SITE_URL: https://thatcanadian.dev
-      VITE_STAFF_APP_URL: https://app.thatcanadian.dev
+      VITE_CUSTOMER_SITE_URL: https://libabite-order.thatcanadian.dev
+      VITE_STAFF_APP_URL: https://libabite-work.thatcanadian.dev
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

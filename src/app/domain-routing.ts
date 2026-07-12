@@ -1,5 +1,5 @@
-const TEMP_CUSTOMER_HOST = "thatcanadian.dev";
-const TEMP_STAFF_HOST = "app.thatcanadian.dev";
+const TEMP_CUSTOMER_HOST = "libabite-order.thatcanadian.dev";
+const TEMP_STAFF_HOST = "libabite-work.thatcanadian.dev";
 
 function readEnv(name: string) {
   return String(import.meta.env[name] || "").trim();

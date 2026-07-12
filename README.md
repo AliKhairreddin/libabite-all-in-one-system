@@ -4,8 +4,8 @@
 
 LibaBite is a full-stack prototype for connecting restaurant ordering, kitchen execution, inventory, reservations, delivery, staff workflows, payments, and reporting in one operational system.
 
-- **Customer surface:** [thatcanadian.dev](https://thatcanadian.dev)
-- **Staff surface:** [app.thatcanadian.dev](https://app.thatcanadian.dev)
+- **Customer surface:** [libabite-order.thatcanadian.dev](https://libabite-order.thatcanadian.dev)
+- **Staff surface:** [libabite-work.thatcanadian.dev](https://libabite-work.thatcanadian.dev)
 
 > **Status:** Functional prototype, not a production POS. Domain workflows, cloud sync, checkout plumbing, receipt queues, and deployment are implemented; production authentication, live payment credentials, external marketplace approvals, and physical printer validation still require operational rollout work.
 
@@ -107,8 +107,8 @@ Relevant client configuration:
 ```text
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 VITE_CONVEX_STATE_KEY=libabite-main
-VITE_CUSTOMER_SITE_URL=https://thatcanadian.dev
-VITE_STAFF_APP_URL=https://app.thatcanadian.dev
+VITE_CUSTOMER_SITE_URL=https://libabite-order.thatcanadian.dev
+VITE_STAFF_APP_URL=https://libabite-work.thatcanadian.dev
 ```
 
 Without `VITE_CONVEX_URL`, the app stays in browser-local prototype mode.
