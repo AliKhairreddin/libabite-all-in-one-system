@@ -18,8 +18,13 @@ when verification fails and deploying would be unsafe.
 
 ## Domain Context
 
-The active development/current system domain for this project is
-`thatcanadian.dev`.
+The active production domains for this project are
+`libabite-order.thatcanadian.dev` for customer ordering and
+`libabite-work.thatcanadian.dev` for staff operations.
+
+The apex domain `thatcanadian.dev` is intentionally reserved for a separate
+site. Do not attach this project to it. The former staff hostname
+`app.thatcanadian.dev` is also no longer assigned to this project.
 
 `libabite.nl` is the old/currently used external system that the team wants to
 improve on and eventually stop using. Do not assume `libabite.nl` is the domain
