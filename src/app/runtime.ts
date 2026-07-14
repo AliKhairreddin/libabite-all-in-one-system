@@ -369,6 +369,7 @@ const {
   getCustomerCartTotal,
   getCustomerOrderContext,
   removeCustomerCartItem,
+  resumeWebsitePayment,
   setCustomerCartOpen,
   setCustomerUpsellStep,
   setWebsiteFulfillment,
@@ -428,6 +429,7 @@ const publicOrderingUi = createPublicOrderingUi({
   getOrderTotal,
   getOrderableProductsForContext,
   getProductAvailability,
+  getReservationRequestValidation,
   getReservationValidation,
   getStaffUrl,
   getWebsiteOrderingUrl,
@@ -441,7 +443,13 @@ const publicOrderingUi = createPublicOrderingUi({
   orderLocationLabel,
   productById
 });
-const { renderCustomerQrScreen, renderPublicHomeScreen, renderWebsiteOrderScreen, renderWebsiteReservationScreen } = publicOrderingUi;
+const {
+  refreshWebsiteReservationAvailability,
+  renderCustomerQrScreen,
+  renderPublicHomeScreen,
+  renderWebsiteOrderScreen,
+  renderWebsiteReservationScreen
+} = publicOrderingUi;
 renderCustomerOrderingSurfaces = publicOrderingUi.renderCustomerOrderingSurfaces;
 
 const {
@@ -811,6 +819,7 @@ const {
   getAvailableReservationTable,
   getReservationRequestValidation,
   getReservationValidation,
+  refreshWebsiteReservationAvailability,
   render: () => render(),
   renderReservationPlanner,
   renderWebsiteReservationScreen: () => renderWebsiteReservationScreen(),
@@ -969,6 +978,7 @@ export function createAppRuntime() {
       recordWaste,
       regenerateQrCode,
       removeCustomerCartItem,
+      resumeWebsitePayment,
       removeOrderDraftLine,
       removeSellableRecipeLine,
       render,
@@ -978,6 +988,7 @@ export function createAppRuntime() {
       renderProcedureFormControls,
       renderProductionRecipeFields,
       renderProductsInSelects,
+      refreshWebsiteReservationAvailability,
       renderReservationPlanner,
       renderSellableProductForm,
       renderSellableRecipeCostPreview,

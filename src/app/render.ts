@@ -1,5 +1,4 @@
 import { state } from "./state.js";
-import { ROLE_ORDER } from "../shared/constants.js";
 import { escapeHtml } from "../shared/html.js";
 
 const NAV_ICONS = {
@@ -146,7 +145,6 @@ export function createAppRenderer(deps) {
     const isKitchenStationApp = Boolean(user) && user?.role === "kitchen_staff" && !customerSession;
     const sidebarCollapsed = Boolean(user) && !isDriverApp && !isKitchenStationApp && getStoredSidebarCollapsed();
   
-    renderDemoLogins();
     if (publicOrderLink) publicOrderLink.href = getWebsiteOrderingUrl();
     if (publicReservationLink) publicReservationLink.href = getWebsiteReservationUrl();
     document.body.classList.toggle("is-authenticated", Boolean(user) && !customerSession);
@@ -163,42 +161,12 @@ export function createAppRenderer(deps) {
       sidebarToggle.setAttribute("title", sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
     }
   
-    if (loginForm && !user && !customerSession) {
-      loginForm.elements.email.value = loginForm.elements.email.value || "owner@libabite.nl";
-      loginForm.elements.password.value = loginForm.elements.password.value || "admin123";
-    }
-  
     if (!user || customerSession) return;
   
     currentUserName.textContent = user.name;
     currentUserRole.textContent = roleDefinition(user.role).label;
     quickOrderButton.hidden = !can("canCreateOrders");
-    resetDemoButton.hidden = !can("canResetDemo");
-  }
-  
-  function renderDemoLogins() {
-    const container = document.querySelector("#demoLogins");
-    if (!container) return;
-  
-    container.innerHTML = state.users
-      .filter((account) => account.status === "Active")
-      .slice()
-      .sort((first, second) => {
-        const firstRoleIndex = ROLE_ORDER.indexOf(first.role);
-        const secondRoleIndex = ROLE_ORDER.indexOf(second.role);
-        return (firstRoleIndex === -1 ? ROLE_ORDER.length : firstRoleIndex)
-          - (secondRoleIndex === -1 ? ROLE_ORDER.length : secondRoleIndex)
-          || first.name.localeCompare(second.name);
-      })
-      .map((user) => {
-        return `
-          <button class="demo-login" type="button" data-demo-login="${escapeHtml(user.email)}" data-demo-password="${escapeHtml(user.password)}">
-            <strong>${escapeHtml(roleDefinition(user.role).label)} - ${escapeHtml(user.name)}</strong>
-            <span>${escapeHtml(user.email)}</span>
-          </button>
-        `;
-      })
-      .join("");
+    resetDemoButton.hidden = true;
   }
   
   function render() {
@@ -286,7 +254,10 @@ export function createAppRenderer(deps) {
         : "";
     document.querySelector("#viewTitle").textContent = scopedTitle || currentView?.dataset.title || "Dashboard";
     document.querySelectorAll(".nav-item").forEach((item) => {
-      item.classList.toggle("is-active", item.dataset.view === state.activeView);
+      const active = item.dataset.view === state.activeView;
+      item.classList.toggle("is-active", active);
+      if (active) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
     });
   }
   

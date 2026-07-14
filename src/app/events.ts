@@ -70,6 +70,7 @@ export function bindAppEvents(handlers) {
     recordWaste,
     regenerateQrCode,
     removeCustomerCartItem,
+    resumeWebsitePayment,
     removeOrderDraftLine,
     removeSellableRecipeLine,
     render,
@@ -79,6 +80,7 @@ export function bindAppEvents(handlers) {
     renderProcedureFormControls,
     renderProductionRecipeFields,
     renderProductsInSelects,
+    refreshWebsiteReservationAvailability,
     renderReservationPlanner,
     renderSellableProductForm,
     renderSellableRecipeCostPreview,
@@ -122,8 +124,62 @@ export function bindAppEvents(handlers) {
     uploadDeliveryProof,
     endShiftBreak
   } = handlers;
+  const runAsyncAction = (action: () => unknown, failureMessage: string) => {
+    return Promise.resolve()
+      .then(action)
+      .catch((error) => {
+        console.error(failureMessage, error);
+        showToast(failureMessage);
+      });
+  };
+  let customerUpsellReturnProductId = "";
+
+  const focusCustomerUpsellDialog = () => {
+    window.requestAnimationFrame(() => {
+      const dialog: any = document.querySelector(".customer-upsell-flow-card[role='dialog']");
+      dialog?.querySelector("button:not([disabled])")?.focus({ preventScroll: true });
+    });
+  };
+
+  const closeCustomerUpsellAndRestoreFocus = () => {
+    const productId = customerUpsellReturnProductId;
+    customerUpsellReturnProductId = "";
+    closeCustomerUpsell();
+    if (!productId) return;
+    window.requestAnimationFrame(() => {
+      const card: any = document.querySelector(`[data-customer-product-card="${CSS.escape(productId)}"]`);
+      card?.querySelector("[data-customer-add]")?.focus({ preventScroll: true });
+    });
+  };
+
   document.addEventListener("keydown", (event: any) => {
     handleAddressKeydown(event);
+    const dialog: any = document.querySelector(".customer-upsell-flow-card[role='dialog']");
+    if (!dialog) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCustomerUpsellAndRestoreFocus();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(dialog.querySelectorAll(
+      "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    )).filter((element: any) => element.getClientRects().length > 0) as any[];
+    if (!focusable.length) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
   });
 
   const handleAddressSuggestionPress = (event: any) => {
@@ -159,14 +215,6 @@ export function bindAppEvents(handlers) {
       return;
     }
 
-    const demoLogin = event.target.closest("[data-demo-login]");
-    if (demoLogin) {
-      const loginForm = document.querySelector("#loginForm");
-      loginForm.elements.email.value = demoLogin.dataset.demoLogin;
-      loginForm.elements.password.value = demoLogin.dataset.demoPassword;
-      return;
-    }
-  
     const viewButton = event.target.closest("[data-view]");
     if (viewButton) setView(viewButton.dataset.view);
   
@@ -338,7 +386,12 @@ export function bindAppEvents(handlers) {
     if (toggleQr) toggleQrCode(toggleQr.dataset.toggleQr);
 
     const reservationStatus = event.target.closest("[data-reservation-status][data-reservation-id]");
-    if (reservationStatus) updateReservationStatus(reservationStatus.dataset.reservationId, reservationStatus.dataset.reservationStatus);
+    if (reservationStatus) {
+      runAsyncAction(
+        () => updateReservationStatus(reservationStatus.dataset.reservationId, reservationStatus.dataset.reservationStatus),
+        "Could not update the reservation."
+      );
+    }
 
     const editReservation = event.target.closest("[data-edit-reservation]");
     if (editReservation) selectReservationForEdit(editReservation.dataset.editReservation);
@@ -348,6 +401,10 @@ export function bindAppEvents(handlers) {
 
     const reservationMapTable = event.target.closest("[data-reservation-map-table]");
     if (reservationMapTable) {
+      if (reservationMapTable.disabled || reservationMapTable.getAttribute("aria-disabled") === "true") {
+        event.preventDefault();
+        return;
+      }
       const tableId = reservationMapTable.dataset.reservationMapTable;
       const reservationForm = reservationMapTable.closest("#reservationForm");
       const customerReservationForm = reservationMapTable.closest("#customerReservationForm");
@@ -361,7 +418,8 @@ export function bindAppEvents(handlers) {
         button.setAttribute("aria-pressed", selected ? "true" : "false");
       });
 
-      if (reservationForm) renderReservationPlanner();
+      if (customerReservationForm) refreshWebsiteReservationAvailability(customerReservationForm);
+      else if (reservationForm) renderReservationPlanner();
       return;
     }
 
@@ -373,16 +431,23 @@ export function bindAppEvents(handlers) {
 
     const customerAdd = event.target.closest("[data-customer-add]");
     if (customerAdd) {
+      if (!customerAdd.closest(".customer-upsell-flow")) {
+        customerUpsellReturnProductId = String(customerAdd.dataset.customerAdd || "");
+      }
       addCustomerCartItem(customerAdd.dataset.customerAdd, {
         keepUpsellOpen: Boolean(customerAdd.closest(".customer-inline-upsell, .customer-upsell-flow"))
       });
+      if (document.querySelector(".customer-upsell-flow-card[role='dialog']")) focusCustomerUpsellDialog();
     }
 
     const customerUpsellStep = event.target.closest("[data-customer-upsell-step]");
-    if (customerUpsellStep) setCustomerUpsellStep(customerUpsellStep.dataset.customerUpsellStep);
+    if (customerUpsellStep) {
+      setCustomerUpsellStep(customerUpsellStep.dataset.customerUpsellStep);
+      focusCustomerUpsellDialog();
+    }
 
     const customerUpsellClose = event.target.closest("[data-customer-upsell-close]");
-    if (customerUpsellClose) closeCustomerUpsell();
+    if (customerUpsellClose) closeCustomerUpsellAndRestoreFocus();
 
     const customerCartOpen = event.target.closest("[data-customer-cart-open]");
     if (customerCartOpen) setCustomerCartOpen(true);
@@ -404,9 +469,25 @@ export function bindAppEvents(handlers) {
 
     const customerNewOrder = event.target.closest("[data-customer-new-order]");
     if (customerNewOrder) startNewCustomerOrder();
+
+    const resumePayment = event.target.closest("[data-customer-resume-payment]");
+    if (resumePayment) {
+      resumePayment.disabled = true;
+      void runAsyncAction(
+        () => resumeWebsitePayment(resumePayment.dataset.customerResumePayment),
+        "Could not restart secure payment."
+      ).finally(() => {
+        if (resumePayment.isConnected) resumePayment.disabled = false;
+      });
+    }
   });
 
   document.addEventListener("input", (event: any) => {
+    const reservationScheduleField = event.target.closest("#customerReservationForm [name='date'], #customerReservationForm [name='time'], #customerReservationForm [name='guests']");
+    if (reservationScheduleField) {
+      refreshWebsiteReservationAvailability(reservationScheduleField.closest("#customerReservationForm"));
+    }
+
     const addressInput = event.target.closest("[data-address-input]");
     if (addressInput) handleAddressInput(addressInput);
   });
@@ -422,6 +503,12 @@ export function bindAppEvents(handlers) {
   });
   
   document.addEventListener("change", (event: any) => {
+    const reservationScheduleField = event.target.closest("#customerReservationForm [name='date'], #customerReservationForm [name='time'], #customerReservationForm [name='guests']");
+    if (reservationScheduleField) {
+      refreshWebsiteReservationAvailability(reservationScheduleField.closest("#customerReservationForm"));
+      return;
+    }
+
     const productionProduct = event.target.closest("#productionProduct");
     if (productionProduct) {
       renderProductionRecipeFields({ reset: true });
@@ -487,7 +574,21 @@ export function bindAppEvents(handlers) {
     if (!customerOrderForm) return;
     event.preventDefault();
     if (getCustomerOrderingSession()?.mode === "website") {
-      void submitWebsiteOrder(new FormData(customerOrderForm));
+      if (customerOrderForm.dataset.submitting === "true") return;
+      customerOrderForm.dataset.submitting = "true";
+      customerOrderForm.setAttribute("aria-busy", "true");
+      const submitButton: any = customerOrderForm.querySelector('[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+      const formData = new FormData(customerOrderForm);
+      void runAsyncAction(
+        () => submitWebsiteOrder(formData),
+        "Could not start secure checkout."
+      ).finally(() => {
+        if (!customerOrderForm.isConnected) return;
+        delete customerOrderForm.dataset.submitting;
+        customerOrderForm.removeAttribute("aria-busy");
+        if (submitButton) submitButton.disabled = false;
+      });
     } else {
       submitCustomerQrOrder(new FormData(customerOrderForm));
     }
@@ -497,7 +598,21 @@ export function bindAppEvents(handlers) {
     const customerReservationForm = event.target.closest("#customerReservationForm");
     if (!customerReservationForm) return;
     event.preventDefault();
-    submitWebsiteReservation(new FormData(customerReservationForm));
+    if (customerReservationForm.dataset.submitting === "true") return;
+    customerReservationForm.dataset.submitting = "true";
+    customerReservationForm.setAttribute("aria-busy", "true");
+    const submitButton: any = customerReservationForm.querySelector('[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+    const formData = new FormData(customerReservationForm);
+    void runAsyncAction(
+      () => submitWebsiteReservation(formData),
+      "Could not submit the reservation request."
+    ).finally(() => {
+      if (!customerReservationForm.isConnected) return;
+      delete customerReservationForm.dataset.submitting;
+      customerReservationForm.removeAttribute("aria-busy");
+      refreshWebsiteReservationAvailability(customerReservationForm);
+    });
   });
   
   document.querySelector("#orderForm").addEventListener("submit", (event: any) => {
@@ -618,7 +733,10 @@ export function bindAppEvents(handlers) {
   
   document.querySelector("#reservationForm").addEventListener("submit", (event: any) => {
     event.preventDefault();
-    addReservation(new FormData(event.currentTarget));
+    runAsyncAction(
+      () => addReservation(new FormData(event.currentTarget)),
+      "Could not save the reservation."
+    );
   });
   document.querySelector("#reservationForm").addEventListener("input", renderReservationPlanner);
   document.querySelector("#reservationForm").addEventListener("change", renderReservationPlanner);

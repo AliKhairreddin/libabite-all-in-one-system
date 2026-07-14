@@ -27,6 +27,7 @@ import {
   normalizePickupStatus,
   RESTAURANT_COORDINATES
 } from "../domain/delivery.js";
+import { getValidOrderLineSnapshot } from "../domain/orders.js";
 
 const DRIVER_ROUTE_ORIGIN = "Libabite, Roermond, Netherlands";
 const LIVE_MAP_MIN_ZOOM = 13;
@@ -73,9 +74,11 @@ export function createTeamUi(deps) {
     return order.items
       .map((item) => {
         const product = productById(item.productId);
-        if (!product) return null;
+        const snapshot = getValidOrderLineSnapshot(item);
+        const productName = snapshot?.productName || product?.name;
+        if (!productName) return null;
         const detail = orderItemDetailText(item);
-        return `${item.quantity}x ${product.name}${detail ? ` (${detail})` : ""}`;
+        return `${item.quantity}x ${productName}${detail ? ` (${detail})` : ""}`;
       })
       .filter(Boolean)
       .join(", ");
@@ -613,7 +616,7 @@ export function createTeamUi(deps) {
     const exceptions = orders.filter((order) => ["Failed delivery", "Returned"].includes(getDeliveryStatus(order))).length;
     const late = orders.filter((order) => order.deliveryWasLate || deliveryIsLate(order)).length;
     const cash = orders.filter((order) => order.cashCollected).length;
-    const successRate = delivered + exceptions ? Math.round((delivered / (delivered + exceptions)) * 100) : 100;
+    const successRate = delivered + exceptions ? `${Math.round((delivered / (delivered + exceptions)) * 100)}%` : "N/A";
     return `
       <article class="driver-performance-card">
         <header>
@@ -628,7 +631,7 @@ export function createTeamUi(deps) {
           <span>Late</span><strong>${late}</strong>
           <span>Exceptions</span><strong>${exceptions}</strong>
           <span>Cash stops</span><strong>${cash}</strong>
-          <span>Success rate</span><strong>${successRate}%</strong>
+          <span>Success rate</span><strong>${successRate}</strong>
         </div>
       </article>
     `;
@@ -709,6 +712,7 @@ export function createTeamUi(deps) {
   }
 
   function shiftStatusClass(metrics) {
+    if (metrics.requiresReview) return "danger";
     if (metrics.missed || metrics.earlyOutMinutes) return "danger";
     if (metrics.lateMinutes || metrics.overtimeMinutes) return "warning";
     if (metrics.attendanceStatus === "On shift" || metrics.attendanceStatus === "On break") return "info";
@@ -765,6 +769,7 @@ export function createTeamUi(deps) {
             <div><span>Overtime</span><strong>${metrics.overtimeMinutes}m</strong></div>
           </div>
         `}
+        ${metrics.requiresReview ? `<p class="shift-note">${escapeHtml(metrics.anomalyReason)} A manager must verify and correct this shift before payroll use.</p>` : ""}
         ${shift.notes ? `<p class="shift-note">${escapeHtml(shift.notes)}</p>` : ""}
         <div class="mini-actions">${shiftClockActionsHtml(shift)}${shiftManagerActionsHtml(shift)}</div>
       </article>

@@ -119,10 +119,28 @@ function productMap(state: any) {
   return new Map(asArray(state?.products).map((product: any) => [product.id, product]));
 }
 
+function orderLineTotalCents(item: any, productsById: Map<string, any>) {
+  const quantity = Math.floor(Number(item?.quantity) || 0);
+  const unitPriceCents = Number(item?.unitPriceCents);
+  const lineTotalCents = Number(item?.lineTotalCents);
+  if (
+    quantity > 0
+    && Number.isSafeInteger(unitPriceCents)
+    && unitPriceCents >= 0
+    && Number.isSafeInteger(lineTotalCents)
+    && lineTotalCents >= 0
+    && lineTotalCents === unitPriceCents * quantity
+  ) return lineTotalCents;
+
+  const productPrice = Number(productsById.get(item?.productId)?.price);
+  if (quantity < 1 || !Number.isFinite(productPrice) || productPrice < 0) return 0;
+  const fallbackTotalCents = Math.round(productPrice * 100) * quantity;
+  return Number.isSafeInteger(fallbackTotalCents) ? fallbackTotalCents : 0;
+}
+
 function orderTotalCents(order: any, productsById: Map<string, any>) {
   return asArray(order?.items).reduce((sum: number, item: any) => {
-    const product = productsById.get(item.productId);
-    return sum + Math.round((Number(product?.price) || 0) * (Number(item.quantity) || 0) * 100);
+    return sum + orderLineTotalCents(item, productsById);
   }, 0);
 }
 
@@ -227,12 +245,12 @@ async function mirrorOrders(ctx: any, appStateKey: string, state: any, now: numb
       const product = productsById.get(item.productId);
       const quantity = Number(item.quantity) || 0;
       await upsertOperational(ctx, "orderItems", appStateKey, `${order.id}:${index + 1}`, {
-        name: cleanText(product?.name) || item.productId,
+        name: cleanText(item.productName) || cleanText(product?.name) || item.productId,
         status: optionalText(order.status),
         orderId: cleanText(order.id),
         productId: cleanText(item.productId),
         quantity,
-        lineTotalCents: Math.round((Number(product?.price) || 0) * quantity * 100),
+        lineTotalCents: orderLineTotalCents(item, productsById),
         raw: item,
         updatedAt: now
       });

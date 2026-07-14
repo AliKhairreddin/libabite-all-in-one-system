@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#203427">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="LibaBite Driver">
+    <meta name="apple-mobile-web-app-title" content="LibaBite">
     <title>LibaBite Ops</title>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/webp" href="https://inch-digital.com/libabiteimg/logo.webp">
     <link rel="apple-touch-icon" href="https://inch-digital.com/libabiteimg/logo.webp">
-    <script type="module" crossorigin src="/assets/app-BkbqIb8s.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/app-BEXhfDYa.css">
+    <script type="module" crossorigin src="/assets/app-8fTJPr15.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/app-D9uJoGP1.css">
   </head>
   <body>
+    <a class="skip-link" href="#workspaceMain">Skip to main content</a>
     <section class="customer-qr-screen" id="customerQrScreen" aria-label="Customer ordering" hidden></section>
 
     <section class="login-screen" id="loginScreen" aria-label="Login">
@@ -32,15 +33,14 @@
         <form id="loginForm" class="stacked-form">
           <label>
             Email
-            <input name="email" type="email" value="owner@libabite.nl" autocomplete="username" required>
+            <input name="email" type="email" autocomplete="username" required>
           </label>
           <label>
             Password
-            <input name="password" type="password" value="admin123" autocomplete="current-password" required>
+            <input name="password" type="password" autocomplete="current-password" required>
           </label>
           <button class="primary-btn" type="submit">Log In</button>
         </form>
-        <div class="demo-logins" id="demoLogins" aria-label="Demo accounts"></div>
         <a class="primary-btn public-order-link" data-public-link="order" href="?order=website">Order Online</a>
         <a class="ghost-btn public-order-link" data-public-link="reservation" href="?reservation=website">Reserve Table</a>
       </div>
@@ -59,7 +59,7 @@
         <nav class="nav-list" id="navList"></nav>
       </aside>
 
-      <main class="workspace">
+      <main class="workspace" id="workspaceMain" tabindex="-1">
         <header class="topbar">
           <div>
             <p class="eyebrow">All-in-one restaurant system</p>
@@ -1210,7 +1210,7 @@ Switch off signs and lock the restaurant.</textarea>
                   </label>
                   <label>
                     Password
-                    <input name="password" type="password" value="demo123" autocomplete="new-password" required>
+                    <input name="password" type="password" autocomplete="new-password" required>
                   </label>
                 </div>
                 <label>
@@ -1297,6 +1297,30 @@ Switch off signs and lock the restaurant.</textarea>
                     <input name="closesAt" type="time" required>
                   </label>
                 </div>
+                <div class="form-row">
+                  <label>
+                    Restaurant time zone
+                    <input name="timeZone" type="text" value="Europe/Amsterdam" required>
+                  </label>
+                  <label class="check-row">
+                    <input name="reservationsEnabled" type="checkbox">
+                    <span>Accept online reservation requests</span>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Reservation notice (minutes)
+                    <input name="reservationLeadMinutes" type="number" min="0" max="10080" step="15" required>
+                  </label>
+                  <label>
+                    Booking horizon (days)
+                    <input name="reservationHorizonDays" type="number" min="1" max="365" required>
+                  </label>
+                  <label>
+                    Maximum online party
+                    <input name="reservationMaxGuests" type="number" min="1" max="100" required>
+                  </label>
+                </div>
                 <div class="language-checks" id="supportedLanguageChecks"></div>
                 <div class="receipt-printer-settings">
                   <div class="panel-header compact inline-panel-header">
@@ -1381,7 +1405,7 @@ Switch off signs and lock the restaurant.</textarea>
               </form>
             </section>
 
-            <section class="panel settings-danger-panel">
+            <section class="panel settings-danger-panel" hidden>
               <div class="panel-header compact">
                 <div>
                   <p class="eyebrow">Danger zone</p>
@@ -1406,7 +1430,7 @@ Switch off signs and lock the restaurant.</textarea>
               <div class="panel-header compact">
                 <div>
                   <p class="eyebrow">Data model</p>
-                  <h2>Phase 1 database structure</h2>
+                  <h2>Operational collections</h2>
                 </div>
               </div>
               <div class="schema-grid" id="schemaGrid"></div>
@@ -1415,7 +1439,7 @@ Switch off signs and lock the restaurant.</textarea>
             <section class="panel wide-panel external-delivery-panel">
               <div class="panel-header compact">
                 <div>
-                  <p class="eyebrow">Phase 18</p>
+                  <p class="eyebrow">Integrations</p>
                   <h2>External delivery apps</h2>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 {
-  "name": "LibaBite Driver",
+  "name": "LibaBite Restaurant System",
   "short_name": "LibaBite",
-  "description": "Driver delivery route app for LibaBite.",
+  "description": "Ordering and restaurant operations for LibaBite.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,10 +10,10 @@
   "theme_color": "#203427",
   "icons": [
     {
-      "src": "https://inch-digital.com/libabiteimg/logo.webp",
-      "sizes": "1024x889",
-      "type": "image/webp",
-      "purpose": "any maskable"
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ]
 }

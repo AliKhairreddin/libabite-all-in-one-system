@@ -3,6 +3,7 @@ import {
   PAYMENT_METHOD_OPTIONS
 } from "../shared/constants.js";
 import { isDeliveryTerminal } from "../domain/delivery.js";
+import { getValidOrderLineSnapshot } from "../domain/orders.js";
 import { isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
 import { escapeHtml } from "../shared/html.js";
 import { getReceiptPrintSummary } from "../app/receipt-printing.js";
@@ -110,15 +111,20 @@ export function createOrderCardsUi(deps) {
 
   function orderCard(order) {
     const productLines = order.items.map((item) => {
+      const snapshot = getValidOrderLineSnapshot(item);
       const product = productById(item.productId);
-      if (!product) return null;
+      const productName = snapshot?.productName || product?.name;
+      if (!productName) return null;
       const detail = orderItemDetailText(item);
-      return `${item.quantity}x ${product.name}${detail ? ` (${detail})` : ""}`;
+      return `${item.quantity}x ${productName}${detail ? ` (${detail})` : ""}`;
     }).filter(Boolean).join(", ");
     const statusClass = orderStatusClass(order.status);
     const paymentSummary = getOrderPaymentSummary(order);
     const receiptPrint = getReceiptPrintSummary(order.id);
     const canFrontUpdate = can("canCreateOrders") && order.status !== "Paid" && order.status !== "Cancelled";
+    const awaitingWebsitePayment = (order.channel || order.orderType) === "Website order"
+      && order.paymentMethod === "Online payment"
+      && !paymentSummary.paid;
     const canKitchenUpdate = can("canAdvanceTickets") && ["Sent to kitchen", "Preparing", "Delayed"].includes(order.status);
     const kitchenSummary = getOrderProgressSummary(order);
     const fulfillmentMeta = getOrderFulfillmentMeta(order);
@@ -133,6 +139,9 @@ export function createOrderCardsUi(deps) {
             <strong>#${order.number} ${escapeHtml(productLines)}</strong>
             <span class="pill ${statusClass}">${escapeHtml(order.status)}</span>
             <span class="pill ${paymentSummary.className}">${escapeHtml(paymentSummary.statusLabel)}</span>
+            ${order.needsKitchenDispatch === true ? '<span class="pill danger">Paid · kitchen dispatch required</span>' : ""}
+            ${order.paymentReconciliationRequired === true ? '<span class="pill danger">Payment exception · review/refund</span>' : ""}
+            ${awaitingWebsitePayment ? '<span class="pill warning">Awaiting verified payment</span>' : ""}
             ${receiptPrint.job ? `<span class="pill ${receiptPrint.className}">Print: ${escapeHtml(receiptPrint.label)}</span>` : ""}
           </div>
           <div class="meta-line">
@@ -153,7 +162,7 @@ export function createOrderCardsUi(deps) {
           ` : ""}
         </div>
         <div class="mini-actions">
-          ${order.status === "New" && canFrontUpdate ? `<button class="mini-btn" type="button" data-send-kitchen="${escapeHtml(order.id)}">Send</button>` : ""}
+          ${order.status === "New" && canFrontUpdate && !awaitingWebsitePayment ? `<button class="mini-btn" type="button" data-send-kitchen="${escapeHtml(order.id)}">${order.needsKitchenDispatch === true ? "Dispatch paid order" : "Send"}</button>` : ""}
           ${canKitchenUpdate ? `<button class="mini-btn" type="button" data-next-order="${escapeHtml(order.id)}">Next</button>` : ""}
           ${order.status === "Ready" && canFrontUpdate ? `<button class="mini-btn" type="button" data-mark-served="${escapeHtml(order.id)}">Served</button>` : ""}
           ${!paymentSummary.paid && canFrontUpdate ? paymentCaptureHtml(order) : ""}

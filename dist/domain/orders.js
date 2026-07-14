@@ -1,5 +1,65 @@
 import { DEFAULT_RECIPE_ORDER_CONTEXT, FULFILLMENT_STATUSES, LEGACY_ORDER_TYPE_MAP, ORDER_OPERATIONAL_STATUSES, ORDER_TYPE_OPTIONS, PHONE_MESSAGE_FULFILLMENT_OPTIONS, PHONE_MESSAGE_ORDER_CHANNEL, WEBSITE_DEFAULT_FULFILLMENT, WEBSITE_FULFILLMENT_OPTIONS, WEBSITE_ORDER_CHANNEL } from "../shared/constants.js";
 import { normalizeLineModifiers } from "../data/normalize.js";
+import { normalizeVatSetting, vatRateForSetting } from "./commerce.js";
+function cleanSnapshotText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+}
+function normalizeCurrencyCents(value) {
+    const cents = Number(value);
+    return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
+}
+function priceToCents(value) {
+    const price = Number(value);
+    if (!Number.isFinite(price) || price < 0)
+        return null;
+    const cents = Math.round(price * 100);
+    return Number.isSafeInteger(cents) ? cents : null;
+}
+export function getValidOrderLineSnapshot(item) {
+    const quantity = Math.floor(Number(item?.quantity) || 0);
+    const productName = cleanSnapshotText(item?.productName);
+    const unitPriceCents = normalizeCurrencyCents(item?.unitPriceCents);
+    const lineTotalCents = normalizeCurrencyCents(item?.lineTotalCents);
+    const vatSetting = normalizeVatSetting(item?.vatSetting, "");
+    const vatRate = Number(item?.vatRate);
+    const kitchenStation = cleanSnapshotText(item?.kitchenStation);
+    if (quantity < 1
+        || !productName
+        || unitPriceCents === null
+        || lineTotalCents === null
+        || lineTotalCents !== unitPriceCents * quantity
+        || !vatSetting
+        || !Number.isFinite(vatRate)
+        || vatRate < 0
+        || vatRate > 1)
+        return null;
+    return {
+        productName,
+        unitPriceCents,
+        vatSetting,
+        vatRate,
+        lineTotalCents,
+        ...(kitchenStation ? { kitchenStation } : {})
+    };
+}
+export function getOrderLineReportingValues(item, product = null) {
+    const productId = cleanSnapshotText(item?.productId);
+    const quantity = Math.floor(Number(item?.quantity) || 0);
+    const snapshot = getValidOrderLineSnapshot(item);
+    if (!productId || quantity < 1 || (!snapshot && !product))
+        return null;
+    const fallbackUnitPriceCents = priceToCents(product?.price);
+    const lineRevenueCents = snapshot
+        ? snapshot.lineTotalCents
+        : fallbackUnitPriceCents === null ? 0 : fallbackUnitPriceCents * quantity;
+    return {
+        productId,
+        productName: snapshot?.productName || cleanSnapshotText(product?.name) || productId,
+        quantity,
+        lineRevenueCents,
+        usesSnapshot: Boolean(snapshot)
+    };
+}
 export function normalizeOrderItems(items, productById = (_productId) => true) {
     const byProduct = new Map();
     (Array.isArray(items) ? items : []).forEach((item) => {
@@ -23,13 +83,37 @@ export function normalizeOrderItems(items, productById = (_productId) => true) {
 export function countOrderItems(items) {
     return (Array.isArray(items) ? items : []).reduce((sum, item) => sum + (Math.floor(Number(item.quantity) || 0)), 0);
 }
-export function calculateItemsTotal(items, productById) {
-    return items.reduce((sum, item) => {
+export function snapshotOrderItems(items, productById) {
+    return normalizeOrderItems(items, productById).map((item) => {
         const product = productById(item.productId);
-        if (!product)
-            return sum;
-        return sum + product.price * item.quantity;
-    }, 0);
+        const unitPriceCents = priceToCents(product?.price);
+        if (unitPriceCents === null)
+            return item;
+        const vatSetting = normalizeVatSetting(product?.vatSetting, "reduced");
+        return {
+            ...item,
+            productName: cleanSnapshotText(product?.name) || item.productId,
+            unitPriceCents,
+            vatSetting,
+            vatRate: vatRateForSetting(vatSetting),
+            lineTotalCents: unitPriceCents * item.quantity,
+            ...(cleanSnapshotText(product?.station) ? { kitchenStation: cleanSnapshotText(product.station) } : {})
+        };
+    });
+}
+export function getOrderLineTotalCents(item, productById) {
+    const snapshot = getValidOrderLineSnapshot(item);
+    if (snapshot)
+        return snapshot.lineTotalCents;
+    const quantity = Math.floor(Number(item?.quantity) || 0);
+    if (quantity < 1 || typeof productById !== "function")
+        return 0;
+    const unitPriceCents = priceToCents(productById(item?.productId)?.price);
+    return unitPriceCents === null ? 0 : unitPriceCents * quantity;
+}
+export function calculateItemsTotal(items, productById) {
+    const totalCents = (Array.isArray(items) ? items : []).reduce((sum, item) => sum + getOrderLineTotalCents(item, productById), 0);
+    return totalCents / 100;
 }
 export function calculateOrderTotal(order, productById) {
     return calculateItemsTotal(order?.items || [], productById);

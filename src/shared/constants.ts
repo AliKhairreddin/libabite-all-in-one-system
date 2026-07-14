@@ -354,6 +354,11 @@ export const DEFAULT_RESTAURANT_SETTINGS = {
   currencyLabel: "Euro",
   opensAt: "11:00",
   closesAt: "22:00",
+  timeZone: "Europe/Amsterdam",
+  reservationsEnabled: true,
+  reservationLeadMinutes: 120,
+  reservationHorizonDays: 90,
+  reservationMaxGuests: 12,
   defaultLanguage: "nl",
   supportedLanguages: ["nl", "ar", "tr", "en"]
 };

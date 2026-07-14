@@ -83,6 +83,7 @@ export function upsertCustomerFromOrderDetails(customers, details) {
   const email = String(details?.email || "").trim();
   const deliveryAddress = String(details?.deliveryAddress || "").replace(/\s+/g, " ").trim();
   const notes = String(details?.notes || "").trim();
+  const marketingConsent = details?.marketingConsent === true;
   if (!name && !phone && !email && !deliveryAddress && !notes) return null;
 
   let customer = customers.find((item) => item.id === details?.customerId) || findCustomerByPhone(customers, phone);
@@ -94,17 +95,46 @@ export function upsertCustomerFromOrderDetails(customers, details) {
       email,
       addresses: [],
       notes: "",
+      marketingConsent: false,
+      marketingConsentAtMs: "",
+      marketingConsentPolicyVersion: "",
+      marketingConsentSource: "",
       createdAt: timeNow(),
       updatedAt: timeNow()
     };
     customers.push(customer);
   }
 
+  const previousEmail = String(customer.email || "").trim().toLowerCase();
+  const nextEmail = email.toLowerCase();
+  const consentedEmailChanged = Boolean(
+    customer.marketingConsent === true
+    && nextEmail
+    && previousEmail !== nextEmail
+  );
+
   if (name) customer.name = name;
   if (phone) customer.phone = phone;
   if (email) customer.email = email;
   if (deliveryAddress) customer.addresses = normalizeAddressHistory([deliveryAddress, ...(customer.addresses || [])]);
   if (notes) customer.notes = notes;
+  if (consentedEmailChanged && !marketingConsent) {
+    // Consent belongs to the address that received the disclosure. A staff or
+    // customer profile edit must never transfer it to a different address.
+    customer.marketingConsent = false;
+    customer.marketingConsentAtMs = "";
+    customer.marketingConsentPolicyVersion = "";
+    customer.marketingConsentSource = "";
+  }
+  if (marketingConsent) {
+    const consentedAtMs = Number(details?.marketingConsentAtMs);
+    customer.marketingConsent = true;
+    customer.marketingConsentAtMs = Number.isFinite(consentedAtMs) && consentedAtMs > 0
+      ? consentedAtMs
+      : Number(customer.marketingConsentAtMs) || Date.now();
+    customer.marketingConsentPolicyVersion = String(details?.marketingConsentPolicyVersion || customer.marketingConsentPolicyVersion || "").replace(/\s+/g, " ").trim();
+    customer.marketingConsentSource = String(details?.marketingConsentSource || customer.marketingConsentSource || "").replace(/\s+/g, " ").trim();
+  }
   customer.updatedAt = timeNow();
   return customer;
 }

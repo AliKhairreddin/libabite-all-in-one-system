@@ -11,24 +11,24 @@ import {
   UNPAID_PAYMENT_METHOD
 } from "../shared/constants.js";
 
-function cleanText(value) {
+function cleanText(value: unknown) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
-function roundCents(value) {
+function roundCents(value: unknown) {
   return Math.max(0, Math.round(Number(value) || 0));
 }
 
-function currencyCode(value = "eur") {
+function currencyCode(value: unknown = "eur") {
   const currency = cleanText(value).toLowerCase();
   return /^[a-z]{3}$/.test(currency) ? currency : "eur";
 }
 
-export function isPaidPaymentMethod(method) {
+export function isPaidPaymentMethod(method: unknown) {
   return PAYMENT_METHOD_OPTIONS.some((option) => option.value === method && option.paid);
 }
 
-export function normalizePaymentMethod(method, paymentStatus = "") {
+export function normalizePaymentMethod(method: unknown, paymentStatus: unknown = "") {
   const candidate = String(method || "").trim();
   if (PAYMENT_METHOD_OPTIONS.some((option) => option.value === candidate)) return candidate;
   if (["Unpaid", "Pay later"].includes(candidate)) return UNPAID_PAYMENT_METHOD;
@@ -36,17 +36,13 @@ export function normalizePaymentMethod(method, paymentStatus = "") {
   return UNPAID_PAYMENT_METHOD;
 }
 
-export function getPaymentStatusForMethod(method, fallbackStatus = "") {
-  const hasFallback = Boolean(cleanText(fallbackStatus));
-  const normalizedFallback = normalizePaymentStatus(fallbackStatus);
-  if (hasFallback && ["Pending", "Authorized", "Failed", "Cancelled", "Refunded", "Partially refunded"].includes(normalizedFallback)) return normalizedFallback;
-  if (hasFallback && normalizedFallback === "Unpaid" && normalizePaymentMethod(method) === "Online payment") return "Unpaid";
-  if (isPaidPaymentMethod(method)) return "Paid";
-  return normalizedFallback === "Paid" ? "Pay later" : normalizedFallback;
+export function getPaymentStatusForMethod(method: unknown, fallbackStatus: unknown = "") {
+  void method;
+  return normalizePaymentStatus(fallbackStatus);
 }
 
-export function normalizePaymentStatus(status, fallback = "Unpaid") {
-  const legacyMap = {
+export function normalizePaymentStatus(status: unknown, fallback: string = "Unpaid") {
+  const legacyMap: Record<string, string> = {
     "pay_later": "Pay later",
     "pay later": "Pay later",
     "pending": "Pending",
@@ -65,7 +61,11 @@ export function normalizePaymentStatus(status, fallback = "Unpaid") {
   return PAYMENT_STATUSES.includes(fallback) ? fallback : "Unpaid";
 }
 
-export function normalizePaymentProvider(provider, fallback = "manual") {
+export function isPaidPaymentStatus(status: unknown) {
+  return normalizePaymentStatus(status) === "Paid";
+}
+
+export function normalizePaymentProvider(provider: unknown, fallback: string = "manual") {
   const key = cleanText(provider).toLowerCase();
   const byId = PAYMENT_PROVIDERS.find((item) => item.id === key);
   if (byId) return byId.id;
@@ -74,16 +74,16 @@ export function normalizePaymentProvider(provider, fallback = "manual") {
   return PAYMENT_PROVIDERS.some((item) => item.id === fallback) ? fallback : "manual";
 }
 
-export function paymentProviderLabel(provider) {
+export function paymentProviderLabel(provider: unknown) {
   return PAYMENT_PROVIDERS.find((item) => item.id === normalizePaymentProvider(provider))?.label || "Manual / recorded by staff";
 }
 
-export function normalizePaymentKind(kind, fallback = "order") {
+export function normalizePaymentKind(kind: unknown, fallback: string = "order") {
   const candidate = cleanText(kind);
   return PAYMENT_LEDGER_KINDS.includes(candidate) ? candidate : fallback;
 }
 
-export function defaultProviderForPaymentMethod(method) {
+export function defaultProviderForPaymentMethod(method: unknown) {
   const normalizedMethod = normalizePaymentMethod(method);
   if (normalizedMethod === "Cash") return "cash";
   if (normalizedMethod === "Card") return DEFAULT_TERMINAL_PAYMENT_PROVIDER;
@@ -92,23 +92,82 @@ export function defaultProviderForPaymentMethod(method) {
   return "manual";
 }
 
-export function providerSupportsOnlineCheckout(provider) {
+export function providerSupportsOnlineCheckout(provider: unknown) {
   const id = normalizePaymentProvider(provider, DEFAULT_ONLINE_PAYMENT_PROVIDER);
   return ONLINE_PAYMENT_PROVIDER_OPTIONS.includes(id);
 }
 
-export function providerSupportsInPersonPayment(provider) {
+export function providerSupportsInPersonPayment(provider: unknown) {
   const id = normalizePaymentProvider(provider, DEFAULT_TERMINAL_PAYMENT_PROVIDER);
   return IN_PERSON_PAYMENT_PROVIDER_OPTIONS.includes(id);
 }
 
-export function orderPaymentStatusFromLedger(records = [], fallbackStatus = "Unpaid") {
-  const relevant = (Array.isArray(records) ? records : []).filter((record) => normalizePaymentKind(record.kind) === "order");
-  if (relevant.some((record) => normalizePaymentStatus(record.status) === "Paid")) return "Paid";
-  if (relevant.some((record) => normalizePaymentStatus(record.status) === "Pending")) return "Pending";
-  if (relevant.some((record) => normalizePaymentStatus(record.status) === "Authorized")) return "Authorized";
-  if (relevant.some((record) => normalizePaymentStatus(record.status) === "Failed")) return "Failed";
-  return normalizePaymentStatus(fallbackStatus);
+export function applyPendingCheckoutToOrder(order: any, input: any = {}) {
+  if (!order || typeof order !== "object") return null;
+  order.paymentStatus = "Pending";
+  if (input.paymentMethod) order.paymentMethod = input.paymentMethod;
+  if (input.paymentReference) order.paymentReference = input.paymentReference;
+  if (input.paymentProcessor) order.paymentProcessor = input.paymentProcessor;
+  if (input.checkoutSessionId) order.stripeCheckoutSessionId = input.checkoutSessionId;
+  if (input.paymentIntentId) order.stripePaymentIntentId = input.paymentIntentId;
+
+  const currentAttempt = Math.max(0, Math.floor(Number(order.checkoutAttempt) || 0));
+  const serverAttempt = Math.max(0, Math.floor(Number(input.checkoutAttempt) || 0));
+  if (serverAttempt > 0) order.checkoutAttempt = Math.max(currentAttempt, serverAttempt);
+  return order;
+}
+
+export function paymentRequiresReconciliation(result: any) {
+  return result?.requiresReconciliation === true
+    || result?.order?.paymentReconciliationRequired === true;
+}
+
+export function shouldQueuePaymentConfirmation(result: any) {
+  return Boolean(result)
+    && result.duplicate !== true
+    && !paymentRequiresReconciliation(result);
+}
+
+function paymentRecordAmountCents(record: any) {
+  if (!record || typeof record !== "object") return 0;
+  if (record.amountCents !== undefined && record.amountCents !== null && record.amountCents !== "") {
+    return roundCents(record.amountCents);
+  }
+  return roundCents((Number(record.amount) || 0) * 100);
+}
+
+function optionalExpectedAmountCents(value: any) {
+  const candidate = value && typeof value === "object" ? value.expectedAmountCents : value;
+  if (candidate === undefined || candidate === null || candidate === "") return null;
+  const amount = Number(candidate);
+  return Number.isFinite(amount) && amount >= 0 ? roundCents(amount) : null;
+}
+
+export function orderPaymentStatusFromLedger(records: any[] = [], fallbackStatus: unknown = "Unpaid", expectedAmountCents: any = undefined) {
+  const ledger: any[] = (Array.isArray(records) ? records : []).filter((record) => record && typeof record === "object");
+  const orderCharges = ledger.filter((record) => normalizePaymentKind(record.kind) === "order");
+  const refunds = ledger.filter((record) => normalizePaymentKind(record.kind) === "refund");
+  const successfulCharges = orderCharges.filter((record) => isPaidPaymentStatus(record.status));
+  const successfulRefunds = refunds.filter((record) => ["Paid", "Refunded", "Partially refunded"].includes(normalizePaymentStatus(record.status)));
+  const capturedCents = successfulCharges.reduce((sum, record) => sum + paymentRecordAmountCents(record), 0);
+  const refundedCents = successfulRefunds.reduce((sum, record) => sum + paymentRecordAmountCents(record), 0);
+  const netCapturedCents = Math.max(0, capturedCents - refundedCents);
+  const expectedCents = optionalExpectedAmountCents(expectedAmountCents);
+  const hasRefundedCharge = orderCharges.some((record) => normalizePaymentStatus(record.status) === "Refunded");
+  const hasPartiallyRefundedCharge = orderCharges.some((record) => normalizePaymentStatus(record.status) === "Partially refunded");
+
+  if (expectedCents !== null && netCapturedCents >= expectedCents) return "Paid";
+  if (refundedCents > 0 || hasRefundedCharge || hasPartiallyRefundedCharge) {
+    if (hasRefundedCharge || (capturedCents > 0 && refundedCents >= capturedCents)) return "Refunded";
+    return "Partially refunded";
+  }
+  if (expectedCents === null && netCapturedCents > 0) return "Paid";
+  if (orderCharges.some((record) => normalizePaymentStatus(record.status) === "Pending")) return "Pending";
+  if (orderCharges.some((record) => normalizePaymentStatus(record.status) === "Authorized")) return "Authorized";
+  if (orderCharges.some((record) => normalizePaymentStatus(record.status) === "Failed")) return "Failed";
+
+  const fallback = normalizePaymentStatus(fallbackStatus);
+  return expectedCents !== null && fallback === "Paid" ? "Unpaid" : fallback;
 }
 
 export function buildPaymentLedgerRecord(input: any = {}, options: any = {}) {
@@ -166,8 +225,8 @@ export function buildPaymentLedgerRecord(input: any = {}, options: any = {}) {
   };
 }
 
-export function upsertPaymentLedgerRecord(records = [], nextRecord: any) {
-  const nextRecords = Array.isArray(records) ? [...records] : [];
+export function upsertPaymentLedgerRecord(records: any[] = [], nextRecord: any) {
+  const nextRecords: any[] = Array.isArray(records) ? [...records] : [];
   const record = buildPaymentLedgerRecord(nextRecord);
   const index = nextRecords.findIndex((item) => {
     if (record.id && item.id === record.id) return true;

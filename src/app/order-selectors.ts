@@ -19,6 +19,7 @@ import {
   calculateItemsTotal,
   calculateOrderTotal,
   countOrderItems,
+  getValidOrderLineSnapshot,
   normalizeOrderFulfillment,
   normalizeOrderItems as normalizeOrderItemsForProducts,
   normalizeOrderType,
@@ -26,7 +27,7 @@ import {
   productCanBeOrdered,
   productCanBeOrderedForOrderContext
 } from "../domain/orders.js";
-import { isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus } from "../domain/payments.js";
+import { isPaidPaymentStatus, normalizePaymentMethod, normalizePaymentStatus } from "../domain/payments.js";
 
 export function getOrderableProducts(channel) {
   return state.products.filter((product) => productCanBeOrdered(product, channel));
@@ -48,12 +49,36 @@ export function getVatLabel(vatSetting) {
   return VAT_OPTIONS.find((option) => option.id === vatSetting)?.label || "Standard VAT";
 }
 
+function getOrderLineVatValues(item) {
+  const snapshot = getValidOrderLineSnapshot(item);
+  if (snapshot) {
+    return {
+      vatSetting: snapshot.vatSetting,
+      rate: snapshot.vatRate,
+      lineTotal: snapshot.lineTotalCents / 100
+    };
+  }
+
+  const product = productById(item?.productId);
+  const quantity = Math.floor(Number(item?.quantity) || 0);
+  const price = Number(product?.price);
+  if (!product || quantity < 1 || !Number.isFinite(price) || price < 0) return null;
+
+  const vatSetting = VAT_OPTIONS.some((option) => option.id === product.vatSetting)
+    ? product.vatSetting
+    : "standard";
+  return {
+    vatSetting,
+    rate: getVatRate(product),
+    lineTotal: price * quantity
+  };
+}
+
 export function getOrderSubtotalExcludingVat(order) {
-  return normalizeOrderItems(order.items || []).reduce((sum, item) => {
-    const product = productById(item.productId);
-    if (!product) return sum;
-    const lineTotal = product.price * item.quantity;
-    return sum + (lineTotal / (1 + getVatRate(product)));
+  return (Array.isArray(order?.items) ? order.items : []).reduce((sum, item) => {
+    const values = getOrderLineVatValues(item);
+    if (!values) return sum;
+    return sum + (values.lineTotal / (1 + values.rate));
   }, 0);
 }
 
@@ -63,16 +88,15 @@ export function getOrderVatTotal(order) {
 
 export function getOrderVatBreakdown(order) {
   const breakdown = new Map();
-  normalizeOrderItems(order.items || []).forEach((item) => {
-    const product = productById(item.productId);
-    if (!product) return;
-    const vatSetting = VAT_OPTIONS.some((option) => option.id === product.vatSetting) ? product.vatSetting : "standard";
-    const rate = getVatRate(product);
-    const lineTotal = product.price * item.quantity;
+  (Array.isArray(order?.items) ? order.items : []).forEach((item) => {
+    const values = getOrderLineVatValues(item);
+    if (!values) return;
+    const { vatSetting, rate, lineTotal } = values;
     const tax = lineTotal - (lineTotal / (1 + rate));
-    const current = breakdown.get(vatSetting) || { vatSetting, rate, tax: 0 };
+    const key = `${vatSetting}:${rate}`;
+    const current = breakdown.get(key) || { vatSetting, rate, tax: 0 };
     current.tax += tax;
-    breakdown.set(vatSetting, current);
+    breakdown.set(key, current);
   });
   return [...breakdown.values()];
 }
@@ -149,7 +173,7 @@ export function getOrderPaidByName(order) {
 }
 
 export function isOrderPaid(order) {
-  return order.paymentStatus === "Paid" || isPaidPaymentMethod(order.paymentMethod);
+  return isPaidPaymentStatus(order?.paymentStatus);
 }
 
 export function getOrderPaymentSummary(order) {

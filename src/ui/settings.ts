@@ -35,6 +35,11 @@ export function createSettingsUi(deps) {
     form.elements.currency.value = settings.currency;
     form.elements.opensAt.value = settings.opensAt;
     form.elements.closesAt.value = settings.closesAt;
+    form.elements.timeZone.value = settings.timeZone;
+    form.elements.reservationsEnabled.checked = settings.reservationsEnabled;
+    form.elements.reservationLeadMinutes.value = settings.reservationLeadMinutes;
+    form.elements.reservationHorizonDays.value = settings.reservationHorizonDays;
+    form.elements.reservationMaxGuests.value = settings.reservationMaxGuests;
     form.elements.receiptPrinterEnabled.checked = Boolean(printerSettings.enabled);
     form.elements.receiptPrinterId.value = printerSettings.printerId;
     form.elements.receiptPrinterName.value = printerSettings.printerName;

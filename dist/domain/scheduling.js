@@ -1,6 +1,8 @@
 import { MINUTE_MS, SCHEDULE_ROLES, SCHEDULE_STATIONS, SHIFT_GRACE_MINUTES } from "../shared/constants.js";
 const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_INPUT_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const MAX_SHIFT_DURATION_MINUTES = 16 * 60;
+const MAX_POST_SHIFT_OVERRUN_MINUTES = 4 * 60;
 export function toDateInputString(date = new Date()) {
     const local = new Date(date.getTime() - date.getTimezoneOffset() * MINUTE_MS);
     return local.toISOString().slice(0, 10);
@@ -67,18 +69,41 @@ export function getShiftPlannedMinutes(shift) {
 }
 export function getShiftBreakMinutes(shift, nowMs = Date.now()) {
     const savedBreakMinutes = Math.max(0, Math.round(Number(shift?.breakMinutes) || 0));
-    const breakStartedAtMs = Number(shift?.breakStartedAtMs) || 0;
-    if (!breakStartedAtMs || shift?.clockOutAtMs)
+    const clockInAtMs = Number(shift?.clockInAtMs) || 0;
+    if (!clockInAtMs)
         return savedBreakMinutes;
-    return savedBreakMinutes + Math.max(0, Math.round((nowMs - breakStartedAtMs) / MINUTE_MS));
+    const breakStartedAtMs = Number(shift?.breakStartedAtMs) || 0;
+    const observedEndMs = Number(shift?.clockOutAtMs) || nowMs;
+    const effectiveEndMs = Math.min(observedEndMs, getReasonableShiftEndMs(shift));
+    const maximumBreakMinutes = Math.max(0, Math.round((effectiveEndMs - clockInAtMs) / MINUTE_MS));
+    const runningBreakMinutes = breakStartedAtMs && !shift?.clockOutAtMs
+        ? Math.max(0, Math.round((effectiveEndMs - breakStartedAtMs) / MINUTE_MS))
+        : 0;
+    return Math.min(maximumBreakMinutes, savedBreakMinutes + runningBreakMinutes);
+}
+function getReasonableShiftEndMs(shift) {
+    const clockInAtMs = Number(shift?.clockInAtMs) || 0;
+    if (!clockInAtMs)
+        return 0;
+    const hardEndMs = clockInAtMs + MAX_SHIFT_DURATION_MINUTES * MINUTE_MS;
+    const scheduledGraceEndMs = getShiftEndMs(shift) + MAX_POST_SHIFT_OVERRUN_MINUTES * MINUTE_MS;
+    return Math.max(clockInAtMs, Math.min(hardEndMs, scheduledGraceEndMs));
+}
+export function shiftRequiresReview(shift, nowMs = Date.now()) {
+    const clockInAtMs = Number(shift?.clockInAtMs) || 0;
+    if (!clockInAtMs)
+        return false;
+    const observedEndMs = Number(shift?.clockOutAtMs) || nowMs;
+    return observedEndMs > getReasonableShiftEndMs(shift);
 }
 export function getShiftActualMinutes(shift, nowMs = Date.now()) {
     const clockInAtMs = Number(shift?.clockInAtMs) || 0;
     if (!clockInAtMs)
         return 0;
-    const clockOutAtMs = Number(shift?.clockOutAtMs) || nowMs;
-    const grossMinutes = Math.max(0, Math.round((clockOutAtMs - clockInAtMs) / MINUTE_MS));
-    return Math.max(0, grossMinutes - getShiftBreakMinutes(shift, nowMs));
+    const observedEndMs = Number(shift?.clockOutAtMs) || nowMs;
+    const effectiveEndMs = Math.min(observedEndMs, getReasonableShiftEndMs(shift));
+    const grossMinutes = Math.max(0, Math.round((effectiveEndMs - clockInAtMs) / MINUTE_MS));
+    return Math.max(0, grossMinutes - Math.min(grossMinutes, getShiftBreakMinutes(shift, effectiveEndMs)));
 }
 export function getShiftLateMinutes(shift) {
     const clockInAtMs = Number(shift?.clockInAtMs) || 0;
@@ -104,6 +129,8 @@ export function shiftIsMissed(shift, nowMs = Date.now()) {
 export function getShiftAttendanceStatus(shift, nowMs = Date.now()) {
     if (shiftIsMissed(shift, nowMs))
         return "Missed";
+    if (shiftRequiresReview(shift, nowMs))
+        return "Needs review";
     if (shift?.clockOutAtMs) {
         if (getShiftEarlyOutMinutes(shift))
             return "Left early";
@@ -133,6 +160,7 @@ export function getShiftMetrics(shift, nowMs = Date.now()) {
     const lateMinutes = getShiftLateMinutes(shift);
     const earlyOutMinutes = getShiftEarlyOutMinutes(shift);
     const overtimeMinutes = getShiftOvertimeMinutes(shift, nowMs);
+    const requiresReview = shiftRequiresReview(shift, nowMs);
     return {
         plannedMinutes,
         actualMinutes,
@@ -140,6 +168,8 @@ export function getShiftMetrics(shift, nowMs = Date.now()) {
         lateMinutes,
         earlyOutMinutes,
         overtimeMinutes,
+        requiresReview,
+        anomalyReason: requiresReview ? "Clocked time exceeded the scheduled end plus the safety limit." : "",
         missed: shiftIsMissed(shift, nowMs),
         attendanceStatus: getShiftAttendanceStatus(shift, nowMs),
         driverOnTimeStatus: getDriverOnTimeStatus(shift, nowMs)

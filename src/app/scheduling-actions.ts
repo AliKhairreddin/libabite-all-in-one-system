@@ -3,6 +3,7 @@ import { timeNow } from "../shared/dates.js";
 import { uniqueRecordId } from "../shared/ids.js";
 import {
   addDays,
+  getShiftBreakMinutes,
   getShiftAttendanceStatus,
   getWeekStartDate,
   isShiftTime,
@@ -249,7 +250,7 @@ export function createSchedulingRuntime(deps) {
 
     const now = Date.now();
     if (shift.breakStartedAtMs) {
-      shift.breakMinutes = Math.max(0, Math.round(Number(shift.breakMinutes) || 0) + Math.round((now - shift.breakStartedAtMs) / 60000));
+      shift.breakMinutes = getShiftBreakMinutes(shift, now);
       shift.breakStartedAtMs = "";
       shift.breakStartedAt = "";
     }
@@ -288,7 +289,7 @@ export function createSchedulingRuntime(deps) {
     }
 
     const now = Date.now();
-    shift.breakMinutes = Math.max(0, Math.round(Number(shift.breakMinutes) || 0) + Math.round((now - shift.breakStartedAtMs) / 60000));
+    shift.breakMinutes = getShiftBreakMinutes(shift, now);
     shift.breakStartedAtMs = "";
     shift.breakStartedAt = "";
     shift.status = getShiftAttendanceStatus(shift, now);

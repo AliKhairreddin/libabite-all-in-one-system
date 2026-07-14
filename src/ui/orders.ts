@@ -1,4 +1,5 @@
 import { state } from "../app/state.js";
+import { getValidOrderLineSnapshot } from "../domain/orders.js";
 import { escapeHtml } from "../shared/html.js";
 import { getReceiptPrintSummary } from "../app/receipt-printing.js";
 
@@ -31,6 +32,27 @@ export function createOrdersUi(deps) {
     getWaiterPickupOrders
   } = deps;
 
+  function getOrderItemDisplay(item) {
+    const snapshot = getValidOrderLineSnapshot(item);
+    if (snapshot) {
+      return {
+        name: snapshot.productName,
+        unitPrice: snapshot.unitPriceCents / 100,
+        lineTotal: snapshot.lineTotalCents / 100
+      };
+    }
+
+    const product = productById(item?.productId);
+    const quantity = Math.floor(Number(item?.quantity) || 0);
+    const price = Number(product?.price);
+    if (!product || quantity < 1 || !Number.isFinite(price) || price < 0) return null;
+    return {
+      name: product.name,
+      unitPrice: price,
+      lineTotal: price * quantity
+    };
+  }
+
   function renderOrders() {
     const filtered = state.orderFilter === "All"
       ? state.orders
@@ -57,10 +79,10 @@ export function createOrdersUi(deps) {
 
   function waiterPickupItemsText(order) {
     return order.items.map((item) => {
-      const product = productById(item.productId);
-      if (!product) return null;
+      const display = getOrderItemDisplay(item);
+      if (!display) return null;
       const detail = orderItemDetailText(item);
-      return `${item.quantity}x ${product.name}${detail ? ` (${detail})` : ""}`;
+      return `${item.quantity}x ${display.name}${detail ? ` (${detail})` : ""}`;
     }).filter(Boolean).join(", ");
   }
 
@@ -108,17 +130,17 @@ export function createOrdersUi(deps) {
   }
   
   function receiptLineHtml(item) {
-    const product = productById(item.productId);
-    if (!product) return "";
+    const display = getOrderItemDisplay(item);
+    if (!display) return "";
     const detail = orderItemDetailText(item);
     return `
       <div class="receipt-line">
         <div>
-          <strong>${escapeHtml(product.name)}</strong>
-          <span>Qty ${item.quantity} x ${escapeHtml(money(product.price))}</span>
+          <strong>${escapeHtml(display.name)}</strong>
+          <span>Qty ${item.quantity} x ${escapeHtml(money(display.unitPrice))}</span>
           ${detail ? `<span>${escapeHtml(detail)}</span>` : ""}
         </div>
-        <span>${escapeHtml(money(product.price * item.quantity))}</span>
+        <span>${escapeHtml(money(display.lineTotal))}</span>
       </div>
     `;
   }

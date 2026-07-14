@@ -7,8 +7,12 @@ import {
 import { RESERVATION_SOURCES } from "../shared/constants.js";
 import { normalizePaymentMethod, normalizePaymentStatus } from "../domain/payments.js";
 import { timeNow } from "../shared/dates.js";
-import { saveState, state } from "./state.js";
+import { flushRemoteState, saveState, state } from "./state.js";
 import { recordReservationPayment } from "./payment-ledger.js";
+import {
+  MARKETING_CONSENT_POLICY_VERSION,
+  queueRecordCommunication
+} from "./communication-actions.js";
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -23,12 +27,39 @@ function normalizeReservationSource(source) {
   return RESERVATION_SOURCES.includes(candidate) ? candidate : "Website";
 }
 
+function reservationStatusCommunicationEvent(status) {
+  if (status === "Confirmed") return "reservation.confirmed";
+  if (status === "Declined") return "reservation.declined";
+  if (status === "Cancelled") return "reservation.cancelled";
+  return "";
+}
+
+async function queueReservationEventAfterRemoteFlush(reservationId, eventType) {
+  if (!reservationId || !eventType) return;
+  try {
+    await flushRemoteState();
+  } catch (error) {
+    console.warn("Reservation remains saved locally; communication will wait for a successful remote sync.", {
+      reservationId,
+      eventType,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return;
+  }
+  await queueRecordCommunication({
+    recordType: "reservation",
+    recordId: reservationId,
+    eventType
+  });
+}
+
 export function createReservationActionsRuntime(deps) {
   const {
     can,
     getAvailableReservationTable,
     getReservationRequestValidation,
     getReservationValidation,
+    refreshWebsiteReservationAvailability,
     render,
     renderReservationPlanner,
     renderWebsiteReservationScreen,
@@ -40,10 +71,23 @@ export function createReservationActionsRuntime(deps) {
     return state.reservations.find((reservation) => reservation.id === id);
   }
 
+  function refreshWebsiteReservationForm() {
+    if (!refreshWebsiteReservationAvailability?.()) renderWebsiteReservationScreen();
+  }
+
   function reservationFromForm(formData, fallback: any = {}) {
     const source = normalizeReservationSource(formData.get("source") || fallback.source);
     const paymentProcessor = cleanText(formData.get("paymentProcessor") || fallback.paymentProcessor);
     const paymentStatus = normalizePaymentStatus(formData.get("paymentStatus") || fallback.paymentStatus);
+    const email = cleanText(formData.get("email") || fallback.email);
+    const emailChanged = Boolean(
+      fallback.id
+      && email.toLowerCase() !== cleanText(fallback.email).toLowerCase()
+    );
+    const hasSubmittedMarketingConsent = formData.has("marketingConsent");
+    const marketingConsent = Boolean(email) && (hasSubmittedMarketingConsent
+      ? formData.get("marketingConsent") === "true"
+      : !emailChanged && fallback.marketingConsent === true);
     const paymentMethod = normalizePaymentMethod(
       fallback.paymentMethod || (paymentProcessor === "Cash" ? "Cash" : paymentProcessor ? "Online payment" : "Unpaid / pay later"),
       paymentStatus
@@ -56,7 +100,17 @@ export function createReservationActionsRuntime(deps) {
       time: cleanText(formData.get("time") || fallback.time),
       tableId: cleanText(formData.get("tableId") || fallback.tableId),
       phone: cleanText(formData.get("phone") || fallback.phone),
-      email: cleanText(formData.get("email") || fallback.email),
+      email,
+      marketingConsent,
+      marketingConsentAtMs: marketingConsent
+        ? Math.max(0, Number(emailChanged ? 0 : fallback.marketingConsentAtMs) || Date.now())
+        : "",
+      marketingConsentPolicyVersion: marketingConsent
+        ? cleanText(fallback.marketingConsentPolicyVersion) || MARKETING_CONSENT_POLICY_VERSION
+        : "",
+      marketingConsentSource: marketingConsent
+        ? cleanText(fallback.marketingConsentSource) || (source === "Website" ? "website-reservation-form" : "staff-reservation-form")
+        : "",
       notes: cleanNotes(formData.get("notes") || fallback.notes),
       source,
       status: normalizeReservationStatus(formData.get("status") || fallback.status, source === "Website" ? "Pending" : "Confirmed"),
@@ -85,7 +139,7 @@ export function createReservationActionsRuntime(deps) {
     });
   }
 
-  function addReservation(formData) {
+  async function addReservation(formData) {
     if (!can("canManageReservations")) {
       showToast("This role cannot create reservations.");
       return;
@@ -110,6 +164,8 @@ export function createReservationActionsRuntime(deps) {
     }
 
     if (existingReservation) {
+      const previousStatus = existingReservation.status;
+      const scheduleChanged = existingReservation.date !== reservation.date || existingReservation.time !== reservation.time;
       Object.assign(existingReservation, reservation, {
         id: existingReservation.id,
         createdAt: existingReservation.createdAt || timeNow(),
@@ -120,6 +176,11 @@ export function createReservationActionsRuntime(deps) {
       saveState();
       render();
       showToast(`Reservation updated for ${existingReservation.name}.`);
+      const statusEvent = previousStatus !== existingReservation.status
+        ? reservationStatusCommunicationEvent(existingReservation.status)
+        : "";
+      const eventType = statusEvent || (scheduleChanged && existingReservation.status === "Confirmed" ? "reservation.rescheduled" : "");
+      await queueReservationEventAfterRemoteFlush(existingReservation.id, eventType);
       return;
     }
 
@@ -135,9 +196,13 @@ export function createReservationActionsRuntime(deps) {
     saveState();
     render();
     showToast(`Reservation booked for ${newReservation.name} at ${tableById(newReservation.tableId)?.name || "table"}.`);
+    await queueReservationEventAfterRemoteFlush(
+      newReservation.id,
+      reservationStatusCommunicationEvent(newReservation.status)
+    );
   }
 
-  function submitWebsiteReservation(formData) {
+  async function submitWebsiteReservation(formData) {
     const reservation = reservationFromForm(formData, { source: "Website", status: "Pending" });
     reservation.source = "Website";
     reservation.status = "Pending";
@@ -145,7 +210,7 @@ export function createReservationActionsRuntime(deps) {
     const validation = getReservationRequestValidation({ ...reservation, tableId: "" });
     if (!validation.ok) {
       showToast(validation.detail);
-      renderWebsiteReservationScreen();
+      refreshWebsiteReservationForm();
       return;
     }
 
@@ -158,7 +223,7 @@ export function createReservationActionsRuntime(deps) {
       });
       if (!tableValidation.ok) {
         showToast(tableValidation.detail);
-        renderWebsiteReservationScreen();
+        refreshWebsiteReservationForm();
         return;
       }
     }
@@ -166,7 +231,7 @@ export function createReservationActionsRuntime(deps) {
     const table = selectedTable || validation.table || getAvailableReservationTable(reservation);
     if (!table) {
       showToast("No table is available for that party size and time.");
-      renderWebsiteReservationScreen();
+      refreshWebsiteReservationForm();
       return;
     }
 
@@ -182,9 +247,10 @@ export function createReservationActionsRuntime(deps) {
     saveState();
     render();
     showToast(`Reservation request received for ${newReservation.name}.`);
+    await queueReservationEventAfterRemoteFlush(newReservation.id, "reservation.request_received");
   }
 
-  function updateReservationStatus(reservationId, status) {
+  async function updateReservationStatus(reservationId, status) {
     if (!can("canManageReservations")) {
       showToast("This role cannot manage reservations.");
       return;
@@ -192,6 +258,7 @@ export function createReservationActionsRuntime(deps) {
 
     const reservation = reservationById(reservationId);
     if (!reservation) return;
+    const previousStatus = reservation.status;
     const nextStatus = normalizeReservationStatus(status, reservation.status || "Pending");
 
     if (nextStatus === "Confirmed") {
@@ -212,6 +279,12 @@ export function createReservationActionsRuntime(deps) {
     saveState();
     render();
     showToast(`${reservation.name} marked ${nextStatus.toLowerCase()}.`);
+    if (previousStatus !== nextStatus) {
+      await queueReservationEventAfterRemoteFlush(
+        reservation.id,
+        reservationStatusCommunicationEvent(nextStatus)
+      );
+    }
   }
 
   function selectReservationForEdit(reservationId) {

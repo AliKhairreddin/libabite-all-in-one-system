@@ -53,7 +53,8 @@ export function getReservationRequestValidation(candidate) {
     state.reservations,
     state.reservationBlocks,
     state.reservationCapacityRules,
-    RESERVATION_TURNOVER_MINUTES
+    RESERVATION_TURNOVER_MINUTES,
+    state.restaurantSettings
   );
 }
 

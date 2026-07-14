@@ -1,5 +1,6 @@
 import { calculateOrderTotal } from "../domain/orders.js";
 import {
+  applyPendingCheckoutToOrder,
   buildPaymentLedgerRecord,
   normalizePaymentProvider,
   normalizePaymentStatus,
@@ -89,12 +90,7 @@ export function applyPaidPaymentToOrder(order, input: any = {}) {
 
 export function recordPendingOnlinePayment(order, input: any = {}) {
   if (!order?.id) return null;
-  order.paymentStatus = "Pending";
-  if (input.paymentMethod) order.paymentMethod = input.paymentMethod;
-  if (input.paymentReference) order.paymentReference = input.paymentReference;
-  if (input.paymentProcessor) order.paymentProcessor = input.paymentProcessor;
-  if (input.checkoutSessionId) order.stripeCheckoutSessionId = input.checkoutSessionId;
-  if (input.paymentIntentId) order.stripePaymentIntentId = input.paymentIntentId;
+  applyPendingCheckoutToOrder(order, input);
   return recordOrderPayment(order, {
     ...input,
     status: "Pending",

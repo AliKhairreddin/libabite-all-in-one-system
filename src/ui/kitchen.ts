@@ -169,7 +169,7 @@ export function createKitchenUi(deps) {
           <div class="ticket-heading">
             <span class="ticket-kicker">${escapeHtml(stationScope)}</span>
             <strong>${escapeHtml(orderLabel)}</strong>
-            <p>${ticket.quantity}x ${escapeHtml(product?.name || "Unknown item")}</p>
+            <p>${ticket.quantity}x ${escapeHtml(ticket.productName || product?.name || "Unknown item")}</p>
           </div>
           <div class="ticket-pills">
             <span class="pill ${statusClass}">${escapeHtml(getTicketStatusLabel(ticket.status))}</span>

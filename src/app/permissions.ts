@@ -68,11 +68,9 @@ function assignedKitchenStationFromShift(user) {
 export function currentKitchenStation() {
   const user = currentUser();
   if (user?.role !== "kitchen_staff") return "";
-  const demoStation = user.id === "amina" || user.email === "kitchen@libabite.nl" ? "Grill station" : "";
   return kitchenStationOrBlank(user.station || user.kitchenStation)
     || assignedKitchenStationFromShift(user)
     || kitchenStationOrBlank(state.activeStation)
-    || demoStation
     || "Main kitchen";
 }
 

@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { convertWasteQuantityToStockUnits, getWasteUnitOptionsForIngredient, normalizeReceiptPrinterSettings, unitTypeDefinition } from "../dist/data/normalize.js";
+import { convertWasteQuantityToStockUnits, getWasteUnitOptionsForIngredient, normalizeCustomers, normalizeOrderLineItem, normalizeReceiptPrinterSettings, normalizeState, unitTypeDefinition } from "../dist/data/normalize.js";
+import { seedState } from "../dist/data/seed.js";
 import {
   findCustomerBySearchValue,
   getAddressHistoryForCustomer,
@@ -10,7 +11,7 @@ import {
 } from "../dist/domain/customers.js";
 import { getProductAvailability, getStockRequirementsForItems, getStockShortages, planStockDeduction } from "../dist/domain/inventory.js";
 import { advanceStatus, getOrderProgressSummary, resolveOrderStatusFromTickets, setTicketStatus } from "../dist/domain/kitchen.js";
-import { calculateItemsTotal, calculateOrderTotal, countOrderItems, normalizeOrderFulfillment, normalizeOrderItems } from "../dist/domain/orders.js";
+import { calculateItemsTotal, calculateOrderTotal, countOrderItems, getOrderLineReportingValues, normalizeOrderFulfillment, normalizeOrderItems, snapshotOrderItems } from "../dist/domain/orders.js";
 import { normalizeProductAllergens, productAllergenSummary, vatRateForSetting } from "../dist/domain/commerce.js";
 import {
   buildExternalMenuPayload,
@@ -22,7 +23,18 @@ import {
 } from "../dist/domain/external-delivery.js";
 import { formatCustomerDeliveryEta, formatDeliveryDistance, getDeliveryRouteProgress, normalizeDeliveryLocationHistory } from "../dist/domain/delivery.js";
 import { externalPlatformRequiredSecrets, getExternalPlatformReadiness } from "../dist/domain/external-platform-adapters.js";
-import { buildPaymentLedgerRecord, getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod, normalizePaymentStatus } from "../dist/domain/payments.js";
+import {
+  applyPendingCheckoutToOrder,
+  buildPaymentLedgerRecord,
+  getPaymentStatusForMethod,
+  isPaidPaymentMethod,
+  isPaidPaymentStatus,
+  normalizePaymentMethod,
+  normalizePaymentStatus,
+  orderPaymentStatusFromLedger,
+  paymentRequiresReconciliation,
+  shouldQueuePaymentConfirmation
+} from "../dist/domain/payments.js";
 import {
   getProductionExecutionDraft,
   getProductionFieldName,
@@ -35,17 +47,26 @@ import { procedureAssignedToUser, procedureFrequencyWindowMs, procedureStatusCla
 import { convertActualUsageToStockUnits, convertRecipeLineToStockUnits, getRecipeUsageLabel, recipeLineAppliesToOrder } from "../dist/domain/recipes.js";
 import { normalizeScanCode, resolveScanCode } from "../dist/domain/scanning.js";
 import {
+  addReservationCalendarDays,
   getAvailableReservationTable,
+  getReservationDateBounds,
   getReservationBlockConflicts,
   getReservationCapacityIssue,
   getReservationConflicts,
   getReservationIssues,
   getReservationMergeOptions,
+  getReservationPolicyValidation,
   getReservationRequestValidation,
+  reservationDateTimeToUtcMs,
   getReservationSeatingRecommendation,
   getReservationValidation
 } from "../dist/domain/reservations.js";
-import { formatShiftHours, getShiftMetrics, getWeekDates, getWeekStartDate } from "../dist/domain/scheduling.js";
+import { formatShiftHours, getShiftBreakMinutes, getShiftMetrics, getWeekDates, getWeekStartDate } from "../dist/domain/scheduling.js";
+import { verifyStripeWebhookSignature } from "../dist/domain/stripe-webhooks.js";
+import {
+  captureWebsiteCheckoutDraft,
+  restoreWebsiteCheckoutDraftControls
+} from "../dist/domain/checkout-draft.js";
 import {
   buildSupplierOrderDrafts,
   buildSupplierOrderPayload,
@@ -60,16 +81,103 @@ import { slugify, uniqueRecordId } from "../dist/shared/ids.js";
 import { formatMoney } from "../dist/shared/money.js";
 import { ROLE_DEFINITIONS } from "../dist/shared/constants.js";
 
-test("payment methods normalize into paid and pay-later states", () => {
+async function stripeTestSignature(rawBody, secret, timestamp) {
+  const encoder = new TextEncoder();
+  const key = await globalThis.crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const digest = new Uint8Array(await globalThis.crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(`${timestamp}.${rawBody}`)
+  ));
+  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+test("website checkout drafts restore contact, notes, consent, provider, and delivery metadata", () => {
+  const formData = new FormData();
+  formData.set("fulfillment", "Delivery");
+  formData.set("customerName", "Sam Guest");
+  formData.set("customerPhone", "+31 6 12345678");
+  formData.set("customerEmail", "sam@example.com");
+  formData.set("notes", "No onion");
+  formData.set("marketingConsent", "true");
+  formData.set("paymentProvider", "mollie");
+  formData.set("deliveryAddress", "Markt 1, Roermond");
+  formData.set("deliveryAddressLat", "51.1942");
+  formData.set("deliveryAddressLng", "5.9878");
+  formData.set("deliveryAddressPlaceId", "place-1");
+
+  const draft = captureWebsiteCheckoutDraft(formData);
+  const controls = [
+    { name: "customerName", type: "text", value: "" },
+    { name: "customerPhone", type: "tel", value: "" },
+    { name: "customerEmail", type: "email", value: "" },
+    { name: "notes", type: "textarea", value: "" },
+    { name: "marketingConsent", type: "checkbox", value: "true", checked: false },
+    { name: "paymentProvider", type: "radio", value: "stripe", checked: true },
+    { name: "paymentProvider", type: "radio", value: "mollie", checked: false },
+    { name: "deliveryAddress", type: "text", value: "" },
+    { name: "deliveryAddressLat", type: "hidden", value: "" },
+    { name: "deliveryAddressLng", type: "hidden", value: "" },
+    { name: "deliveryAddressPlaceId", type: "hidden", value: "" }
+  ];
+
+  restoreWebsiteCheckoutDraftControls(controls, draft);
+
+  assert.equal(controls[0].value, "Sam Guest");
+  assert.equal(controls[1].value, "+31 6 12345678");
+  assert.equal(controls[2].value, "sam@example.com");
+  assert.equal(controls[3].value, "No onion");
+  assert.equal(controls[4].checked, true);
+  assert.equal(controls[5].checked, false);
+  assert.equal(controls[6].checked, true);
+  assert.equal(controls[7].value, "Markt 1, Roermond");
+  assert.equal(controls[8].value, "51.1942");
+  assert.equal(controls[9].value, "5.9878");
+  assert.equal(controls[10].value, "place-1");
+
+  const uncheckedControl = { name: "marketingConsent", type: "checkbox", value: "true", checked: true };
+  restoreWebsiteCheckoutDraftControls([uncheckedControl], captureWebsiteCheckoutDraft(new FormData()));
+  assert.equal(uncheckedControl.checked, false);
+});
+
+test("Stripe webhook signatures require the exact body and a fresh timestamp", async () => {
+  const secret = "whsec_test_secret";
+  const timestamp = 1_700_000_000;
+  const rawBody = '{"id":"evt_test","type":"checkout.session.completed"}';
+  const signature = await stripeTestSignature(rawBody, secret, timestamp);
+  const header = `t=${timestamp},v1=${"0".repeat(64)},v1=${signature}`;
+
+  assert.equal((await verifyStripeWebhookSignature(rawBody, header, secret, { nowMs: timestamp * 1000 })).ok, true);
+  assert.equal((await verifyStripeWebhookSignature(`${rawBody} `, header, secret, { nowMs: timestamp * 1000 })).ok, false);
+  assert.equal((await verifyStripeWebhookSignature(rawBody, header, secret, { nowMs: (timestamp + 301) * 1000 })).reason, "timestamp_outside_tolerance");
+});
+
+test("payment methods are descriptive and payment status stays explicit", () => {
   assert.equal(normalizePaymentMethod("Paid"), "Cash");
   assert.equal(normalizePaymentMethod("Pay later"), "Unpaid / pay later");
   assert.equal(isPaidPaymentMethod("Card"), true);
   assert.equal(isPaidPaymentMethod("Unpaid / pay later"), false);
-  assert.equal(getPaymentStatusForMethod("Online payment"), "Paid");
+  assert.equal(getPaymentStatusForMethod("Online payment"), "Unpaid");
+  assert.equal(getPaymentStatusForMethod("Cash"), "Unpaid");
+  assert.equal(getPaymentStatusForMethod("Card"), "Unpaid");
   assert.equal(getPaymentStatusForMethod("Online payment", "Unpaid"), "Unpaid");
   assert.equal(getPaymentStatusForMethod("Online payment", "Pending"), "Pending");
-  assert.equal(getPaymentStatusForMethod("Unpaid / pay later", "Paid"), "Pay later");
+  assert.equal(getPaymentStatusForMethod("Unpaid / pay later", "Paid"), "Paid");
+  assert.equal(isPaidPaymentStatus("paid"), true);
+  assert.equal(isPaidPaymentStatus("Pending"), false);
   assert.equal(normalizePaymentStatus("partially_refunded"), "Partially refunded");
+  assert.equal(buildPaymentLedgerRecord({
+    orderId: "ORD-UNPAID",
+    amountCents: 1450,
+    provider: "stripe",
+    paymentMethod: "Online payment"
+  }, { nowMs: 1000 }).status, "Unpaid");
   assert.equal(buildPaymentLedgerRecord({
     orderId: "ORD-1",
     amountCents: 1450,
@@ -78,6 +186,49 @@ test("payment methods normalize into paid and pay-later states", () => {
     status: "Paid",
     checkoutSessionId: "cs_test_123"
   }, { nowMs: 1000 }).externalId, "cs_test_123");
+});
+
+test("pending checkout state preserves the server-issued provider attempt", () => {
+  const order = { id: "ORD-RETRY", paymentStatus: "Failed", checkoutAttempt: 2 };
+  applyPendingCheckoutToOrder(order, {
+    paymentMethod: "Online payment",
+    paymentProcessor: "Stripe",
+    paymentReference: "cs_retry_3",
+    checkoutSessionId: "cs_retry_3",
+    checkoutAttempt: 3
+  });
+
+  assert.equal(order.paymentStatus, "Pending");
+  assert.equal(order.stripeCheckoutSessionId, "cs_retry_3");
+  assert.equal(order.checkoutAttempt, 3);
+
+  applyPendingCheckoutToOrder(order, { checkoutAttempt: 1 });
+  assert.equal(order.checkoutAttempt, 3);
+});
+
+test("payment confirmation communication queues only for the first non-reconciliation transition", () => {
+  const applied = { order: { paymentReconciliationRequired: false } };
+  assert.equal(paymentRequiresReconciliation(applied), false);
+  assert.equal(shouldQueuePaymentConfirmation(applied), true);
+  assert.equal(shouldQueuePaymentConfirmation({ ...applied, duplicate: true }), false);
+  assert.equal(shouldQueuePaymentConfirmation({ order: { paymentReconciliationRequired: true } }), false);
+  assert.equal(paymentRequiresReconciliation({ requiresReconciliation: true }), true);
+});
+
+test("order payment ledger uses net captured cents and an optional expected amount", () => {
+  const paid = (amountCents) => ({ kind: "order", status: "Paid", amountCents });
+  const refund = (amountCents, status = "Refunded") => ({ kind: "refund", status, amountCents });
+
+  assert.equal(orderPaymentStatusFromLedger([paid(600), paid(400)], "Unpaid", 1000), "Paid");
+  assert.equal(orderPaymentStatusFromLedger([paid(600)], "Unpaid", 1000), "Unpaid");
+  assert.equal(orderPaymentStatusFromLedger([paid(1200), refund(200)], "Unpaid", 1000), "Paid");
+  assert.equal(orderPaymentStatusFromLedger([paid(1000), refund(200)], "Unpaid", 1000), "Partially refunded");
+  assert.equal(orderPaymentStatusFromLedger([paid(1000), refund(1000)], "Unpaid", 1000), "Refunded");
+  assert.equal(orderPaymentStatusFromLedger([paid(1000), refund(200)], "Unpaid"), "Partially refunded");
+  assert.equal(orderPaymentStatusFromLedger([paid(1000)], "Unpaid"), "Paid");
+  assert.equal(orderPaymentStatusFromLedger([{ kind: "order", status: "Pending", amountCents: 1000 }], "Unpaid", 1000), "Pending");
+  assert.equal(orderPaymentStatusFromLedger([{ kind: "reservation_deposit", status: "Paid", amountCents: 1000 }], "Unpaid", 1000), "Unpaid");
+  assert.equal(orderPaymentStatusFromLedger([paid(500)], "Paid", 1000), "Unpaid");
 });
 
 test("commerce helpers normalize Netherlands VAT and allergen metadata", () => {
@@ -163,6 +314,204 @@ test("order totals ignore missing products and multiply quantities", () => {
   ], productById);
   assert.deepEqual(normalized, [{ productId: "kefta-plate", quantity: 3, note: "hot", modifiers: ["Extra sauce"] }]);
   assert.equal(countOrderItems(normalized), 3);
+});
+
+test("accepted order lines keep immutable product, price, VAT, and kitchen routing snapshots", () => {
+  const products = new Map([
+    ["kefta-plate", { id: "kefta-plate", name: "Kefta Plate", price: 12.5, vatSetting: "reduced", station: "Main kitchen" }],
+    ["mint-tea", { id: "mint-tea", name: "Mint Tea", price: 3, vatSetting: "standard", station: "Drinks" }]
+  ]);
+  const productById = (id) => products.get(id);
+  const items = snapshotOrderItems([
+    { productId: "kefta-plate", quantity: 1, note: "hot", modifiers: ["Extra sauce"] },
+    { productId: "kefta-plate", quantity: 1, notes: "hot", modifiers: ["Extra sauce"] },
+    { productId: "mint-tea", quantity: 1 }
+  ], productById);
+
+  assert.deepEqual(items[0], {
+    productId: "kefta-plate",
+    quantity: 2,
+    note: "hot",
+    modifiers: ["Extra sauce"],
+    productName: "Kefta Plate",
+    unitPriceCents: 1250,
+    vatSetting: "reduced",
+    vatRate: 0.09,
+    lineTotalCents: 2500,
+    kitchenStation: "Main kitchen"
+  });
+  assert.equal(calculateItemsTotal(items, productById), 28);
+
+  products.get("kefta-plate").name = "Renamed Plate";
+  products.get("kefta-plate").price = 20;
+  products.get("kefta-plate").vatSetting = "standard";
+  products.get("mint-tea").price = 5;
+
+  assert.equal(calculateOrderTotal({ items }, productById), 28);
+  assert.equal(calculateItemsTotal([{ productId: "kefta-plate", quantity: 2 }], productById), 40);
+  assert.equal(calculateItemsTotal([{
+    ...items[0],
+    lineTotalCents: 9999
+  }], productById), 40);
+});
+
+test("order line normalization preserves only complete valid snapshots", () => {
+  const productIds = new Set(["kefta-plate"]);
+  const snapshot = {
+    productId: "kefta-plate",
+    quantity: 2,
+    note: "hot",
+    modifiers: ["Extra sauce"],
+    productName: "Kefta Plate",
+    unitPriceCents: 1250,
+    vatSetting: "reduced",
+    vatRate: 0.09,
+    lineTotalCents: 2500
+  };
+
+  assert.deepEqual(normalizeOrderLineItem(snapshot, productIds), snapshot);
+  assert.equal(normalizeOrderLineItem(snapshot, new Set()), null);
+  assert.deepEqual(normalizeOrderLineItem(snapshot, new Set(), { preserveDeletedProductSnapshot: true }), snapshot);
+  assert.deepEqual(normalizeOrderLineItem({ ...snapshot, lineTotalCents: -1 }, productIds), {
+    productId: "kefta-plate",
+    quantity: 2,
+    note: "hot",
+    modifiers: ["Extra sauce"]
+  });
+  assert.equal(normalizeOrderLineItem({ ...snapshot, lineTotalCents: -1 }, new Set()), null);
+
+  assert.deepEqual(getOrderLineReportingValues(snapshot, {
+    id: "kefta-plate",
+    name: "Renamed Plate",
+    price: 99
+  }), {
+    productId: "kefta-plate",
+    productName: "Kefta Plate",
+    quantity: 2,
+    lineRevenueCents: 2500,
+    usesSnapshot: true
+  });
+  assert.deepEqual(getOrderLineReportingValues(snapshot), {
+    productId: "kefta-plate",
+    productName: "Kefta Plate",
+    quantity: 2,
+    lineRevenueCents: 2500,
+    usesSnapshot: true
+  });
+});
+
+test("accepted order normalization retains a valid snapshot after product deletion", () => {
+  const candidate = structuredClone(seedState);
+  const archivedLine = {
+    productId: "deleted-special",
+    quantity: 2,
+    note: "historical",
+    modifiers: [],
+    productName: "Deleted Special",
+    unitPriceCents: 875,
+    vatSetting: "reduced",
+    vatRate: 0.09,
+    lineTotalCents: 1750,
+    kitchenStation: "Main kitchen"
+  };
+  candidate.orders = [{
+    id: "ORD-ARCHIVED-PRODUCT",
+    number: 991,
+    channel: "Takeaway",
+    fulfillment: "Pickup",
+    paymentStatus: "Paid",
+    paymentMethod: "Cash",
+    status: "Completed",
+    items: [archivedLine],
+    createdAt: "2026-01-01T12:00:00.000Z",
+    createdAtMs: Date.parse("2026-01-01T12:00:00.000Z")
+  }];
+  candidate.tickets = [{
+    id: "TCK-ARCHIVED-PRODUCT",
+    orderId: "ORD-ARCHIVED-PRODUCT",
+    productId: "deleted-special",
+    quantity: 2,
+    station: "",
+    status: "Queued"
+  }];
+
+  const normalized = normalizeState(candidate);
+  assert.deepEqual(normalized.orders.find((order) => order.id === "ORD-ARCHIVED-PRODUCT").items, [archivedLine]);
+  assert.deepEqual(
+    normalized.tickets.map((ticket) => ({ productId: ticket.productId, productName: ticket.productName, station: ticket.station })),
+    [{ productId: "deleted-special", productName: "Deleted Special", station: "Main kitchen" }]
+  );
+});
+
+test("state normalization preserves safe communication consent fields", () => {
+  const candidate = structuredClone(seedState);
+  const product = candidate.products[0];
+  const [line] = snapshotOrderItems([{ productId: product.id, quantity: 1 }], (id) => candidate.products.find((item) => item.id === id));
+  candidate.customers = [{
+    id: "customer-consent",
+    name: "Consent Customer",
+    phone: "+31 6 12345678",
+    email: "consent@example.com",
+    marketingConsent: true,
+    marketingConsentAtMs: 1234.5,
+    marketingConsentPolicyVersion: " policy  v1 ",
+    marketingConsentSource: " website  order "
+  }];
+  candidate.orders = [{
+    id: "ORD-CONSENT",
+    number: 999,
+    channel: "Website order",
+    fulfillment: "Pickup",
+    paymentStatus: "Unpaid",
+    paymentMethod: "Online payment",
+    status: "New",
+    customerEmail: "consent@example.com",
+    marketingConsent: true,
+    marketingConsentAtMs: 2345,
+    marketingConsentPolicyVersion: "policy-v1",
+    marketingConsentSource: "website_order",
+    items: [line]
+  }];
+  candidate.reservations = [{
+    id: "RES-CONSENT",
+    date: "2099-01-01",
+    time: "19:00",
+    name: "Consent Customer",
+    guests: 2,
+    tableId: candidate.tables[0].id,
+    email: "consent@example.com",
+    source: "Website",
+    status: "Pending",
+    marketingConsent: "true",
+    marketingConsentAtMs: -1,
+    marketingConsentPolicyVersion: " policy-v2 ",
+    marketingConsentSource: " reservation "
+  }];
+
+  const normalized = normalizeState(candidate);
+  const customer = normalized.customers.find((item) => item.id === "customer-consent");
+  const order = normalized.orders.find((item) => item.id === "ORD-CONSENT");
+  const reservation = normalized.reservations.find((item) => item.id === "RES-CONSENT");
+
+  assert.deepEqual({
+    marketingConsent: customer.marketingConsent,
+    marketingConsentAtMs: customer.marketingConsentAtMs,
+    marketingConsentPolicyVersion: customer.marketingConsentPolicyVersion,
+    marketingConsentSource: customer.marketingConsentSource
+  }, {
+    marketingConsent: true,
+    marketingConsentAtMs: 1234.5,
+    marketingConsentPolicyVersion: "policy v1",
+    marketingConsentSource: "website order"
+  });
+  assert.equal(order.marketingConsent, true);
+  assert.equal(order.marketingConsentAtMs, 2345);
+  assert.equal(order.marketingConsentPolicyVersion, "policy-v1");
+  assert.equal(order.marketingConsentSource, "website_order");
+  assert.equal(reservation.marketingConsent, false);
+  assert.equal(reservation.marketingConsentAtMs, "");
+  assert.equal(reservation.marketingConsentPolicyVersion, "");
+  assert.equal(reservation.marketingConsentSource, "");
 });
 
 test("website order fulfillment preserves delivery checkout choice", () => {
@@ -344,6 +693,81 @@ test("customer helpers find history, favorites, and upsert records", () => {
   assert.deepEqual(customer.addresses, ["3 Rue C", "1 Rue A"]);
 });
 
+test("customer consent merge accepts only literal true and an unchecked order does not revoke consent", () => {
+  const customers = [{
+    id: "cust-consent",
+    name: "Nour",
+    phone: "+33 6 12 34 56",
+    email: "nour@example.com",
+    addresses: [],
+    notes: "",
+    marketingConsent: true,
+    marketingConsentAtMs: 1000,
+    marketingConsentPolicyVersion: "policy-v1",
+    marketingConsentSource: "website-order-form"
+  }];
+
+  const existing = upsertCustomerFromOrderDetails(customers, {
+    name: "Nour",
+    phone: "+33 6 12 34 56",
+    email: "nour@example.com",
+    marketingConsent: false,
+    marketingConsentAtMs: "",
+    marketingConsentPolicyVersion: "",
+    marketingConsentSource: ""
+  });
+  assert.equal(existing.marketingConsent, true);
+  assert.equal(existing.marketingConsentAtMs, 1000);
+  assert.equal(existing.marketingConsentPolicyVersion, "policy-v1");
+
+  const changedAddressWithoutConsent = upsertCustomerFromOrderDetails(customers, {
+    customerId: existing.id,
+    name: "Nour",
+    email: "new-address@example.com",
+    marketingConsent: false
+  });
+  assert.equal(changedAddressWithoutConsent.email, "new-address@example.com");
+  assert.equal(changedAddressWithoutConsent.marketingConsent, false);
+  assert.equal(changedAddressWithoutConsent.marketingConsentAtMs, "");
+  assert.equal(changedAddressWithoutConsent.marketingConsentPolicyVersion, "");
+
+  const uncheckedNewCustomer = upsertCustomerFromOrderDetails(customers, {
+    name: "Sam",
+    phone: "+33 6 00 00 00",
+    email: "sam@example.com",
+    marketingConsent: "true"
+  });
+  assert.equal(uncheckedNewCustomer.marketingConsent, false);
+
+  const optedInCustomer = upsertCustomerFromOrderDetails(customers, {
+    customerId: uncheckedNewCustomer.id,
+    name: "Sam",
+    email: "sam@example.com",
+    marketingConsent: true,
+    marketingConsentAtMs: 2000,
+    marketingConsentPolicyVersion: " policy-v2 ",
+    marketingConsentSource: " website-order-form "
+  });
+  assert.equal(optedInCustomer.marketingConsent, true);
+  assert.equal(optedInCustomer.marketingConsentAtMs, 2000);
+  assert.equal(optedInCustomer.marketingConsentPolicyVersion, "policy-v2");
+  assert.equal(optedInCustomer.marketingConsentSource, "website-order-form");
+});
+
+test("customer normalization never transfers consent between emails sharing a phone", () => {
+  const customers = normalizeCustomers([
+    { id: "first", name: "Shared phone A", phone: "+31 6 12345678", email: "a@example.com", marketingConsent: false },
+    { id: "second", name: "Shared phone B", phone: "+31 6 12345678", email: "b@example.com", marketingConsent: true, marketingConsentAtMs: 2000 },
+    { id: "third", name: "Shared phone A", phone: "+31 6 12345678", email: "a@example.com", marketingConsent: true, marketingConsentAtMs: 3000 }
+  ]);
+
+  assert.equal(customers.length, 2);
+  assert.equal(customers.find((customer) => customer.email === "a@example.com").marketingConsent, true);
+  assert.equal(customers.find((customer) => customer.email === "a@example.com").marketingConsentAtMs, 3000);
+  assert.equal(customers.find((customer) => customer.email === "b@example.com").marketingConsent, true);
+  assert.equal(customers.find((customer) => customer.email === "b@example.com").marketingConsentAtMs, 2000);
+});
+
 test("delivery route helpers normalize GPS samples and estimate route progress", () => {
   const route = [
     { lat: 51.1949, lng: 5.9878 },
@@ -426,6 +850,60 @@ test("reservation conflicts respect table, status, and turnover window", () => {
   assert.equal(getReservationValidation({ date: "2026-06-01", tableId: "table-3", guests: 4, time: "19:30" }, tables, reservations).ok, true);
 });
 
+test("reservation conflicts span adjacent service dates and DST transitions", () => {
+  const overnightReservations = [{
+    id: "late-table-hold",
+    date: "2026-06-01",
+    tableId: "table-1",
+    time: "23:30",
+    status: "Confirmed",
+    name: "Late guest"
+  }];
+
+  assert.deepEqual(getReservationConflicts({
+    id: "after-midnight",
+    date: "2026-06-02",
+    tableId: "table-1",
+    time: "00:15"
+  }, overnightReservations).map((reservation) => reservation.id), ["late-table-hold"]);
+  assert.equal(getReservationConflicts({
+    id: "after-turnover",
+    date: "2026-06-02",
+    tableId: "table-1",
+    time: "01:00"
+  }, overnightReservations).length, 0);
+
+  const nextDateReservation = [{
+    id: "early-table-hold",
+    date: "2026-06-02",
+    tableId: "table-1",
+    time: "00:15",
+    status: "Confirmed",
+    name: "Early guest"
+  }];
+  assert.deepEqual(getReservationConflicts({
+    id: "late-arrival",
+    date: "2026-06-01",
+    tableId: "table-1",
+    time: "23:45"
+  }, nextDateReservation).map((reservation) => reservation.id), ["early-table-hold"]);
+
+  const springForwardReservations = [{
+    id: "post-dst-jump",
+    date: "2026-03-29",
+    tableId: "table-1",
+    time: "03:45",
+    status: "Confirmed",
+    name: "DST guest"
+  }];
+  assert.deepEqual(getReservationConflicts({
+    id: "pre-dst-jump",
+    date: "2026-03-29",
+    tableId: "table-1",
+    time: "01:30"
+  }, springForwardReservations, 120, "Europe/Amsterdam").map((reservation) => reservation.id), ["post-dst-jump"]);
+});
+
 test("reservation seating recommendations prefer two-tops and joined tables", () => {
   const date = "2026-06-01";
   const time = "18:00";
@@ -488,6 +966,52 @@ test("reservation requests honor blocked windows and capacity rules", () => {
   }, tables, reservations, blocks, rules).ok, true);
 });
 
+test("reservation policy enforces restaurant time, notice, horizon, and party size", () => {
+  const nowMs = Date.parse("2026-06-01T10:00:00.000Z"); // 12:00 in Amsterdam.
+  const policy = {
+    reservationsEnabled: true,
+    opensAt: "11:00",
+    closesAt: "22:00",
+    timeZone: "Europe/Amsterdam",
+    reservationLeadMinutes: 120,
+    reservationHorizonDays: 30,
+    reservationMaxGuests: 8,
+    nowMs
+  };
+
+  assert.equal(reservationDateTimeToUtcMs("2026-06-01", "14:00", "Europe/Amsterdam"), Date.parse("2026-06-01T12:00:00.000Z"));
+  assert.equal(getReservationPolicyValidation({ date: "2026-06-01", time: "13:00", guests: 2 }, policy).title, "More notice needed");
+  assert.equal(getReservationPolicyValidation({ date: "2026-06-01", time: "14:00", guests: 2 }, policy).ok, true);
+  assert.equal(getReservationPolicyValidation({ date: "2026-06-01", time: "22:00", guests: 2 }, policy).title, "Outside booking hours");
+  assert.equal(getReservationPolicyValidation({ date: "2026-06-01", time: "14:00", guests: 9 }, policy).title, "Party too large");
+  assert.equal(getReservationPolicyValidation({ date: "2026-07-15", time: "14:00", guests: 2 }, policy).title, "Too far ahead");
+  assert.equal(getReservationPolicyValidation({ date: "", time: "14:00", guests: 2 }, policy).title, "Choose date");
+  assert.equal(getReservationPolicyValidation({ date: "2026-06-01", time: "14:00", guests: 2 }, { ...policy, reservationsEnabled: false }).title, "Reservations paused");
+});
+
+test("reservation horizon uses inclusive restaurant-local calendar dates across DST", () => {
+  const nowMs = Date.parse("2026-10-23T22:30:00.000Z"); // 00:30 on 24 October in Amsterdam.
+  const policy = {
+    reservationsEnabled: true,
+    opensAt: "00:00",
+    closesAt: "23:59",
+    timeZone: "Europe/Amsterdam",
+    reservationLeadMinutes: 0,
+    reservationHorizonDays: 1,
+    reservationMaxGuests: 8,
+    nowMs
+  };
+
+  assert.deepEqual(getReservationDateBounds(policy), {
+    min: "2026-10-24",
+    max: "2026-10-25",
+    horizonDays: 1
+  });
+  assert.equal(addReservationCalendarDays("2026-03-28", 1), "2026-03-29");
+  assert.equal(getReservationPolicyValidation({ date: "2026-10-25", time: "22:00", guests: 2 }, policy).ok, true);
+  assert.equal(getReservationPolicyValidation({ date: "2026-10-26", time: "12:00", guests: 2 }, policy).title, "Too far ahead");
+});
+
 test("staff shift metrics compare planned time with actual punches", () => {
   const monday = getWeekStartDate("2026-05-30");
   assert.equal(monday, "2026-05-25");
@@ -539,6 +1063,32 @@ test("staff shift metrics compare planned time with actual punches", () => {
   }, new Date("2026-05-27T14:10:00").getTime());
   assert.equal(missedMetrics.missed, true);
   assert.equal(missedMetrics.attendanceStatus, "Missed");
+
+  const staleOpenShift = {
+    date: "2026-05-20",
+    startTime: "10:00",
+    endTime: "18:00",
+    role: "Front",
+    clockInAtMs: new Date("2026-05-20T10:00:00").getTime()
+  };
+  const staleMetrics = getShiftMetrics(staleOpenShift, new Date("2026-05-23T10:00:00").getTime());
+  assert.equal(staleMetrics.actualMinutes, 720);
+  assert.equal(staleMetrics.overtimeMinutes, 240);
+  assert.equal(staleMetrics.requiresReview, true);
+  assert.equal(staleMetrics.attendanceStatus, "Needs review");
+
+  const staleOpenBreakShift = {
+    ...staleOpenShift,
+    breakMinutes: 20,
+    breakStartedAtMs: new Date("2026-05-20T17:00:00").getTime()
+  };
+  const staleOpenBreakMinutes = getShiftBreakMinutes(staleOpenBreakShift, new Date("2026-05-23T10:00:00").getTime());
+  assert.equal(staleOpenBreakMinutes, 320);
+  const staleOpenBreakMetrics = getShiftMetrics(staleOpenBreakShift, new Date("2026-05-23T10:00:00").getTime());
+  assert.equal(staleOpenBreakMetrics.breakMinutes, 320);
+  assert.equal(staleOpenBreakMetrics.actualMinutes, 400);
+  assert.equal(staleOpenBreakMetrics.requiresReview, true);
+  assert.equal(staleOpenBreakMetrics.attendanceStatus, "Needs review");
 });
 
 test("inventory deduction planner prefers requested location then largest remaining stock", () => {

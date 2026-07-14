@@ -44,6 +44,77 @@ export default defineSchema({
     .index("by_key", ["key"])
     .index("by_provider", ["provider"]),
 
+  notificationOutbox: defineTable({
+    appStateKey: v.string(),
+    dedupeKey: v.string(),
+    recordType: v.string(),
+    recordId: v.string(),
+    eventType: v.string(),
+    recipientEmail: v.string(),
+    recipientName: v.optional(v.string()),
+    provider: v.string(),
+    templateKey: v.string(),
+    templateVersion: v.number(),
+    templateVariables: v.any(),
+    status: v.string(),
+    attemptCount: v.number(),
+    maxAttempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    providerMessageId: v.optional(v.string()),
+    providerStatus: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    acceptedAt: v.optional(v.number())
+  })
+    .index("by_dedupe", ["dedupeKey"])
+    .index("by_record", ["appStateKey", "recordType", "recordId"])
+    .index("by_status_next_attempt", ["status", "nextAttemptAt"]),
+
+  integrationOutbox: defineTable({
+    appStateKey: v.string(),
+    dedupeKey: v.string(),
+    integration: v.string(),
+    operation: v.string(),
+    recordType: v.string(),
+    recordId: v.string(),
+    recipientEmail: v.string(),
+    recipientName: v.optional(v.string()),
+    explicitMarketingConsent: v.boolean(),
+    consentedAt: v.optional(v.number()),
+    consentPolicyVersion: v.optional(v.string()),
+    status: v.string(),
+    attemptCount: v.number(),
+    maxAttempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    providerRecordId: v.optional(v.string()),
+    providerStatus: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number())
+  })
+    .index("by_dedupe", ["dedupeKey"])
+    .index("by_record", ["appStateKey", "recordType", "recordId"])
+    .index("by_app_email", ["appStateKey", "recipientEmail"])
+    .index("by_status_next_attempt", ["status", "nextAttemptAt"]),
+
+  marketingConsents: defineTable({
+    appStateKey: v.string(),
+    email: v.string(),
+    explicitConsent: v.boolean(),
+    sourceRecordType: v.string(),
+    sourceRecordId: v.string(),
+    consentedAt: v.number(),
+    policyVersion: v.optional(v.string()),
+    mailchimpStatus: v.optional(v.string()),
+    updatedAt: v.number()
+  })
+    .index("by_app_email", ["appStateKey", "email"])
+    .index("by_source", ["appStateKey", "sourceRecordType", "sourceRecordId"]),
+
   restaurantProfiles: defineTable({
     key: v.string(),
     appStateKey: v.string(),

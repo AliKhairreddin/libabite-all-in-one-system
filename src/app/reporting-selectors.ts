@@ -17,7 +17,7 @@ import {
   getShiftMetrics,
   toDateInputString
 } from "../domain/scheduling.js";
-import { normalizeOrderType } from "../domain/orders.js";
+import { getOrderLineReportingValues, normalizeOrderType } from "../domain/orders.js";
 import { state } from "./state.js";
 import {
   customerById,
@@ -175,14 +175,16 @@ function getProductPerformanceRows(orders = reportableOrders()) {
   const rows = new Map();
 
   orders.forEach((order) => {
-    normalizeOrderItems(order.items || []).forEach((item) => {
+    const productsCountedForOrder = new Set();
+    (Array.isArray(order.items) ? order.items : []).forEach((item) => {
       const product = productById(item.productId);
-      if (!product) return;
-      const current = rows.get(product.id) || {
-        productId: product.id,
-        name: product.name || "Product",
-        category: product.category || "Other",
-        station: product.station || "Main kitchen",
+      const historical = getOrderLineReportingValues(item, product);
+      if (!historical) return;
+      const current = rows.get(historical.productId) || {
+        productId: historical.productId,
+        name: historical.productName,
+        category: product?.category || "Archived product",
+        station: product?.station || "Unknown station",
         quantity: 0,
         orderCount: 0,
         revenue: 0,
@@ -190,15 +192,17 @@ function getProductPerformanceRows(orders = reportableOrders()) {
         grossProfit: 0,
         marginPercent: 0
       };
-      const lineRevenue = (Number(product.price) || 0) * item.quantity;
-      const lineCost = getProductCost(product, orderContext(order)) * item.quantity;
-      current.quantity += item.quantity;
-      current.orderCount += 1;
+      if (historical.usesSnapshot) current.name = historical.productName;
+      const lineRevenue = historical.lineRevenueCents / 100;
+      const lineCost = product ? getProductCost(product, orderContext(order)) * historical.quantity : 0;
+      current.quantity += historical.quantity;
+      if (!productsCountedForOrder.has(historical.productId)) current.orderCount += 1;
+      productsCountedForOrder.add(historical.productId);
       current.revenue = roundMoney(current.revenue + lineRevenue);
       current.cost = roundMoney(current.cost + lineCost);
       current.grossProfit = roundMoney(current.revenue - current.cost);
       current.marginPercent = current.revenue > 0 ? roundPercent((current.grossProfit / current.revenue) * 100) : 0;
-      rows.set(product.id, current);
+      rows.set(historical.productId, current);
     });
   });
 
@@ -324,12 +328,18 @@ function getWasteSummary() {
 
 function getStaffCurrentlyWorking() {
   const workers = new Map();
+  const staffIdsRequiringReview = new Set();
   state.staffShifts
     .filter((shift) => shift.clockInAtMs && !shift.clockOutAtMs)
     .forEach((shift) => {
       const metrics = getShiftMetrics(shift);
-      workers.set(shift.staffId || shift.id, {
-        id: shift.staffId || shift.id,
+      const staffId = shift.staffId || shift.id;
+      if (metrics.requiresReview) {
+        staffIdsRequiringReview.add(staffId);
+        return;
+      }
+      workers.set(staffId, {
+        id: staffId,
         name: shift.staffName || "Staff",
         role: shift.role || "Staff",
         station: shift.station || "",
@@ -341,7 +351,7 @@ function getStaffCurrentlyWorking() {
   (state.staff || [])
     .filter((staff) => String(staff.status || "").toLowerCase() === "on shift")
     .forEach((staff) => {
-      if (workers.has(staff.id)) return;
+      if (workers.has(staff.id) || staffIdsRequiringReview.has(staff.id)) return;
       workers.set(staff.id, {
         id: staff.id,
         name: staff.name || "Staff",
@@ -487,7 +497,7 @@ function getKitchenDelayRows() {
         orderId: ticket.orderId,
         orderNumber: order?.number || "",
         station: ticket.station || "Kitchen",
-        productName: product?.name || "Product",
+        productName: ticket.productName || product?.name || "Product",
         status: ticket.status || "Queued",
         slaState: sla.state,
         slaLabel: sla.label,

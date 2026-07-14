@@ -1,17 +1,20 @@
 import {
   DEFAULT_PAID_PAYMENT_METHOD,
   TICKET_STATUSES,
-  UNPAID_PAYMENT_METHOD
+  UNPAID_PAYMENT_METHOD,
+  WEBSITE_ORDER_CHANNEL
 } from "../shared/constants.js";
 import { normalizeKitchenStation, normalizeLineModifiers } from "../data/normalize.js";
 import { advanceStatus, resolveOrderStatusFromTickets, setTicketStatus } from "../domain/kitchen.js";
 import {
+  getValidOrderLineSnapshot,
   normalizeFulfillmentStatus,
   normalizeOrderFulfillment,
   normalizeOrderOperationalStatus,
   normalizeOrderType,
   orderTypeDefinition,
-  productCanBeOrderedForOrderContext
+  productCanBeOrderedForOrderContext,
+  snapshotOrderItems
 } from "../domain/orders.js";
 import { getPaymentStatusForMethod, isPaidPaymentMethod, normalizePaymentMethod } from "../domain/payments.js";
 import { createReceiptPdfBlob } from "../domain/receipt-pdf.js";
@@ -177,12 +180,14 @@ export function createStaffOrderRuntime(deps) {
     const createdAtMs = Date.now();
     const tickets = order.items.map((item, index) => {
       const product = productById(item.productId);
+      const snapshot = getValidOrderLineSnapshot(item);
       return {
         id: `TCK-${order.number}-${index + 1}`,
         orderId: order.id,
-        productId: product.id,
+        productId: item.productId,
+        productName: snapshot?.productName || product?.name || item.productId || "Unknown item",
         quantity: item.quantity,
-        station: normalizeKitchenStation(product.station),
+        station: normalizeKitchenStation(snapshot?.kitchenStation || product?.station || "Main kitchen"),
         status: "Queued",
         createdAt,
         createdAtMs,
@@ -244,8 +249,28 @@ export function createStaffOrderRuntime(deps) {
       showToast(`Order #${order.number} cannot be sent from ${order.status}.`);
       return false;
     }
+    const requiresVerifiedOnlinePayment = (order.channel || order.orderType) === WEBSITE_ORDER_CHANNEL
+      && order.paymentMethod === "Online payment";
+    if (requiresVerifiedOnlinePayment && !isOrderPaid(order)) {
+      showToast(`Order #${order.number} is still awaiting verified online payment.`);
+      return false;
+    }
 
-    const validation = validateOrderForKitchen(order);
+    // A provider-verified website order is already an accepted commercial
+    // commitment. Menu availability or stock changes during checkout must not
+    // strand the paid order; the kitchen needs the ticket so staff can fulfil,
+    // substitute, or contact/refund the customer. New/unpaid orders still pass
+    // through the full availability and stock validation above.
+    const acceptedPaidWebsiteOrder = requiresVerifiedOnlinePayment && isOrderPaid(order);
+    const validation = acceptedPaidWebsiteOrder
+      ? {
+          ok: true,
+          orderContext: {
+            channel: order.channel,
+            fulfillment: order.fulfillment
+          }
+        }
+      : validateOrderForKitchen(order);
     if (!validation.ok) {
       showToast(validation.message);
       renderOrderBuilder();
@@ -256,6 +281,7 @@ export function createStaffOrderRuntime(deps) {
     order.status = "Sent to kitchen";
     order.operationalStatus = normalizeOrderOperationalStatus(order.status);
     order.fulfillmentStatus = normalizeFulfillmentStatus(order.status);
+    order.needsKitchenDispatch = false;
     const tickets = createKitchenTicketsForOrder(order);
     const stations = [...new Set(tickets.map((ticket) => ticket.station))];
     const stockChanges = order.inventoryDeducted ? [] : deductInventoryForItems(order.items, validation.orderContext);
@@ -323,6 +349,7 @@ export function createStaffOrderRuntime(deps) {
     const createdAt = timeNow();
     const createdAtMs = Date.now();
     const staff = currentUser();
+    const acceptedItems = snapshotOrderItems(items, productById);
     const order: any = {
       id: orderId,
       number,
@@ -384,7 +411,7 @@ export function createStaffOrderRuntime(deps) {
       cashCollectedByName: "",
       customerNotes: manualCustomer?.notes || "",
       notes: String(formData.get("notes") || "").trim(),
-      items: items.map((item) => ({ ...item }))
+      items: acceptedItems
     };
 
     const validation = validateOrderForKitchen(order);
@@ -697,17 +724,25 @@ export function createStaffOrderRuntime(deps) {
       fulfillment: fulfillmentLabel(order),
       staffName: getOrderStaffName(order),
       items: order.items.map((item) => {
+        const snapshot = getValidOrderLineSnapshot(item);
         const product = productById(item.productId);
+        const legacyPrice = Number(product?.price);
+        const unitPrice = snapshot
+          ? snapshot.unitPriceCents / 100
+          : Number.isFinite(legacyPrice) && legacyPrice >= 0 ? legacyPrice : 0;
+        const lineTotal = snapshot
+          ? snapshot.lineTotalCents / 100
+          : unitPrice * Math.max(0, Math.floor(Number(item.quantity) || 0));
         const detail = [
           item.modifiers?.length ? item.modifiers.join(", ") : "",
           item.note || ""
         ].filter(Boolean).join(" · ");
         return {
-          name: product?.name || "Unknown item",
+          name: snapshot?.productName || product?.name || "Unknown item",
           detail,
           quantity: item.quantity,
-          unitPrice: money(product?.price || 0),
-          total: money((product?.price || 0) * item.quantity)
+          unitPrice: money(unitPrice),
+          total: money(lineTotal)
         };
       }),
       notes: order.notes,

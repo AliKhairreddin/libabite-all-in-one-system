@@ -9,7 +9,12 @@
  */
 
 import type * as appState from "../appState.js";
+import type * as communications from "../communications.js";
+import type * as communicationsWorker from "../communicationsWorker.js";
+import type * as http from "../http.js";
+import type * as mailchimpAdapters from "../mailchimpAdapters.js";
 import type * as operationalSync from "../operationalSync.js";
+import type * as paymentWebhooks from "../paymentWebhooks.js";
 import type * as payments from "../payments.js";
 import type * as receiptPrintJobs from "../receiptPrintJobs.js";
 
@@ -21,7 +26,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   appState: typeof appState;
+  communications: typeof communications;
+  communicationsWorker: typeof communicationsWorker;
+  http: typeof http;
+  mailchimpAdapters: typeof mailchimpAdapters;
   operationalSync: typeof operationalSync;
+  paymentWebhooks: typeof paymentWebhooks;
   payments: typeof payments;
   receiptPrintJobs: typeof receiptPrintJobs;
 }>;

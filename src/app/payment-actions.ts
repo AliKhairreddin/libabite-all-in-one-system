@@ -3,19 +3,60 @@ import { getConvexStateKey, getSharedConvexClient, isConvexEnabled } from "./con
 import { saveState, state } from "./state.js";
 import { timeNow } from "../shared/dates.js";
 import { WEBSITE_PAYMENT_PROCESSOR } from "../shared/constants.js";
+import { paymentRequiresReconciliation } from "../domain/payments.js";
 import { applyPaidPaymentToOrder } from "./payment-ledger.js";
 import { enqueueReceiptPrintJob } from "./receipt-printing.js";
 
-function paymentReturnUrl(orderId: string, result: "success" | "cancelled", provider = "stripe") {
-  const url = new URL(window.location.href);
-  url.searchParams.set("order", "website");
-  url.searchParams.set("payment", result);
-  url.searchParams.set("orderId", orderId);
-  url.searchParams.set("provider", provider);
-  return url.toString();
+export type PaymentReconciliationOrderPatch = {
+  id: string;
+  status?: string;
+  operationalStatus?: string;
+  fulfillmentStatus?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paymentProcessor?: string;
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
+  paidAt?: string;
+  paidAtMs?: number;
+  paidByName?: string;
+  needsKitchenDispatch?: boolean;
+  paymentReconciliationRequired: true;
+  paymentReconciliationReason?: string;
+};
+
+export type WebsiteCheckoutSessionResult = {
+  ok: boolean;
+  message?: string;
+  provider?: string;
+  checkoutUrl?: string;
+  checkoutSessionId?: string;
+  paymentIntentId?: string;
+  checkoutAttempt?: number;
+  paid?: boolean;
+  orderId?: string;
+  requiresReconciliation?: boolean;
+  reconciliationOrder?: PaymentReconciliationOrderPatch | null;
+  reused?: boolean;
+};
+
+const PAYMENT_RECONCILIATION_MESSAGE = "Payment was received after this order changed. The restaurant must review it and will contact you about fulfillment or a refund.";
+
+export function refreshReconciliationOrderLocally(orderId: string, patch: PaymentReconciliationOrderPatch | null | undefined) {
+  if (!patch || patch.id !== orderId) return false;
+  const orderIndex = state.orders.findIndex((item) => item.id === orderId);
+  if (orderIndex < 0) return false;
+  state.orders[orderIndex] = { ...state.orders[orderIndex], ...patch };
+  saveState({ syncRemote: false });
+  return true;
 }
 
-export async function createWebsiteCheckoutSession(order: any, amountCents: number, provider = "stripe") {
+export async function createWebsiteCheckoutSession(
+  order: any,
+  _amountCents: number,
+  provider = "stripe"
+): Promise<WebsiteCheckoutSessionResult> {
   if (!isConvexEnabled()) {
     return {
       ok: false,
@@ -34,12 +75,8 @@ export async function createWebsiteCheckoutSession(order: any, amountCents: numb
   return await client.action(anyApi.payments.createOnlineCheckoutSession as any, {
     provider,
     appStateKey: getConvexStateKey(),
-    order,
-    amountCents,
-    currency: "eur",
-    successUrl: paymentReturnUrl(order.id, "success", provider),
-    cancelUrl: paymentReturnUrl(order.id, "cancelled", provider)
-  });
+    orderId: order.id
+  }) as WebsiteCheckoutSessionResult;
 }
 
 function removePaymentReturnParams() {
@@ -61,15 +98,15 @@ export async function handleWebsitePaymentReturn(deps: {
 
   const orderId = String(params.get("orderId") || state.websiteLastOrderId || "").trim();
   if (paymentResult === "cancelled") {
-    deps.showToast("Payment cancelled. Your order is still saved.");
+    deps.showToast("Payment was not completed. Your order is still saved so you can try again.");
     removePaymentReturnParams();
     deps.render();
     return true;
   }
 
   const provider = String(params.get("provider") || "stripe").trim().toLowerCase();
-  const order = state.orders.find((item) => item.id === orderId);
-  const checkoutSessionId = String(params.get("session_id") || params.get("sessionId") || order?.stripeCheckoutSessionId || order?.paymentReference || "").trim();
+  const requestedOrder = state.orders.find((item) => item.id === orderId);
+  const checkoutSessionId = String(params.get("session_id") || params.get("sessionId") || requestedOrder?.stripeCheckoutSessionId || requestedOrder?.paymentReference || "").trim();
   if (paymentResult !== "success" || !checkoutSessionId || !orderId) return false;
 
   const client = getSharedConvexClient();
@@ -78,19 +115,38 @@ export async function handleWebsitePaymentReturn(deps: {
     return false;
   }
 
-  const confirmationAction = provider === "mollie"
-    ? anyApi.payments.confirmMollieCheckoutPayment
-    : anyApi.payments.confirmStripeCheckoutSession;
-  const confirmation = await client.action(confirmationAction as any, {
+  const confirmation = await client.action(anyApi.payments.confirmOnlineCheckoutSession as any, {
+    provider,
     appStateKey: getConvexStateKey(),
-    checkoutSessionId,
-    orderId,
-    ...(order ? { order } : {})
+    checkoutSessionId
   });
 
   if (!confirmation?.ok || !confirmation?.paid) {
     deps.showToast(confirmation?.message || "Stripe has not confirmed the payment yet.");
     return false;
+  }
+
+  const confirmedOrderId = String(confirmation.orderId || "").trim();
+  if (!confirmedOrderId || confirmedOrderId !== orderId) {
+    removePaymentReturnParams();
+    deps.render();
+    deps.showToast("Payment was verified for a different order than this return link. No local order was changed; contact the restaurant if the paid order is not shown.");
+    return true;
+  }
+  const order = state.orders.find((item) => item.id === confirmedOrderId);
+  if (!order) {
+    removePaymentReturnParams();
+    deps.render();
+    deps.showToast("Payment was verified, but this device does not have the matching order yet. Refresh before making another payment.");
+    return true;
+  }
+
+  if (paymentRequiresReconciliation(confirmation)) {
+    refreshReconciliationOrderLocally(confirmedOrderId, confirmation.reconciliationOrder);
+    removePaymentReturnParams();
+    deps.render();
+    deps.showToast(PAYMENT_RECONCILIATION_MESSAGE);
+    return true;
   }
 
   if (order) {
@@ -105,7 +161,7 @@ export async function handleWebsitePaymentReturn(deps: {
       paidAt: order.paidAt || timeNow(),
       paidAtMs,
       paidByUserId: "",
-      paidByName: "Stripe checkout",
+      paidByName: provider === "mollie" ? "Mollie checkout" : "Stripe checkout",
       captureMode: "online_checkout"
     });
     enqueueReceiptPrintJob(order, "website_payment_paid");

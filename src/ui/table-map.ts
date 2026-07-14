@@ -56,6 +56,7 @@ function statusForTable(table, getTableValidation) {
   const validation = getTableValidation?.(table);
   if (!validation) {
     return {
+      available: true,
       className: "is-available",
       label: "Available",
       detail: `${table.capacity} seats`
@@ -63,6 +64,7 @@ function statusForTable(table, getTableValidation) {
   }
 
   return {
+    available: Boolean(validation.ok),
     className: validation.ok ? "is-available" : "is-unavailable",
     label: validation.pillText || (validation.ok ? "Available" : "Unavailable"),
     detail: validation.detail || `${table.capacity} seats`
@@ -74,6 +76,7 @@ export function reservationTableMapHtml({
   selectedTableId = "",
   recommendedTableIds = [],
   getTableValidation,
+  disableUnavailable = false,
   title = "Choose a table",
   kicker = "Floor map",
   mapId = "reservation-table-map"
@@ -83,6 +86,7 @@ export function reservationTableMapHtml({
   const tableButtons = tables.map((table, index) => {
     const layout = tableLayout(table, index);
     const status = statusForTable(table, getTableValidation);
+    const disabled = disableUnavailable && !status.available;
     const selected = table.id === selectedTable?.id;
     const recommended = recommendedTableIdSet.has(table.id);
     const tableLabel = `${table.name}, ${table.capacity} seats, ${table.zone}`;
@@ -92,8 +96,10 @@ export function reservationTableMapHtml({
         class="floor-table floor-table-${escapeHtml(layout.shape)} floor-feature-${escapeHtml(layout.feature)} ${status.className} ${recommended ? "is-recommended" : ""} ${selected ? "is-selected" : ""}"
         type="button"
         data-reservation-map-table="${escapeHtml(table.id)}"
+        aria-disabled="${disabled ? "true" : "false"}"
         aria-pressed="${selected ? "true" : "false"}"
-        aria-label="${escapeHtml(`${tableLabel}. ${status.label}${recommended ? ". Recommended" : ""}`)}"
+        aria-label="${escapeHtml(`${tableLabel}. ${status.label}${recommended ? ". Recommended" : ""}. ${status.detail}`)}"
+        title="${escapeHtml(status.detail)}"
         style="--x: ${layout.x}%; --y: ${layout.y}%; --w: ${layout.w}%; --h: ${layout.h}%"
       >
         <span class="floor-table-shadow" aria-hidden="true"></span>

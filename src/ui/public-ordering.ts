@@ -2,13 +2,22 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { state } from "../app/state.js";
-import { CUSTOMER_QR_ORDER_CONTEXT, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS, WEBSITE_ORDER_CHANNEL } from "../shared/constants.js";
+import { CUSTOMER_QR_ORDER_CONTEXT, ONLINE_PAYMENT_PROVIDER_OPTIONS, PRODUCT_CATEGORIES, WEBSITE_FULFILLMENT_OPTIONS, WEBSITE_ORDER_CHANNEL } from "../shared/constants.js";
 import { formatCustomerDeliveryEta, formatDeliveryDistance, getDeliveryStatus, RESTAURANT_COORDINATES } from "../domain/delivery.js";
-import { getReservationDateLabel } from "../domain/reservations.js";
+import {
+  addReservationCalendarDays,
+  formatReservationMinutes,
+  getReservationDateBounds,
+  getReservationDateLabel,
+  getReservationMinutes,
+  getReservationPolicyValidation,
+  getRestaurantLocalDate,
+  isReservationDate,
+  isReservationTime
+} from "../domain/reservations.js";
 import { escapeHtml } from "../shared/html.js";
 import { normalizeWebsiteFulfillment, productCanBeOrderedForOrderContext, websiteFulfillmentOption } from "../domain/orders.js";
 import { productAllergenSummary } from "../domain/commerce.js";
-import { toDateInputString } from "../domain/scheduling.js";
 import { reservationTableMapHtml } from "./table-map.js";
 
 export function createPublicOrderingUi(deps) {
@@ -24,6 +33,7 @@ export function createPublicOrderingUi(deps) {
     getOrderTotal,
     getOrderableProductsForContext,
     getProductAvailability,
+    getReservationRequestValidation,
     getReservationValidation,
     getWebsiteOrderingUrl,
     getStockShortages,
@@ -76,6 +86,23 @@ export function createPublicOrderingUi(deps) {
   const INLINE_UPSELL_LIMIT = 8;
   const CART_DRINK_UPSELL_LIMIT = 6;
   const LIBABITE_LOGO_URL = "https://inch-digital.com/libabiteimg/logo.webp";
+
+  function enabledOnlinePaymentProviders() {
+    const configured = String(import.meta.env.VITE_ONLINE_PAYMENT_PROVIDERS || "stripe")
+      .split(",")
+      .map((provider) => provider.trim().toLowerCase())
+      .filter((provider, index, providers) => ONLINE_PAYMENT_PROVIDER_OPTIONS.includes(provider) && providers.indexOf(provider) === index);
+    return configured.length ? configured : ["stripe"];
+  }
+
+  function onlinePaymentProviderOptionsHtml() {
+    return enabledOnlinePaymentProviders().map((provider, index) => `
+      <label class="check-row">
+        <input name="paymentProvider" type="radio" value="${escapeHtml(provider)}" ${index === 0 ? "checked" : ""}>
+        <span>${provider === "mollie" ? "Mollie" : "Stripe"} checkout</span>
+      </label>
+    `).join("");
+  }
 
   function getRestaurantDisplayName() {
     const name = String(state.restaurantSettings.restaurantName || "").trim();
@@ -208,10 +235,10 @@ export function createPublicOrderingUi(deps) {
     const message = paymentSummary.paid
       ? "Payment received. We are preparing your order."
       : paymentSummary.statusLabel === "Pending"
-        ? "Payment is being confirmed. We will update your order shortly."
+        ? "Payment is not confirmed yet. You can safely resume payment below."
         : paymentSummary.statusLabel === "Pay later"
           ? "Order received. You can pay when you collect or receive it."
-          : "Order received. We will confirm payment with you soon.";
+          : "Payment is required before the restaurant can start this order.";
     return `<p class="customer-confirmation-note">${escapeHtml(message)}</p>`;
   }
 
@@ -371,12 +398,16 @@ export function createPublicOrderingUi(deps) {
       && expectedProductIds.every((productId, index) => renderedProductIds[index] === productId);
   }
 
-  function snapshotCustomerFormValues(form) {
-    const values = {};
+  function snapshotCustomerFormValues(form, options: any = {}) {
+    const values: Record<string, any> = {};
     const activeElement = document.activeElement;
     let focus: any = null;
     form.querySelectorAll("[name]").forEach((control: any) => {
-      if (control.type === "hidden" && !String(control.name || "").startsWith("deliveryAddress")) return;
+      if (
+        control.type === "hidden"
+        && !options.includeHidden
+        && !String(control.name || "").startsWith("deliveryAddress")
+      ) return;
       if (control.type === "radio" || control.type === "checkbox") {
         values[`${control.name}:${control.value}`] = control.checked;
         return;
@@ -397,10 +428,14 @@ export function createPublicOrderingUi(deps) {
     };
   }
 
-  function restoreCustomerFormValues(form, snapshot) {
+  function restoreCustomerFormValues(form, snapshot, options: any = {}) {
     const values = snapshot?.values || {};
     form.querySelectorAll("[name]").forEach((control: any) => {
-      if (control.type === "hidden" && !String(control.name || "").startsWith("deliveryAddress")) return;
+      if (
+        control.type === "hidden"
+        && !options.includeHidden
+        && !String(control.name || "").startsWith("deliveryAddress")
+      ) return;
       if (control.type === "radio" || control.type === "checkbox") {
         const key = `${control.name}:${control.value}`;
         if (Object.prototype.hasOwnProperty.call(values, key)) control.checked = values[key];
@@ -432,7 +467,9 @@ export function createPublicOrderingUi(deps) {
   function updateWebsiteFulfillmentSurfaces(orderContext) {
     if (orderContext.channel !== WEBSITE_ORDER_CHANNEL) return;
     document.querySelectorAll("[data-website-fulfillment]").forEach((button: any) => {
-      button.classList.toggle("is-selected", button.dataset.websiteFulfillment === state.websiteFulfillment);
+      const selected = button.dataset.websiteFulfillment === state.websiteFulfillment;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
     });
   }
 
@@ -651,19 +688,188 @@ export function createPublicOrderingUi(deps) {
     `;
   }
   
-  function getDefaultReservationTime() {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + 120);
-    const minutes = now.getMinutes();
-    now.setMinutes(Math.ceil(minutes / 15) * 15, 0, 0);
-    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const WEBSITE_RESERVATION_SLOT_MINUTES = 15;
+
+  function getWebsiteReservationDateBounds(nowMs = Date.now()) {
+    return getReservationDateBounds({ ...state.restaurantSettings, nowMs });
+  }
+
+  function getWebsiteReservationTimeSlots() {
+    const opensAt = isReservationTime(state.restaurantSettings.opensAt) ? state.restaurantSettings.opensAt : "11:00";
+    const closesAt = isReservationTime(state.restaurantSettings.closesAt) ? state.restaurantSettings.closesAt : "22:00";
+    const openMinutes = getReservationMinutes(opensAt);
+    const closeMinutes = getReservationMinutes(closesAt);
+    if (openMinutes === closeMinutes) return [];
+
+    const slots = [];
+    for (let minutes = 0; minutes < 24 * 60; minutes += WEBSITE_RESERVATION_SLOT_MINUTES) {
+      const withinHours = closeMinutes > openMinutes
+        ? minutes >= openMinutes && minutes < closeMinutes
+        : minutes >= openMinutes || minutes < closeMinutes;
+      if (withinHours) slots.push(formatReservationMinutes(minutes));
+    }
+    return slots;
+  }
+
+  function getDefaultReservationSlot() {
+    const nowMs = Date.now();
+    const bounds = getWebsiteReservationDateBounds(nowMs);
+    const leadMinutes = Math.max(0, Math.floor(Number(state.restaurantSettings.reservationLeadMinutes) || 0));
+    const leadDate = getRestaurantLocalDate(
+      nowMs + leadMinutes * 60 * 1000,
+      state.restaurantSettings.timeZone
+    );
+    const startDate = leadDate < bounds.min ? bounds.min : leadDate > bounds.max ? bounds.max : leadDate;
+    const timeSlots = getWebsiteReservationTimeSlots();
+    const fallbackTime = timeSlots[0]
+      || (isReservationTime(state.restaurantSettings.opensAt) ? state.restaurantSettings.opensAt : "11:00");
+    const fallback = { date: startDate, time: fallbackTime };
+    if (state.restaurantSettings.reservationsEnabled === false || !timeSlots.length) return fallback;
+
+    const guests = Math.min(2, Math.max(1, Math.floor(Number(state.restaurantSettings.reservationMaxGuests) || 12)));
+    let firstPolicyValidSlot = null;
+    for (let date = startDate; date <= bounds.max; date = addReservationCalendarDays(date, 1)) {
+      for (const time of timeSlots) {
+        const candidate = { date, guests, time, status: "Pending" };
+        const policyValidation = getReservationPolicyValidation(candidate, {
+          ...state.restaurantSettings,
+          nowMs
+        });
+        if (!policyValidation.ok) continue;
+        firstPolicyValidSlot ||= { date, time };
+
+        const suggestedTable = getAvailableReservationTable(candidate);
+        if (suggestedTable && getReservationValidation({
+          ...candidate,
+          tableId: suggestedTable.id
+        }).ok) return { date, time };
+      }
+    }
+    return firstPolicyValidSlot || fallback;
+  }
+
+  function reservationAvailabilityError(title, detail, pillText) {
+    return {
+      ok: false,
+      className: "danger",
+      pillClass: "danger",
+      pillText,
+      title,
+      detail
+    };
+  }
+
+  function getWebsiteReservationFieldValidation(values) {
+    if (!isReservationDate(values.date)) {
+      return reservationAvailabilityError("Choose a date", "Choose a valid reservation date to see available tables.", "Date needed");
+    }
+    if (!isReservationTime(values.time)) {
+      return reservationAvailabilityError("Choose a time", "Choose an arrival time to see available tables.", "Time needed");
+    }
+
+    const guests = Number(values.guests);
+    if (!Number.isInteger(guests) || guests < 1) {
+      return reservationAvailabilityError("Enter party size", "Enter the number of guests to see tables that fit your party.", "Guests needed");
+    }
+    return null;
+  }
+
+  function getWebsiteReservationAvailability(values, preferredTableId = "") {
+    const candidate = {
+      date: String(values.date || ""),
+      guests: Number(values.guests),
+      time: String(values.time || ""),
+      status: "Pending"
+    };
+    const inputValidation = getWebsiteReservationFieldValidation(values);
+    const policyValidation = inputValidation || getReservationPolicyValidation(candidate, state.restaurantSettings);
+    const tableValidations = new Map();
+
+    state.tables.forEach((table) => {
+      tableValidations.set(table.id, policyValidation.ok
+        ? getReservationValidation({ ...candidate, tableId: table.id })
+        : policyValidation);
+    });
+
+    const availableTables = policyValidation.ok
+      ? state.tables.filter((table) => tableValidations.get(table.id)?.ok)
+      : [];
+    const suggestedTable = availableTables.length
+      ? getAvailableReservationTable(candidate, availableTables) || availableTables[0]
+      : null;
+    const preferredTable = availableTables.find((table) => table.id === preferredTableId) || null;
+    const selectedTable = preferredTable || suggestedTable;
+    const overallValidation = selectedTable
+      ? tableValidations.get(selectedTable.id)
+      : policyValidation.ok
+        ? getReservationRequestValidation({
+            ...candidate,
+            name: "Availability check",
+            phone: "Availability check",
+            tableId: ""
+          })
+        : policyValidation;
+
+    return {
+      overallValidation,
+      recommendedTableIds: suggestedTable ? [suggestedTable.id] : [],
+      selectedTableId: selectedTable?.id || "",
+      tableValidations
+    };
+  }
+
+  function websiteReservationAvailabilityHtml(model) {
+    const validation = model.overallValidation;
+    return `
+      <div class="stacked-form" data-customer-reservation-availability>
+        ${reservationTableMapHtml({
+          tables: state.tables,
+          selectedTableId: model.selectedTableId,
+          recommendedTableIds: model.recommendedTableIds,
+          disableUnavailable: true,
+          title: "Pick your table",
+          getTableValidation: (table) => model.tableValidations.get(table.id)
+        })}
+        <article
+          class="availability-card ${escapeHtml(validation.className || "")}"
+          data-customer-reservation-availability-feedback
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <header>
+            <strong>${escapeHtml(validation.title || "Check availability")}</strong>
+            <span class="pill ${escapeHtml(validation.pillClass || (validation.ok ? "ok" : "danger"))}">${escapeHtml(validation.pillText || (validation.ok ? "Available" : "Unavailable"))}</span>
+          </header>
+          <p>${escapeHtml(validation.detail || "Choose a date, time, and party size.")}</p>
+        </article>
+      </div>
+    `;
+  }
+
+  function refreshWebsiteReservationAvailability(form: any = document.querySelector("#customerReservationForm")) {
+    if (!form?.matches?.("#customerReservationForm")) return null;
+    const elements: any = form.elements;
+    const tableControl: any = elements.tableId;
+    const model = getWebsiteReservationAvailability({
+      date: elements.date?.value,
+      guests: elements.guests?.value,
+      time: elements.time?.value
+    }, tableControl?.value);
+
+    if (tableControl) tableControl.value = model.selectedTableId;
+    const availability = form.querySelector("[data-customer-reservation-availability]");
+    if (availability) availability.outerHTML = websiteReservationAvailabilityHtml(model);
+    const submitButton: any = form.querySelector("[data-customer-reservation-submit]");
+    if (submitButton) submitButton.disabled = !model.selectedTableId;
+    return model;
   }
   
   function websiteFulfillmentControlsHtml() {
     return `
       <div class="customer-service-toggle" role="group" aria-label="Order type">
         ${WEBSITE_FULFILLMENT_OPTIONS.map((option) => `
-          <button class="${state.websiteFulfillment === option.value ? "is-selected" : ""}" type="button" data-website-fulfillment="${escapeHtml(option.value)}">
+          <button class="${state.websiteFulfillment === option.value ? "is-selected" : ""}" type="button" data-website-fulfillment="${escapeHtml(option.value)}" aria-pressed="${state.websiteFulfillment === option.value ? "true" : "false"}">
             ${escapeHtml(option.label)}
           </button>
         `).join("")}
@@ -737,18 +943,16 @@ export function createPublicOrderingUi(deps) {
             <input name="customerEmail" type="email" autocomplete="email">
           </label>
         </div>
+        <p class="customer-cart-note">If you provide an email, we use it for your receipt and order updates.</p>
+        <label class="check-row customer-marketing-consent">
+          <input name="marketingConsent" type="checkbox" value="true">
+          <span>Email me occasional news and offers. This is optional and separate from order updates.</span>
+        </label>
         ${customerFulfillmentPromiseHtml(fulfillment)}
         ${customerDeliveryAddressHtml(deliverySelected)}
         <fieldset class="customer-payment-options customer-payment-card">
           <legend>Online payment</legend>
-          <div class="check-row">
-            <input name="paymentProvider" type="radio" value="stripe" checked>
-            <span>Stripe checkout</span>
-          </div>
-          <div class="check-row">
-            <input name="paymentProvider" type="radio" value="mollie">
-            <span>Mollie checkout</span>
-          </div>
+          ${onlinePaymentProviderOptionsHtml()}
         </fieldset>
     ` : `
         <fieldset class="customer-payment-options">
@@ -908,15 +1112,29 @@ export function createPublicOrderingUi(deps) {
       }))
       .filter((group) => group.products.length);
     const lastOrder = orderById(state.websiteLastOrderId);
+    const lastOrderPayment = lastOrder ? getOrderPaymentSummary(lastOrder) : null;
+    const canResumePayment = Boolean(
+      lastOrder
+      && lastOrder.status === "New"
+      && ["Unpaid", "Pending", "Failed", "Cancelled"].includes(lastOrderPayment?.statusLabel)
+    );
+    const confirmationEyebrow = lastOrderPayment?.paid
+      ? "Payment confirmed"
+      : lastOrderPayment?.statusLabel === "Pending"
+        ? "Payment pending"
+        : "Payment required";
     const confirmation = lastOrder ? `
       <section class="customer-confirmation">
         <div>
-          <p class="eyebrow">Confirmed</p>
-          <h2>Order #${escapeHtml(lastOrder.number)} received</h2>
-          <p>${escapeHtml(websiteOrderTimingText(lastOrder))} · ${escapeHtml(getOrderPaymentSummary(lastOrder).statusLabel)} · ${escapeHtml(money(getOrderTotal(lastOrder)))}</p>
+          <p class="eyebrow">${escapeHtml(confirmationEyebrow)}</p>
+          <h2>Order #${escapeHtml(lastOrder.number)} ${lastOrderPayment?.paid ? "received" : "saved"}</h2>
+          <p>${escapeHtml(websiteOrderTimingText(lastOrder))} · ${escapeHtml(lastOrderPayment?.statusLabel || "Unpaid")} · ${escapeHtml(money(getOrderTotal(lastOrder)))}</p>
           ${websiteOrderConfirmationNoteHtml(lastOrder)}
         </div>
-        <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>
+        <div class="customer-home-actions">
+          ${canResumePayment ? `<button class="primary-btn" type="button" data-customer-resume-payment="${escapeHtml(lastOrder.id)}">Resume secure payment</button>` : ""}
+          <button class="ghost-btn" type="button" data-customer-new-order>New Order</button>
+        </div>
       </section>
     ` : "";
   
@@ -967,10 +1185,6 @@ export function createPublicOrderingUi(deps) {
 
     const orderContext = getCustomerOrderContext("website");
     const orderableProducts = getOrderableProductsForContext(orderContext).slice(0, 4);
-    const activeReservations = state.reservations
-      .filter((reservation) => ["Pending", "Confirmed", "Arrived"].includes(reservation.status))
-      .sort((first, second) => `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`));
-    const nextReservation = activeReservations[0];
 
     screen.innerHTML = `
       <header class="customer-topbar">
@@ -1013,7 +1227,8 @@ export function createPublicOrderingUi(deps) {
             <span class="pill ok">Delivery</span>
             <span class="pill info">Table booking</span>
           </div>
-          <p>${nextReservation ? `Next table: ${escapeHtml(getReservationDateLabel(nextReservation.date))} ${escapeHtml(nextReservation.time)}` : "Tables are open for website booking."}</p>
+          <p>Table availability depends on the date, time, and party size.</p>
+          <a class="ghost-btn" href="${escapeHtml(getWebsiteReservationUrl())}">Check table availability</a>
         </aside>
       </main>
     `;
@@ -1024,21 +1239,31 @@ export function createPublicOrderingUi(deps) {
     const session = getWebsiteReservationSession();
     if (!screen || !session) return;
 
-    const reservationDate = toDateInputString();
-    const reservationTime = getDefaultReservationTime();
-    const reservationGuests = 2;
-    const suggestedTable = getAvailableReservationTable({
+    const existingForm: any = document.querySelector("#customerReservationForm");
+    const currentLastReservationId = String(state.websiteLastReservationId || "");
+    const formSnapshot = existingForm?.dataset.lastReservationId === currentLastReservationId
+      ? snapshotCustomerFormValues(existingForm, { includeHidden: true })
+      : null;
+    const dateBounds = getWebsiteReservationDateBounds();
+    const defaultGuests = Math.min(2, Math.max(1, Math.floor(Number(state.restaurantSettings.reservationMaxGuests) || 12)));
+    const defaultSlot = formSnapshot ? null : getDefaultReservationSlot();
+    const reservationDate = formSnapshot ? String(formSnapshot.values.date ?? "") : defaultSlot.date;
+    const reservationTime = formSnapshot ? String(formSnapshot.values.time ?? "") : defaultSlot.time;
+    const reservationGuests = formSnapshot ? String(formSnapshot.values.guests ?? "") : String(defaultGuests);
+    const availabilityModel = getWebsiteReservationAvailability({
       date: reservationDate,
       guests: reservationGuests,
       time: reservationTime
-    }) || state.tables[0];
+    }, formSnapshot ? String(formSnapshot.values.tableId || "") : "");
+    if (formSnapshot) formSnapshot.values.tableId = availabilityModel.selectedTableId;
     const lastReservation = state.reservations.find((reservation) => reservation.id === state.websiteLastReservationId);
     const confirmation = lastReservation ? `
       <section class="customer-confirmation">
         <div>
-          <p class="eyebrow">Reservation received</p>
+          <p class="eyebrow">Request received</p>
           <h2>${escapeHtml(getReservationDateLabel(lastReservation.date))} at ${escapeHtml(lastReservation.time)}</h2>
-          <p>${escapeHtml(lastReservation.name)} · ${lastReservation.guests} guests · ${escapeHtml(lastReservation.status)}</p>
+          <p>${escapeHtml(lastReservation.name)} · ${lastReservation.guests} guests</p>
+          <p>This is not yet confirmed. The restaurant will review your request and contact you.</p>
         </div>
       </section>
     ` : "";
@@ -1058,24 +1283,24 @@ export function createPublicOrderingUi(deps) {
         <section class="customer-menu-panel website-reservation-panel">
           <div class="panel-header compact">
             <div>
-              <p class="eyebrow">Reserve</p>
-              <h1>Book a table</h1>
+              <p class="eyebrow">Table request</p>
+              <h1>Request a reservation</h1>
             </div>
           </div>
-          <form id="customerReservationForm" class="stacked-form">
-            <input name="tableId" id="customerReservationTable" type="hidden" value="${escapeHtml(suggestedTable?.id || "")}">
+          <form id="customerReservationForm" class="stacked-form" data-last-reservation-id="${escapeHtml(currentLastReservationId)}">
+            <input name="tableId" id="customerReservationTable" type="hidden" value="${escapeHtml(availabilityModel.selectedTableId)}">
             <div class="customer-checkout-grid">
               <label>
                 Date
-                <input name="date" type="date" min="${escapeHtml(reservationDate)}" value="${escapeHtml(reservationDate)}" required>
+                <input name="date" type="date" min="${escapeHtml(dateBounds.min)}" max="${escapeHtml(dateBounds.max)}" value="${escapeHtml(reservationDate)}" required>
               </label>
               <label>
                 Time
-                <input name="time" type="time" value="${escapeHtml(reservationTime)}" required>
+                <input name="time" type="time" step="900" value="${escapeHtml(reservationTime)}" required>
               </label>
               <label>
                 Guests
-                <input name="guests" type="number" min="1" max="30" value="2" required>
+                <input name="guests" type="number" min="1" max="${escapeHtml(state.restaurantSettings.reservationMaxGuests)}" step="1" value="${escapeHtml(reservationGuests)}" required>
               </label>
               <label>
                 Name
@@ -1090,41 +1315,37 @@ export function createPublicOrderingUi(deps) {
                 <input name="email" type="email" autocomplete="email">
               </label>
             </div>
-            ${reservationTableMapHtml({
-              tables: state.tables,
-              selectedTableId: suggestedTable?.id || "",
-              title: "Pick your table",
-              getTableValidation: (table) => getReservationValidation({
-                date: reservationDate,
-                guests: reservationGuests,
-                time: reservationTime,
-                tableId: table.id,
-                status: "Pending"
-              })
-            })}
+            <p class="customer-cart-note">If you provide an email, we use it for updates about this reservation request.</p>
+            <label class="check-row customer-marketing-consent">
+              <input name="marketingConsent" type="checkbox" value="true">
+              <span>Email me occasional news and offers. This is optional and separate from reservation messages.</span>
+            </label>
+            ${websiteReservationAvailabilityHtml(availabilityModel)}
             <label>
               Notes
               <textarea name="notes" rows="4" placeholder="Occasion, high chair, accessibility, allergies"></textarea>
             </label>
-            <button class="primary-btn" type="submit">Confirm Reservation</button>
+            <button class="primary-btn" type="submit" data-customer-reservation-submit ${availabilityModel.selectedTableId ? "" : "disabled"}>Request a reservation</button>
           </form>
         </section>
         <aside class="customer-cart-panel reservation-info-panel">
           <div class="panel-header compact">
             <div>
-              <p class="eyebrow">Channels</p>
-              <h2>Website booking</h2>
+              <p class="eyebrow">How it works</p>
+              <h2>Request, then confirmation</h2>
             </div>
           </div>
           <div class="reservation-channel-list">
-            <span class="pill ok">Website</span>
-            <span class="pill warning">Google later</span>
-            <span class="pill warning">Facebook/Instagram later</span>
-            <span class="pill info">Manual staff entry</span>
+            <span class="pill ok">Choose a time</span>
+            <span class="pill info">Restaurant review</span>
+            <span class="pill info">Confirmation by email or phone</span>
           </div>
+          <p>Your table is reserved only after the restaurant confirms the request.</p>
         </aside>
       </main>
     `;
+    const nextForm = document.querySelector("#customerReservationForm");
+    if (formSnapshot && nextForm) restoreCustomerFormValues(nextForm, formSnapshot, { includeHidden: true });
   }
   
   return {
@@ -1132,6 +1353,7 @@ export function createPublicOrderingUi(deps) {
     renderCustomerOrderingSurfaces,
     renderPublicHomeScreen,
     renderWebsiteOrderScreen,
-    renderWebsiteReservationScreen
+    renderWebsiteReservationScreen,
+    refreshWebsiteReservationAvailability
   };
 }

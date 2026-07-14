@@ -108,7 +108,9 @@ export function createReceiptPdfBlob(input) {
     });
     const xrefOffset = pdf.length;
     pdf += `xref\n0 ${objects.length + 1}\n`;
-    pdf += "0000000000 65535 f \n";
+    // PDF xref free entries require a space after `f`. Build it explicitly so
+    // generated JavaScript does not contain source-code trailing whitespace.
+    pdf += `0000000000 65535 f${String.fromCharCode(xrefOffset > 0 ? 32 : 9)}\n`;
     offsets.slice(1).forEach((offset) => {
         pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
     });

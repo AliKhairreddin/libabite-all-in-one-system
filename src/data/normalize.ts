@@ -57,6 +57,8 @@ import {
   normalizeExternalPlatformStatus
 } from "../domain/external-delivery.js";
 import {
+  calculateOrderTotal,
+  getValidOrderLineSnapshot,
   normalizeFulfillmentStatus,
   normalizeOrderFulfillment,
   normalizeOrderOperationalStatus,
@@ -792,6 +794,13 @@ export function normalizeRestaurantSettings(settings) {
 
   if (!supportedLanguages.includes(defaultLanguage)) supportedLanguages.unshift(defaultLanguage);
 
+  let timeZone = String(source.timeZone || DEFAULT_RESTAURANT_SETTINGS.timeZone).trim();
+  try {
+    new Intl.DateTimeFormat("en", { timeZone }).format(new Date());
+  } catch {
+    timeZone = DEFAULT_RESTAURANT_SETTINGS.timeZone;
+  }
+
   return {
     restaurantName: source.restaurantName || DEFAULT_RESTAURANT_SETTINGS.restaurantName,
     location: source.location || DEFAULT_RESTAURANT_SETTINGS.location,
@@ -799,6 +808,11 @@ export function normalizeRestaurantSettings(settings) {
     currencyLabel: DEFAULT_RESTAURANT_SETTINGS.currencyLabel,
     opensAt: isReservationTime(source.opensAt) ? source.opensAt : DEFAULT_RESTAURANT_SETTINGS.opensAt,
     closesAt: isReservationTime(source.closesAt) ? source.closesAt : DEFAULT_RESTAURANT_SETTINGS.closesAt,
+    timeZone,
+    reservationsEnabled: source.reservationsEnabled !== false,
+    reservationLeadMinutes: Math.max(0, Math.min(7 * 24 * 60, Math.floor(Number.isFinite(Number(source.reservationLeadMinutes)) ? Number(source.reservationLeadMinutes) : DEFAULT_RESTAURANT_SETTINGS.reservationLeadMinutes))),
+    reservationHorizonDays: Math.max(1, Math.min(365, Math.floor(Number.isFinite(Number(source.reservationHorizonDays)) ? Number(source.reservationHorizonDays) : DEFAULT_RESTAURANT_SETTINGS.reservationHorizonDays))),
+    reservationMaxGuests: Math.max(1, Math.min(100, Math.floor(Number.isFinite(Number(source.reservationMaxGuests)) ? Number(source.reservationMaxGuests) : DEFAULT_RESTAURANT_SETTINGS.reservationMaxGuests))),
     defaultLanguage,
     supportedLanguages: supportedLanguages.length ? supportedLanguages : [...DEFAULT_RESTAURANT_SETTINGS.supportedLanguages]
   };
@@ -1206,15 +1220,22 @@ export function normalizeLineModifiers(modifiers) {
   return [...new Set(source.map((modifier) => String(modifier || "").trim()).filter(Boolean))];
 }
 
-export function normalizeOrderLineItem(item, productIds) {
-  const productId = item.productId;
+export function normalizeOrderLineItem(item, productIds, options: any = {}) {
+  const productId = String(item.productId || "").trim();
   const quantity = Math.floor(Number(item.quantity) || 0);
-  if (!productIds.has(productId) || quantity < 1) return null;
+  const snapshot = getValidOrderLineSnapshot({ ...item, quantity });
+  const preserveDeletedProductSnapshot = options.preserveDeletedProductSnapshot === true;
+  if (
+    !productId
+    || quantity < 1
+    || (!productIds.has(productId) && !(preserveDeletedProductSnapshot && snapshot))
+  ) return null;
   return {
     productId,
     quantity,
     note: String(item.note || item.notes || "").trim(),
-    modifiers: normalizeLineModifiers(item.modifiers)
+    modifiers: normalizeLineModifiers(item.modifiers),
+    ...(snapshot || {})
   };
 }
 
@@ -1233,6 +1254,17 @@ export function normalizeAddressHistory(addresses) {
       .split("\n")
       .map((address) => address.trim());
   return [...new Set(source.map((address) => String(address || "").replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 8);
+}
+
+function normalizeMarketingConsentFields(record) {
+  const email = String(record?.email || record?.customerEmail || "").trim();
+  const explicitConsent = Boolean(email) && record?.marketingConsent === true;
+  return {
+    marketingConsent: explicitConsent,
+    marketingConsentAtMs: explicitConsent ? normalizeOptionalTimestamp(record?.marketingConsentAtMs) : "",
+    marketingConsentPolicyVersion: explicitConsent ? String(record?.marketingConsentPolicyVersion || "").replace(/\s+/g, " ").trim() : "",
+    marketingConsentSource: explicitConsent ? String(record?.marketingConsentSource || "").replace(/\s+/g, " ").trim() : ""
+  };
 }
 
 export function normalizeCustomerRecord(customer, index, seenIds = new Set()) {
@@ -1255,7 +1287,8 @@ export function normalizeCustomerRecord(customer, index, seenIds = new Set()) {
     addresses: normalizeAddressHistory(customer.addresses || customer.addressHistory || customer.deliveryAddress || customer.address),
     notes: String(customer.notes || customer.customerNotes || "").trim(),
     createdAt: customer.createdAt || timeNow(),
-    updatedAt: customer.updatedAt || customer.createdAt || timeNow()
+    updatedAt: customer.updatedAt || customer.createdAt || timeNow(),
+    ...normalizeMarketingConsentFields(customer)
   };
 }
 
@@ -1268,17 +1301,27 @@ export function normalizeCustomers(customers) {
 
   normalized.forEach((customer) => {
     const phoneKey = customerPhoneKey(customer.phone);
-    if (!phoneKey || !byPhone.has(phoneKey)) {
-      if (phoneKey) byPhone.set(phoneKey, customer);
+    const candidates = phoneKey ? byPhone.get(phoneKey) || [] : [];
+    const customerEmailKey = String(customer.email || "").trim().toLowerCase();
+    const existing = candidates.find((candidate) => {
+      const candidateEmailKey = String(candidate.email || "").trim().toLowerCase();
+      return !candidateEmailKey || !customerEmailKey || candidateEmailKey === customerEmailKey;
+    });
+    if (!phoneKey || !existing) {
+      if (phoneKey) byPhone.set(phoneKey, [...candidates, customer]);
       return;
     }
 
-    const existing = byPhone.get(phoneKey);
     existing.name = existing.name || customer.name;
     existing.email = existing.email || customer.email;
     existing.addresses = normalizeAddressHistory([...existing.addresses, ...customer.addresses]);
     existing.notes = existing.notes || customer.notes;
     existing.updatedAt = customer.updatedAt || existing.updatedAt;
+    const mergedEmailKey = String(existing.email || "").trim().toLowerCase();
+    const consentMatchesMergedEmail = Boolean(customerEmailKey && customerEmailKey === mergedEmailKey);
+    if (consentMatchesMergedEmail && customer.marketingConsent && (!existing.marketingConsent || customer.marketingConsentAtMs >= existing.marketingConsentAtMs)) {
+      Object.assign(existing, normalizeMarketingConsentFields(customer));
+    }
     (customer as AnyRecord).mergedInto = existing.id;
   });
 
@@ -1417,10 +1460,7 @@ function orderPaymentLedgerInput(order, productById) {
     || order.stripePaymentIntentId;
   if (!hasPaymentEvidence) return null;
 
-  const amount = (Array.isArray(order.items) ? order.items : []).reduce((sum, item) => {
-    const product = productById.get(item.productId);
-    return sum + ((Number(product?.price) || 0) * (Number(item.quantity) || 0));
-  }, 0);
+  const amount = calculateOrderTotal(order, (productId) => productById.get(productId));
 
   return {
     id: `PAY-order-${order.id}`,
@@ -1664,7 +1704,8 @@ export function normalizeState(candidate) {
       paymentProcessor: String(reservation.paymentProcessor || "").trim(),
       depositAmount: Math.max(0, Number(reservation.depositAmount) || 0),
       paidAt: paymentStatus === "Paid" ? reservation.paidAt || reservation.createdAt || timeNow() : String(reservation.paidAt || "").trim(),
-      paidAtMs: paymentStatus === "Paid" ? normalizeOptionalTimestamp(reservation.paidAtMs) || normalizeTimestamp(reservation.createdAtMs, reservation.paidAt || reservation.createdAt || timeNow()) : normalizeOptionalTimestamp(reservation.paidAtMs)
+      paidAtMs: paymentStatus === "Paid" ? normalizeOptionalTimestamp(reservation.paidAtMs) || normalizeTimestamp(reservation.createdAtMs, reservation.paidAt || reservation.createdAt || timeNow()) : normalizeOptionalTimestamp(reservation.paidAtMs),
+      ...normalizeMarketingConsentFields(reservation)
     });
   });
   next.reservations = normalizedReservations;
@@ -1683,7 +1724,9 @@ export function normalizeState(candidate) {
       const paymentStatus = getPaymentStatusForMethod(paymentMethod, rawPaymentStatus);
       const createdAt = order.createdAt || timeNow();
       const items = Array.isArray(order.items)
-        ? order.items.map((item) => normalizeOrderLineItem(item, productIds)).filter(Boolean)
+        ? order.items
+          .map((item) => normalizeOrderLineItem(item, productIds, { preserveDeletedProductSnapshot: true }))
+          .filter(Boolean)
         : [];
       const requestedTableId = String(order.tableId || "").trim();
       const tableId = tableIds.has(requestedTableId) ? requestedTableId : "";
@@ -1760,6 +1803,7 @@ export function normalizeState(candidate) {
         customerName: String(order.customerName || "").trim(),
         customerPhone: String(order.customerPhone || "").trim(),
         customerEmail: String(order.customerEmail || "").trim(),
+        ...normalizeMarketingConsentFields(order),
         deliveryAddress: String(order.deliveryAddress || order.address || "").trim(),
         deliveryAddressLabel: String(order.deliveryAddressLabel || "").replace(/\s+/g, " ").trim(),
         deliveryAddressLocation: normalizeDeliveryCoordinates(order.deliveryAddressLocation),
@@ -1839,6 +1883,8 @@ export function normalizeState(candidate) {
     .map((ticket, index) => {
       const product = next.products.find((item) => item.id === ticket.productId);
       const order = next.orders.find((item) => item.id === ticket.orderId);
+      const orderLine = order?.items?.find((item) => item.productId === ticket.productId);
+      const orderLineSnapshot = getValidOrderLineSnapshot(orderLine);
       const status = TICKET_STATUSES.includes(ticket.status) ? ticket.status : "Queued";
       const createdAt = ticket.createdAt || order?.createdAt || timeNow();
       const createdAtMs = normalizeTimestamp(ticket.createdAtMs, createdAt);
@@ -1857,8 +1903,9 @@ export function normalizeState(candidate) {
         id: ticket.id || `TCK-${order?.number || Date.now()}-${index + 1}`,
         orderId: ticket.orderId,
         productId: ticket.productId,
+        productName: String(ticket.productName || orderLineSnapshot?.productName || product?.name || ticket.productId || "Unknown item").trim(),
         quantity: Math.max(1, Math.floor(Number(ticket.quantity) || 1)),
-        station: normalizeKitchenStation(ticket.station || product?.station || "Main kitchen"),
+        station: normalizeKitchenStation(ticket.station || orderLineSnapshot?.kitchenStation || product?.station || "Main kitchen"),
         status,
         createdAt,
         createdAtMs,
@@ -1871,7 +1918,13 @@ export function normalizeState(candidate) {
         issueNote: String(ticket.issueNote || ticket.delayReason || "").trim()
       };
     })
-    .filter((ticket) => orderIds.has(ticket.orderId) && productIds.has(ticket.productId));
+    .filter((ticket) => {
+      if (!orderIds.has(ticket.orderId) || !ticket.productId || !ticket.productName) return false;
+      if (productIds.has(ticket.productId)) return true;
+      const order = next.orders.find((item) => item.id === ticket.orderId);
+      const orderLine = order?.items?.find((item) => item.productId === ticket.productId);
+      return Boolean(getValidOrderLineSnapshot(orderLine));
+    });
 
   const highestOrderNumber = next.orders.reduce((highest, order) => Math.max(highest, Number(order.number) || 0), 0);
   if (!Number.isFinite(next.nextOrderNumber) || next.nextOrderNumber <= highestOrderNumber) {

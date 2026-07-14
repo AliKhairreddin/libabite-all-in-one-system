@@ -15,6 +15,7 @@ import {
   normalizeExternalPlatformStatus,
   parseExternalOrderLines
 } from "../domain/external-delivery.js";
+import { snapshotOrderItems } from "../domain/orders.js";
 import { timeNow } from "../shared/dates.js";
 import { slugify, uniqueRecordId } from "../shared/ids.js";
 import { saveState, state } from "./state.js";
@@ -213,6 +214,7 @@ export function createExternalDeliveryRuntime(deps) {
       showToast("No mapped products could be imported.");
       return;
     }
+    const acceptedItems = snapshotOrderItems(items, productById);
 
     const number = state.nextOrderNumber;
     const createdAt = timeNow();
@@ -288,7 +290,7 @@ export function createExternalDeliveryRuntime(deps) {
       externalStatus: "accepted",
       externalStatusPushedAt: "",
       externalStatusPushedAtMs: "",
-      items
+      items: acceptedItems
     };
     order.externalCommissionAmount = calculateExternalCommission(getOrderTotal(order), commissionRate);
 

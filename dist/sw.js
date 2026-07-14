@@ -1,4 +1,4 @@
-const CACHE_NAME = "libabite-driver-v1";
+const CACHE_NAME = "libabite-app-v2";
 const APP_SHELL = [
   "/",
   "/index.html",

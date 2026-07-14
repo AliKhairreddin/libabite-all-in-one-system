@@ -95,6 +95,11 @@ export function createAdminActionsRuntime(deps) {
       currency: "EUR",
       opensAt: String(formData.get("opensAt") || ""),
       closesAt: String(formData.get("closesAt") || ""),
+      timeZone: String(formData.get("timeZone") || DEFAULT_RESTAURANT_SETTINGS.timeZone),
+      reservationsEnabled: formData.get("reservationsEnabled") === "on",
+      reservationLeadMinutes: Number(formData.get("reservationLeadMinutes")),
+      reservationHorizonDays: Number(formData.get("reservationHorizonDays")),
+      reservationMaxGuests: Number(formData.get("reservationMaxGuests")),
       defaultLanguage,
       supportedLanguages
     });
